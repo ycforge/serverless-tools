@@ -1,0 +1,135 @@
+{
+  "timestamp": "2026-08-21T21:44:36.410Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "DATA-ANALYSE.md"
+  },
+  "event": {
+    "version": "2.0",
+    "rawPath": "/probe/users/user-42",
+    "rawQueryString": "",
+    "headers": {
+      "Accept": "*/*",
+      "Host": "conformance.gateway.apigw.yandexcloud.net",
+      "Traceparent": "00-00000000000000003dd1b01f37944f15-08fa206c0c109a66-01",
+      "Tracestate": "",
+      "Uber-Trace-Id": "3dd1b01f37944f15:08fa206c0c109a66:b9406e1c1db18eea:1",
+      "User-Agent": "conformance-fixture/1.0",
+      "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+      "X-Envoy-External-Address": "203.0.113.10",
+      "X-Envoy-Original-Path": "/probe/users/user-42",
+      "X-Forwarded-For": "203.0.113.10",
+      "X-Forwarded-Proto": "https",
+      "X-Real-Remote-Address": "203.0.113.10:50002",
+      "X-Request-Id": "3981fbf0-fa83-4b7d-aed7-07e812f38bfc",
+      "X-Serverless-Certificate-Ids": "{}",
+      "X-Serverless-Gateway-Id": "gwconf00000000000001",
+      "X-Trace-Id": "614fde5c-affd-4449-a332-3acfbdd97de8"
+    },
+    "queryStringParameters": {},
+    "requestContext": {
+      "authorizer": {},
+      "http": {
+        "method": "GET",
+        "path": "/probe/users/user-42?",
+        "sourceIp": "203.0.113.10",
+        "userAgent": "conformance-fixture/1.0"
+      },
+      "requestId": "3981fbf0-fa83-4b7d-aed7-07e812f38bfc",
+      "time": "21/Aug/2026:21:44:36 +0000",
+      "timeEpoch": 1787348676,
+      "apiGateway": {
+        "operationContext": {
+          "probe": {
+            "source": "curl",
+            "test": true,
+            "version": "1.0"
+          }
+        }
+      }
+    },
+    "body": "",
+    "isBase64Encoded": true,
+    "pathParameters": {
+      "ID": "probe/users/user-42"
+    },
+    "parameters": {
+      "ID": "probe/users/user-42"
+    },
+    "multiValueParameters": {
+      "ID": ["probe/users/user-42"]
+    },
+    "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+  },
+  "context": {
+    "awsRequestId": "3981fbf0-fa83-4b7d-aed7-07e812f38bfc",
+    "requestId": "3981fbf0-fa83-4b7d-aed7-07e812f38bfc",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verhttp000000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1787348681310,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "3dd1b01f37944f15:66a901c0c602af80:aee81bd1c1e6049b:1",
+    "_data": {
+      "version": "2.0",
+      "rawPath": "/probe/users/user-42",
+      "rawQueryString": "",
+      "headers": {
+        "Accept": "*/*",
+        "Host": "conformance.gateway.apigw.yandexcloud.net",
+        "Traceparent": "00-00000000000000003dd1b01f37944f15-08fa206c0c109a66-01",
+        "Tracestate": "",
+        "Uber-Trace-Id": "3dd1b01f37944f15:08fa206c0c109a66:b9406e1c1db18eea:1",
+        "User-Agent": "conformance-fixture/1.0",
+        "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+        "X-Envoy-External-Address": "203.0.113.10",
+        "X-Envoy-Original-Path": "/probe/users/user-42",
+        "X-Forwarded-For": "203.0.113.10",
+        "X-Forwarded-Proto": "https",
+        "X-Real-Remote-Address": "203.0.113.10:50002",
+        "X-Request-Id": "3981fbf0-fa83-4b7d-aed7-07e812f38bfc",
+        "X-Serverless-Certificate-Ids": "{}",
+        "X-Serverless-Gateway-Id": "gwconf00000000000001",
+        "X-Trace-Id": "614fde5c-affd-4449-a332-3acfbdd97de8"
+      },
+      "queryStringParameters": {},
+      "requestContext": {
+        "authorizer": {},
+        "http": {
+          "method": "GET",
+          "path": "/probe/users/user-42?",
+          "sourceIp": "203.0.113.10",
+          "userAgent": "conformance-fixture/1.0"
+        },
+        "requestId": "3981fbf0-fa83-4b7d-aed7-07e812f38bfc",
+        "time": "21/Aug/2026:21:44:36 +0000",
+        "timeEpoch": 1787348676,
+        "apiGateway": {
+          "operationContext": {
+            "probe": {
+              "source": "curl",
+              "test": true,
+              "version": "1.0"
+            }
+          }
+        }
+      },
+      "body": "",
+      "isBase64Encoded": true,
+      "pathParameters": {
+        "ID": "probe/users/user-42"
+      },
+      "parameters": {
+        "ID": "probe/users/user-42"
+      },
+      "multiValueParameters": {
+        "ID": ["probe/users/user-42"]
+      },
+      "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+    }
+  }
+}

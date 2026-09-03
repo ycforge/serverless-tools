@@ -6,7 +6,7 @@ Guidance for AI coding agents working in this repository.
 
 This monorepo contains the **source code of the serverless-tools toolchain**, not a deployable application:
 
-- `packages/nest-bridge` — Project A, runtime/transport adapter between Yandex Cloud Functions and plain NestJS apps (`@ycforge/nestjs-connector`; историческое имя `@ycforge/ycsf-nestjs-connector`, мигрирует из github.com/ycforge/ycsf-nestjs-connector);
+- `packages/nest-bridge` — Project A, runtime/transport adapter between Yandex Cloud Functions and plain NestJS apps (`@ycforge/nestjs-connector`; мигрирован из github.com/ycforge/ycsf-nestjs-connector v0.0.3);
 - `packages/composer` — Project B, API Gateway / OpenAPI Composition Builder (`@ycforge/composer`);
 - `packages/pilot` — Project C, Build/Deployment Orchestrator (`@ycforge/pilot`; Terraform is the only deployment engine).
 
@@ -53,3 +53,5 @@ A new session always starts the same way: read constitution → read `specs/READ
 
 - `specs/` and `.specify/` are committed (specs are primary artifacts here).
 - Do not commit `.ycsf/artifacts/`, `.env*`, Terraform state; commit `.terraform.lock.hcl`.
+- **Branching**: any new work (feature/spec implementation) starts with a dedicated branch created **from `dev`**. On completion: commit to that branch, push it, and open a **PR into `dev`** — no direct pushes to `dev`/`main`.
+- Branch naming: `NNN-short-slug` matching the spec directory (e.g. `003-connector-require-auth`).
