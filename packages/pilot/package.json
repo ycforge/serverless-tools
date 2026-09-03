@@ -1,0 +1,33 @@
+{
+  "name": "@ycforge/pilot",
+  "version": "1.0.0",
+  "description": "Build/Deployment Orchestrator (Project C) for the serverless-tools ecosystem. Plugin contracts are exposed via the @ycforge/pilot/contracts subpath export.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "import": "./dist/contracts/index.js",
+      "require": "./dist/contracts/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

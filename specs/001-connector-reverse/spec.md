@@ -1,4 +1,4 @@
-# Feature Specification: YCSF Connector — reverse specification существующей реализации
+# Feature Specification: nest-bridge (Project A) — reverse specification существующей реализации
 
 **Feature Branch**: `001-connector-reverse`
 
@@ -6,7 +6,7 @@
 
 **Status**: Brownfield — документ описывает ФАКТИЧЕСКОЕ поведение существующего кода, а не желаемое
 
-**Input**: Reverse-specification для Project A (`@ycforge/ycsf-nestjs-connector`), исходный код: https://github.com/ycforge/ycsf-nestjs-connector (версия 0.0.3, снятие состояния 2026-09-03). Все ссылки вида `path:line` указывают на файлы этого репозитория. Код будет мигрирован в данную монорепу в `packages/nest-bridge`; эта монорепа — исходный код инструментов YCSF (nest-bridge, composer, pilot), а не деплоимое приложение.
+**Input**: Reverse-specification для Project A (`@ycforge/ycsf-nestjs-connector`), исходный код: https://github.com/ycforge/ycsf-nestjs-connector (версия 0.0.3, снятие состояния 2026-09-03). Все ссылки вида `path:line` указывают на файлы этого репозитория. Код будет мигрирован в данную монорепу в `packages/nest-bridge`; эта монорепа — исходный код инструментов serverless-tools (nest-bridge, composer, pilot), а не деплоимое приложение.
 
 > Это REVERSE spec: требования (EARS) сформулированы по наблюдаемому поведению кода и подтверждены его тестами/фикстурами. Раздел «Расхождения с IDEA.md» в конце фиксирует, где код расходится с архитектурным замыслом.
 

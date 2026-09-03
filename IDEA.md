@@ -1,12 +1,12 @@
- # YCSF — архитектура экосистемы для production NestJS / Serverless в Yandex Cloud
+# @ycforge/serverless-tools — архитектура экосистемы для production NestJS / Serverless в Yandex Cloud
 
 ## 1. Цель проекта
 
-YCSF — экосистема инструментов для запуска обычных приложений, прежде всего NestJS, в Yandex Cloud Serverless-инфраструктуре без превращения NestJS в отдельный framework.
+serverless-tools — экосистема инструментов для запуска обычных приложений, прежде всего NestJS, в Yandex Cloud Serverless-инфраструктуре без превращения NestJS в отдельный framework.
 
 Основная идея — разделить ответственность между тремя проектами:
 
-* **Project A — `@ycforge/ycsf-nestjs-connector`**: runtime/transport adapter между Yandex Cloud Function и обычным NestJS-приложением.
+* **Project A — `@ycforge/nestjs-connector`**: runtime/transport adapter между Yandex Cloud Function и обычным NestJS-приложением.
 * **Project B — API Gateway / OpenAPI Composition Builder**: собирает API Gateway specification из нескольких приложений, их OpenAPI metadata, auth-конфигурации, overrides и integration/resource references.
 * **Project C — Build/Deployment Orchestrator**: управляет сборкой проекта, вызывает builders, собирает artifacts, вызывает materializers и генерирует Terraform-конфигурацию; deployment engine — только Terraform.
 
@@ -18,7 +18,7 @@ YCSF — экосистема инструментов для запуска о�
 
 ---
 
-# 2. Project A — `@ycforge/ycsf-nestjs-connector`
+# 2. Project A — `@ycforge/nestjs-connector`
 
 ## Назначение
 
@@ -33,7 +33,7 @@ Yandex API Gateway
   ↓
 Yandex Cloud Function
   ↓
-YCSF Connector (A)
+nest-bridge (A)
   ↓
 NestJS application
 ```
@@ -45,7 +45,7 @@ Yandex Message Queue
   ↓
 Cloud Function trigger
   ↓
-YCSF Connector
+nest-bridge
   ↓
 NestJS queue handler
 ```
@@ -141,7 +141,7 @@ B не знает Terraform и не знает внутреннюю архите
 
 Главная задача B:
 
-> построить единую Yandex API Gateway OpenAPI specification из нескольких NestJS applications и YCSF configuration.
+> построить единую Yandex API Gateway OpenAPI specification из нескольких NestJS applications и serverless-tools configuration.
 
 ---
 
@@ -508,7 +508,7 @@ B вызывает эту функцию, получает готовый `OpenA
 
 ### Safe mode env
 
-B **всегда** устанавливает `YCSF_OPENAPI_BUILD=1` перед вызовом entry point. Приложение может использовать это для условного отключения side effects, но primary защита — отдельный entry point, где разработчик явно контролирует импортируемые модули.
+B **всегда** устанавливает `SERVERLESS_TOOLS_OPENAPI_BUILD=1` перед вызовом entry point. Приложение может использовать это для условного отключения side effects, но primary защита — отдельный entry point, где разработчик явно контролирует импортируемые модули.
 
 ---
 
@@ -603,9 +603,9 @@ export const Public = () =>
   RequireAuth('public', null);
 ```
 
-Это позволяет приложениям не зависеть напрямую от YCSF-specific terminology.
+Это позволяет приложениям не зависеть напрямую от serverless-tools-specific terminology.
 
-Декоратор живёт в Project A как отдельный подпакет: `@ycforge/ycsf-nestjs-connector/auth` (subpath export). Приложение импортирует auth-контракты точечно (`import { RequireAuth } from '@ycforge/ycsf-nestjs-connector/auth'`), не поднимая весь connector. Аналогично оформляются и остальные декораторы A — `@QueueHandler`/`@QueueMessage` (подпакет `.../queue`), `@YandexContext` (подпакет `.../context`). B читает только OpenAPI metadata (`ApiSecurity`) из сгенерированного spec и не импортирует ни user-код, ни подпакеты A.
+Декоратор живёт в Project A как отдельный подпакет: `@ycforge/nestjs-connector/auth` (subpath export). Приложение импортирует auth-контракты точечно (`import { RequireAuth } from '@ycforge/nestjs-connector/auth'`), не поднимая весь connector. Аналогично оформляются и остальные декораторы A — `@QueueHandler`/`@QueueMessage` (подпакет `.../queue`), `@YandexContext` (подпакет `.../context`). B читает только OpenAPI metadata (`ApiSecurity`) из сгенерированного spec и не импортирует ни user-код, ни подпакеты A.
 
 Runtime-применение guard: metadata `ycsf:auth:guard` сама по себе guard не активирует — A регистрирует глобальный guard, который читает metadata (method > controller) и делегирует указанному guard через DI; если guard равен `null`, проверка пропускается.
 
@@ -957,7 +957,7 @@ ENV[LEGACY_AUTHORIZER_ID]
 
 ### Множественные окружения
 
-YCSF не имеет env-профилей. Различия staging/prod выражаются через Terraform (workspaces, `*.tfvars`, variables) и build-time `{{$ENV}}`; `.ycsf/*.yaml` едины для всех окружений.
+serverless-tools не имеет env-профилей. Различия staging/prod выражаются через Terraform (workspaces, `*.tfvars`, variables) и build-time `{{$ENV}}`; `.ycsf/*.yaml` едины для всех окружений.
 
 ---
 
@@ -965,7 +965,7 @@ YCSF не имеет env-профилей. Различия staging/prod выр�
 
 В системе существуют три разных interpolation mechanisms.
 
-## YCSF build ENV
+## serverless-tools build ENV
 
 ```text
 {{$ENV_NAME}}
@@ -1273,7 +1273,7 @@ extensions:
 
 ### Почему не Terraform override
 
-| Terraform `*_override.tf` | YCSF extension |
+| Terraform `*_override.tf` | serverless-tools extension |
 |---------------------------|----------------|
 | Заменяет **весь** nested block одного типа | Мержит поля на любом уровне вложенности |
 | Адресация по Terraform IDT | Адресация по стабильному IDL |
@@ -1331,7 +1331,7 @@ Materializer может декларировать outputs через `OutputBui
 ```ts
 context.output.declare('ycsf_function_user_service_id', {
   value: 'yandex_function.user_service.id',
-  description: 'YCSF generated: functions.user_service.id',
+  description: 'serverless-tools generated: functions.user_service.id',
 });
 ```
 
@@ -1379,7 +1379,7 @@ C не должен создавать вторую абстракцию над 
 
 Ключевой принцип:
 
-> Terraform остаётся настоящей Terraform configuration, а не "Terraform-like schema" YCSF.
+> Terraform остаётся настоящей Terraform configuration, а не "Terraform-like schema" serverless-tools.
 
 Если Yandex добавляет новый provider field, пользователь может использовать его сразу, не дожидаясь изменения C.
 
@@ -1595,7 +1595,7 @@ ${resources.functions.user_service.id}
 и не содержит Terraform-specific variables вроде:
 
 ```text
-YCSF__FUNCTIONS__USER_SERVICE__ID
+SERVERLESS_TOOLS__FUNCTIONS__USER_SERVICE__ID
 ```
 
 Такие Terraform variable names являются внутренним materialization detail C/materializer.
@@ -1998,14 +1998,14 @@ ordinary NestJS application
 
 ---
 
-# 42. Plugin SDK
+# 42. Plugin contracts
 
 Builders и materializers предполагаются внешними npm packages.
 
-Для external developers нужен небольшой public SDK, условно:
+Отдельного SDK-пакета не существует: контракты для external developers являются частью публичного API пакета pilot (Project C) и экспортируются через subpath export:
 
 ```text
-@ycforge/ycsf-sdk
+@ycforge/pilot/contracts
 ```
 
 Он экспортирует contracts вроде:
@@ -2034,7 +2034,7 @@ C реализует orchestration/runtime для этих contracts.
 ```text
 third-party npm package
         ↓
-implements Builder / Materializer
+implements Builder / Materializer (type-only import из @ycforge/pilot/contracts)
         ↓
 registered/loaded by C
 ```
@@ -2049,9 +2049,11 @@ Builder/Materializer API, форматы `.ycsf/*.yaml`, Artifact — контр
 
 Каждый `.ycsf/*.yaml` имеет обязательное поле `version: 1` на верхнем уровне; C отклоняет неизвестные версии с понятной ошибкой.
 
-`@ycforge/ycsf-sdk` версионируется semver. C объявляет поддерживаемый диапазон SDK major-версий и проверяет версию плагина при загрузке (peer-зависимость плагина на SDK); несовместимость = error до запуска builders.
+Контракты плагинов (`@ycforge/pilot/contracts`) версионируются semver вместе с пакетом pilot. C объявляет поддерживаемый диапазон major-версий contracts и проверяет версию плагина при загрузке (peer-зависимость плагина на `@ycforge/pilot`); несовместимость = error до запуска builders.
 
-Изменение контракта = новая major-версия SDK + migration guide.
+Версия форматов `.ycsf/*.yaml` — отдельная независимая линия версионирования: breaking change формата поднимает `version` поля файла, не затрагивая plugin API и semver пакета.
+
+Изменение plugin API (Builder/Materializer/Artifact) = новая major-версия contracts (pilot) + migration guide. Изменение формата `.ycsf/*.yaml` = новая `version` форматной линии + migration guide.
 
 ---
 
@@ -2096,7 +2098,7 @@ Terraform-specific knowledge должен находиться в materializer.
 
 ## Не создавать вторую Terraform-систему
 
-Нельзя проектировать собственный YCSF DSL, который пытается заменить:
+Нельзя проектировать собственный serverless-tools DSL, который пытается заменить:
 
 ```text
 Terraform provider schema
@@ -2150,7 +2152,7 @@ Terraform остаётся источником истины для infrastructu
 
 17. **App-specific configuration находится рядом с app в `build_config.yaml`.**
 
-18. **`{{$ENV}}` — единый YCSF build-time ENV interpolation syntax.**
+18. **`{{$ENV}}` — единый serverless-tools build-time ENV interpolation syntax.**
 
 19. **ENV values должны быть известны до invocation builder-а.**
 

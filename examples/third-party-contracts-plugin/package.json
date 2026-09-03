@@ -1,0 +1,18 @@
+{
+  "name": "@ycforge-example/contracts-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reference third-party plugin: proves that Builder/Materializer contracts are self-sufficient via the @ycforge/pilot/contracts subpath export (SC-003).",
+  "type": "module",
+  "scripts": {
+    "pretest": "pnpm --filter @ycforge/pilot build",
+    "test": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@ycforge/pilot": "1.x"
+  },
+  "devDependencies": {
+    "@ycforge/pilot": "workspace:*",
+    "typescript": "^5.9.0"
+  }
+}

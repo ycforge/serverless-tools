@@ -31,7 +31,7 @@ Thumbs.db
 .vscode/
 *.swp
 
-# YCSF build artifacts (локальные, регенерируются)
+# serverless-tools build artifacts (локальные, регенерируются)
 .ycsf/artifacts/
 
 # Terraform (user projects / e2e sandboxes)

@@ -1,13 +1,12 @@
-# YCSF Specs Roadmap
+# serverless-tools Specs Roadmap
 
 Разработка ведётся по SDD (spec-kit). Правила процесса — в `.specify/memory/constitution.md`. Архитектурный контекст — `IDEA.md` (читать точечно, по ссылкам на разделы).
 
-**Эта монорепа — исходный код инструментов YCSF, а не деплоимое приложение.** Пакеты:
+**Эта монорепа — исходный код инструментов serverless-tools, а не деплоимое приложение.** Пакеты:
 
-- `packages/nest-bridge` — Project A (`@ycforge/ycsf-nestjs-connector`); код мигрирует сюда из https://github.com/ycforge/ycsf-nestjs-connector;
-- `packages/composer` — Project B (API Gateway / OpenAPI Composition Builder);
-- `packages/pilot` — Project C (Build/Deployment Orchestrator);
-- `packages/sdk` — `@ycforge/ycsf-sdk` (контракты);
+- `packages/nest-bridge` — Project A (`@ycforge/nestjs-connector`; историческое имя `@ycforge/ycsf-nestjs-connector`, код мигрирует сюда из https://github.com/ycforge/ycsf-nestjs-connector);
+- `packages/composer` — Project B (`@ycforge/composer`, API Gateway / OpenAPI Composition Builder);
+- `packages/pilot` — Project C (`@ycforge/pilot`, Build/Deployment Orchestrator); plugin contracts экспортируются через `@ycforge/pilot/contracts`;
 - builders/materializers — отдельные пакеты.
 
 Specs создаются **перед реализацией соответствующей фичи**, а не все заранее. Этот файл — карта планируемых specs; при старте работы над фичей создавайте spec по `/speckit.specify`, сверяясь с указанными разделами IDEA.md.
@@ -25,7 +24,7 @@ Specs создаются **перед реализацией соответст�
 | # | Spec | Scope (IDEA.md) | Статус | Зависимости |
 |---|------|-----------------|--------|-------------|
 | 001 | connector-reverse — reverse-spec Project A | §2, §11 | ✅ | — |
-| 002 | sdk-contracts — Builder/Artifact/Materializer/TerraformResource/ResourceReference/OutputBuilder, версионирование | §7, §8, §15, §22, §23, §26, §42, §43 | 🚧 | — |
+| 002 | pilot-contracts — Builder/Artifact/Materializer/TerraformResource/ResourceReference/OutputBuilder (контракты `@ycforge/pilot/contracts`), версионирование | §7, §8, §15, §22, §23, §26, §42, §43 | ✅ | — |
 
 ## Волна 1 — Project A gaps (по таблице расхождений в specs/001)
 
@@ -39,7 +38,7 @@ Specs создаются **перед реализацией соответст�
 
 | # | Spec | Scope | Статус | Зависимости |
 |---|------|-------|--------|-------------|
-| 006 | openapi-extraction — `openapi_entry`, fallback chain, `YCSF_OPENAPI_BUILD=1`, metadata-only | §10 | ⬜ | 002 |
+| 006 | openapi-extraction — `openapi_entry`, fallback chain, `SERVERLESS_TOOLS_OPENAPI_BUILD=1`, metadata-only | §10 | ⬜ | 002 |
 | 007 | auth-config — `auth.yaml`, scheme types none/jwt/function, валидация ссылок | §11–12 | ⬜ | 002 |
 | 008 | api-composition — merge specs, fail-fast конфликты, provenance (internal), overrides global/local | §13–14 | ⬜ | 006, 007 |
 | 009 | resource-references — IDL/IDT/IDR, `${resources...}` template syntax, ENV-only mode | §15–19 | ⬜ | 002 |
