@@ -23,7 +23,7 @@ Core principle: **A owns runtime, B owns API composition, C owns orchestration/b
 
 ## Development process (SDD / spec-kit)
 
-- This project follows Specification-Driven Development. Spec-kit skills are installed in `.kimi-code/skills/`.
+- This project follows Specification-Driven Development. Spec-kit skills are installed in `.kimi-code/skills/` (source of truth). For **opencode**, the same commands are mirrored as custom commands in `.opencode/commands/speckit-*.md` (invoked as `/speckit-plan` etc.); regenerate them after any skill update with `node scripts/sync-opencode-commands.mjs`. Do not edit `.opencode/commands/` by hand.
 - Feature cycle: `/speckit.specify` → (optional `/speckit.clarify`) → `/speckit.plan` → `/speckit.tasks` → `/speckit.analyze` → `/speckit.implement` → `/speckit.converge`.
 - **No code without an approved spec.** One spec = one focus = one branch.
 - **Test-first**: acceptance criteria from the spec become tests before implementation; confirm RED, then GREEN. Exception (per constitution): thin orchestration layers invoking the Terraform CLI may get characterization tests after the fact.
