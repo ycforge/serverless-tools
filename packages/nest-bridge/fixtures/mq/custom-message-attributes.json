@@ -1,0 +1,99 @@
+{
+  "timestamp": "2026-08-21T21:45:02.150Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "DATA-ANALYSE.md"
+  },
+  "event": {
+    "messages": [
+      {
+        "event_metadata": {
+          "event_id": "339fed2f-2bac427e-0278e0dc-8a291b1e",
+          "event_type": "yandex.cloud.events.messagequeue.QueueMessage",
+          "created_at": "2026-08-21T21:45:01.890Z",
+          "tracing_context": null,
+          "cloud_id": "a1b2c3d4000000000000",
+          "folder_id": "e5f6a7b8000000000000"
+        },
+        "details": {
+          "queue_id": "yrn:yc:ymq:ru-central1:e5f6a7b8000000000000:f-test",
+          "message": {
+            "message_id": "339fed2f-2bac427e-0278e0dc-8a291b1e",
+            "md5_of_body": "46ffbe22390cd3376747f7a65bcb70ec",
+            "body": "{\"scenario\":\"attributes\",\"attempt\":1}",
+            "attributes": {
+              "ApproximateFirstReceiveTimestamp": "1787348702110",
+              "ApproximateReceiveCount": "1",
+              "SenderId": "ymqsender000000001@as",
+              "SentTimestamp": "1787348701890"
+            },
+            "message_attributes": {
+              "Scenario": {
+                "data_type": "String",
+                "string_value": "retry"
+              },
+              "Attempt": {
+                "data_type": "Number",
+                "string_value": "1"
+              }
+            },
+            "md5_of_message_attributes": "a6b81d682df71eda53f112d70d4ba3e0"
+          }
+        }
+      }
+    ]
+  },
+  "context": {
+    "awsRequestId": "f2d61407-f341-4dea-a6ea-3c258d94eced",
+    "requestId": "f2d61407-f341-4dea-a6ea-3c258d94eced",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verqueue0000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1787348710790,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "3663dada45c81b83:f59e35aba7522bf5:2e0dcefb751bd30a:1",
+    "_data": {
+      "messages": [
+        {
+          "event_metadata": {
+            "event_id": "339fed2f-2bac427e-0278e0dc-8a291b1e",
+            "event_type": "yandex.cloud.events.messagequeue.QueueMessage",
+            "created_at": "2026-08-21T21:45:01.890Z",
+            "tracing_context": null,
+            "cloud_id": "a1b2c3d4000000000000",
+            "folder_id": "e5f6a7b8000000000000"
+          },
+          "details": {
+            "queue_id": "yrn:yc:ymq:ru-central1:e5f6a7b8000000000000:f-test",
+            "message": {
+              "message_id": "339fed2f-2bac427e-0278e0dc-8a291b1e",
+              "md5_of_body": "46ffbe22390cd3376747f7a65bcb70ec",
+              "body": "{\"scenario\":\"attributes\",\"attempt\":1}",
+              "attributes": {
+                "ApproximateFirstReceiveTimestamp": "1787348702110",
+                "ApproximateReceiveCount": "1",
+                "SenderId": "ymqsender000000001@as",
+                "SentTimestamp": "1787348701890"
+              },
+              "message_attributes": {
+                "Scenario": {
+                  "data_type": "String",
+                  "string_value": "retry"
+                },
+                "Attempt": {
+                  "data_type": "Number",
+                  "string_value": "1"
+                }
+              },
+              "md5_of_message_attributes": "a6b81d682df71eda53f112d70d4ba3e0"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

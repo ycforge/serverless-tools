@@ -1,0 +1,75 @@
+{
+  "name": "@ycforge/nestjs-connector",
+  "version": "0.1.0",
+  "description": "NestJS adapter for Yandex Cloud Functions: API Gateway v2 HTTP transport and Message Queue trigger transport.",
+  "author": "ycforge (https://github.com/ycforge)",
+  "license": "MIT",
+  "homepage": "https://github.com/ycforge/serverless-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ycforge/serverless-tools.git",
+    "directory": "packages/nest-bridge"
+  },
+  "keywords": [
+    "nestjs",
+    "yandex-cloud",
+    "cloud-functions",
+    "api-gateway",
+    "message-queue",
+    "serverless"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "import": "./dist/auth/index.js",
+      "require": "./dist/auth/index.cjs"
+    },
+    "./queue": {
+      "types": "./dist/queue/index.d.ts",
+      "import": "./dist/queue/index.js",
+      "require": "./dist/queue/index.cjs"
+    },
+    "./context": {
+      "types": "./dist/context/index.d.ts",
+      "import": "./dist/context/index.js",
+      "require": "./dist/context/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/swagger": "^11.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^11.2.1",
+    "@nestjs/core": "^11.2.1",
+    "@nestjs/swagger": "^11.2.0",
+    "@types/node": "^22.15.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
