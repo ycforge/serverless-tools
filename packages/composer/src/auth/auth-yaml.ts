@@ -144,7 +144,7 @@ function validateSchemes(
   const schemes: Record<string, ParsedAuthScheme> = {};
   for (const schemeName of Object.keys(rawSchemes)) {
     if (schemeName === '') {
-      throw new AuthConfigError('AUTH_FILE_INVALID_YAML', { path: sourcePath });
+      throw new AuthConfigError('AUTH_INVALID_SCHEME_NAME', { schemeName });
     }
     const rawScheme = rawSchemes[schemeName];
     const typeName = extractTypeName(rawScheme);

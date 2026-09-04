@@ -249,6 +249,53 @@ schemes:
     expect(thrown).toBeInstanceOf(AuthConfigError);
     expect((thrown as AuthConfigError).schemeName).toBe('user');
   });
+
+  it('rejects an empty scheme-name key with AUTH_INVALID_SCHEME_NAME and schemeName context', () => {
+    const yaml = `
+version: 1
+defaultScheme: user
+schemes:
+  user:
+    type: none
+  '':
+    type: none
+`;
+    expect(() => parseAuthYaml(yaml, SOURCE)).toThrowError(
+      expect.objectContaining({ code: 'AUTH_INVALID_SCHEME_NAME', schemeName: '' }),
+    );
+  });
+
+  it('empty scheme-name error names the scheme and never embeds document contents', () => {
+    const yaml = `
+version: 1
+defaultScheme: user
+schemes:
+  user:
+    type: jwt
+    jwksUri: https://auth.example.com/jwks.json
+    issuer: https://auth.example.com
+    audience: [NEVER-LEAK-SCHEME-CONTENT]
+  '':
+    type: jwt
+    jwksUri: https://evil.example.com/jwks.json
+    issuer: https://evil.example.com
+    audience: [TOP-SECRET-AUDIENCE]
+`;
+    let thrown: unknown;
+    try {
+      parseAuthYaml(yaml, SOURCE);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(AuthConfigError);
+    const error = thrown as AuthConfigError;
+    expect(error.code).toBe('AUTH_INVALID_SCHEME_NAME');
+    expect(error.schemeName).toBe('');
+    expect(error.message).toContain("schemeName: ''");
+    expect(error.message).not.toContain('NEVER-LEAK-SCHEME-CONTENT');
+    expect(error.message).not.toContain('TOP-SECRET-AUDIENCE');
+    expect(error.message).not.toContain('evil.example.com');
+  });
 });
 
 describe('parseAuthYaml — edge cases (T025)', () => {

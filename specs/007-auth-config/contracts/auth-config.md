@@ -103,6 +103,7 @@ interface FunctionReference {
 | `AUTH_FILE_INVALID_YAML` | файл есть, но не YAML-документ (битый YAML / не-объект) | `path` | FR-001 |
 | `AUTH_DUPLICATE_KEY` | повтор ключа вне `schemes` (uniqueKeys по всему документу) | `keyPath` | FR-007 / V |
 | `AUTH_DUPLICATE_SCHEME` | повтор имени схемы внутри `schemes` (последний победитель — никогда) | `schemeName` | FR-007 |
+| `AUTH_INVALID_SCHEME_NAME` | имя схемы в `schemes` — не непустая строка (напр. пустой ключ `''`) | `schemeName` | FR-004 / data-model §SchemeName |
 | `AUTH_VERSION_UNSUPPORTED` | `version` отсутствует или `!= 1` | `field=version` | FR-002 |
 | `AUTH_DEFAULT_MISSING` | `defaultScheme` отсутствует или пуст | `field=defaultScheme` | FR-003 |
 | `AUTH_DEFAULT_UNRESOLVED` | `defaultScheme` указывает на необъявленную схему | `schemeName` | FR-003 |
@@ -115,6 +116,8 @@ interface FunctionReference {
 | `AUTH_FUNCTION_SET_REQUIRED` | есть `function`-схема, но `functions` в запросе отсутствует | `schemeName` | FR-012 / V |
 | `AUTH_SECURITY_UNDECLARED` | scheme name из `security`-записи не объявлен в `auth.yaml` | `schemeName`, `route` | FR-008 |
 | `AUTH_SECURITY_PUBLIC_VIOLATION` | `public` встретился в `security`-записи (договорное нарушение) | `route` | FR-009 |
+
+> Аддитивное дополнение контракта (2026-09-05, version остаётся 1, bump не требуется): код `AUTH_INVALID_SCHEME_NAME` — уточнение классификации невалидного имени схемы (пустой ключ `''` в `schemes`), ранее подпадавшего под документный `AUTH_FILE_INVALID_YAML` без `schemeName`-контекста. Дополнение не меняет существующие конфигурации и не ломает существующую таксономию — вводится только более точный, scheme-level код ошибки (T030).
 
 Все ошибки детерминированны и не содержат содержимого user-документов/секретов: в сообщения попадает только контекст из таблицы выше (имя схемы, маршрут `root|METHOD /path`, путь файла, node-путь ключа, текст ссылки). Сравнение имён схем и имён функций — exact, case-sensitive, без нормализации.
 

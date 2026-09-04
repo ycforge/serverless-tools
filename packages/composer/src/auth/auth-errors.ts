@@ -3,6 +3,7 @@ export const AUTH_CONFIG_ERROR_CODES = [
   'AUTH_FILE_INVALID_YAML',
   'AUTH_DUPLICATE_KEY',
   'AUTH_DUPLICATE_SCHEME',
+  'AUTH_INVALID_SCHEME_NAME',
   'AUTH_VERSION_UNSUPPORTED',
   'AUTH_DEFAULT_MISSING',
   'AUTH_DEFAULT_UNRESOLVED',
@@ -35,6 +36,8 @@ const AUTH_ERROR_MESSAGE_BY_CODE: Record<AuthConfigErrorCode, (c: AuthConfigErro
   AUTH_FILE_INVALID_YAML: (c) => `auth config file is not a valid YAML map: ${c.path ?? '<unknown>'}`,
   AUTH_DUPLICATE_KEY: (c) => `duplicate key in auth config: ${c.keyPath ?? '<unknown>'}`,
   AUTH_DUPLICATE_SCHEME: (c) => `duplicate scheme name in auth config: ${c.schemeName ?? '<unknown>'}`,
+  AUTH_INVALID_SCHEME_NAME: (c) =>
+    `auth config scheme name must be a non-empty string (schemeName: '${c.schemeName ?? ''}')`,
   AUTH_VERSION_UNSUPPORTED: (c) => `auth config version must be 1 (field: ${c.field ?? 'version'})`,
   AUTH_DEFAULT_MISSING: (c) => `auth config is missing required field: ${c.field ?? 'defaultScheme'}`,
   AUTH_DEFAULT_UNRESOLVED: (c) =>

@@ -5,13 +5,14 @@ import {
   type AuthConfigErrorCode,
 } from './auth-errors.js';
 
-const CODE_COUNT = 16;
+const CODE_COUNT = 17;
 
 const MESSAGE_CASES: Array<[AuthConfigErrorCode, Record<string, string>, string[]]> = [
   ['AUTH_FILE_MISSING', { path: '/app/auth.yaml' }, ['/app/auth.yaml']],
   ['AUTH_FILE_INVALID_YAML', { path: '/app/auth.yaml' }, ['/app/auth.yaml']],
   ['AUTH_DUPLICATE_KEY', { keyPath: 'schemes.user.issuer' }, ['schemes.user.issuer']],
   ['AUTH_DUPLICATE_SCHEME', { schemeName: 'user' }, ['user']],
+  ['AUTH_INVALID_SCHEME_NAME', { schemeName: '' }, ["''", 'schemeName']],
   ['AUTH_VERSION_UNSUPPORTED', { field: 'version' }, ['version']],
   ['AUTH_DEFAULT_MISSING', { field: 'defaultScheme' }, ['defaultScheme']],
   ['AUTH_DEFAULT_UNRESOLVED', { schemeName: 'ghost' }, ['ghost']],
@@ -35,7 +36,7 @@ describe('AuthConfigError', () => {
     expect(err.code).toBe('AUTH_VERSION_UNSUPPORTED');
   });
 
-  it('exposes the full 16-code taxonomy from the contract table', () => {
+  it('exposes the full 17-code taxonomy from the contract table', () => {
     expect(AUTH_CONFIG_ERROR_CODES).toHaveLength(CODE_COUNT);
     expect(new Set(AUTH_CONFIG_ERROR_CODES)).toHaveLength(CODE_COUNT);
     for (const code of AUTH_CONFIG_ERROR_CODES) {
