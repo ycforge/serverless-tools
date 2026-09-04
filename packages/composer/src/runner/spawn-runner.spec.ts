@@ -30,10 +30,20 @@ describe('spawnRunner', () => {
     expect(doc?.['x-env-observed']).toBe('1');
   });
 
-  it('classifies an entry that throws as ENTRY_EXECUTION_FAILED', async () => {
+  it('classifies an entry that throws as ENTRY_EXECUTION_FAILED without exposing app error detail', async () => {
     await expect(
       spawnRunner(APP_ROOT, `${FIXTURES}runner-throws.mjs`, 10000),
     ).rejects.toMatchObject({ code: 'ENTRY_EXECUTION_FAILED' });
+    const err = await spawnRunner(APP_ROOT, `${FIXTURES}runner-throws.mjs`, 10000).catch(
+      (e: Error) => e,
+    );
+    expect(err.message).not.toContain('SUPER-SECRET-xyz');
+    expect(err.message).not.toContain('boom: provider init failed');
+  });
+
+  it('still returns the document when the entry writes to stdout and stderr (console.log)', async () => {
+    const doc = await spawnRunner(APP_ROOT, `${FIXTURES}runner-console-log.mjs`, 10000);
+    expect(doc?.['info']).toEqual({ title: 'runner-console-log', version: '1.0.0' });
   });
 
   it('kills a hanging entry as ENTRY_TIMEOUT and leaves the main process alive', async () => {
@@ -44,7 +54,7 @@ describe('spawnRunner', () => {
     expect(Date.now() - started).toBeGreaterThanOrEqual(200);
   });
 
-  it('classifies a child that writes malformed stdout as ENTRY_RETURNED_INVALID', async () => {
+  it('classifies a child that writes malformed bytes on the result channel as ENTRY_RETURNED_INVALID', async () => {
     await expect(
       spawnRunner(APP_ROOT, `${FIXTURES}runner-garbage.mjs`, 10000),
     ).rejects.toMatchObject({ code: 'ENTRY_RETURNED_INVALID' });

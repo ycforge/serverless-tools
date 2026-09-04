@@ -61,7 +61,7 @@ Broken-but-present source is fail-fast (`INVALID_ARTIFACT`, `ENTRY_*`), never a 
 | `ENTRY_TIMEOUT` | runner did not complete within `timeoutMs`, killed | FR-011 |
 | `RUNNER_SPAWN_FAILED` | runner process could not be started | FR-011 |
 
-All errors expose `sourcePath?` where applicable. Extraction errors never contain user payload/token/header data.
+All errors expose `sourcePath?` where applicable. Extraction errors never contain user payload/token/header data: runner failure markers carry no detail, and error messages are deterministic (code + entry path) — application-provided `err.message`/`err.stack`/stderr text are never embedded in an `OpenApiExtractError`.
 
 ## Env contract
 

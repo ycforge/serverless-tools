@@ -1,5 +1,4 @@
 import { writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 writeFileSync(new URL('../init-ran.marker', import.meta.url), 'full init ran\n');
 

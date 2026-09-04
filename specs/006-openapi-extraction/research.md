@@ -11,8 +11,8 @@
 
 ## R2 — Runner spawn + result transport
 
-- **Decision**: `child_process.spawn(process.execPath, [runnerPath, entryPath, mode], { env: { ...process.env, SERVERLESS_TOOLS_OPENAPI_BUILD: "1" }, cwd: appRoot })` with no shell. The runner prints exactly one JSON object (the OpenAPI document) to stdout and exits 0; all diagnostics go to stderr; any non-zero exit, malformed stdout JSON, or timeout (default 30 s, configurable) is a classified error.
-- **Rationale**: stdout-JSON is the least-state transport (no temp files, no IPC channel licensing); spawn-with-array-cwd-env avoids shell injection; the timeout kill protects the main process from a hanging bootstrap (FR-011). `SERVERLESS_TOOLS_OPENAPI_BUILD=1` is injected into the runner env only (FR-002), parent env untouched.
+- **Decision**: `child_process.spawn(process.execPath, [runnerPath, entryPath, mode], { env: { ...process.env, SERVERLESS_TOOLS_OPENAPI_BUILD: "1" }, cwd: appRoot })` with no shell and `stdio: ['ignore','pipe','pipe','pipe']`. The runner writes exactly one JSON object (the OpenAPI document) over the dedicated result pipe (child fd 3) and exits 0; all diagnostics go to stderr; any non-zero exit, malformed result-JSON, or timeout (default 30 s, configurable) is a classified error.
+- **Rationale**: pipe-JSON is the least-state transport (no temp files, no IPC channel licensing), and a dedicated result pipe keeps the application's own stdout/stderr (user `console.log`, warnings) out of the extraction result; spawn-with-array-cwd-env avoids shell injection; the timeout kill protects the main process from a hanging bootstrap (FR-011). `SERVERLESS_TOOLS_OPENAPI_BUILD=1` is injected into the runner env only (FR-002), parent env untouched.
 - **Alternatives considered**: temp file + marker — leaves debris on crash; `fork`/IPC — couples child to parent module graph (we want the child isolated); passing env vars only via CLI args — risks leaking into error logs.
 
 ## R3 — Artifact validation (`swagger.json`/`openapi.json`)

@@ -214,3 +214,12 @@ Task: "Write integration tests (parity, env, no-init) in packages/composer/test/
 ## Phase 8: Convergence
 
 - [x] T026 Fix runner-script path resolution so the bundled `dist/index.js` locates `runner/runner.mjs` (probe source-layout `../../runner/runner.mjs` then bundled-layout `../runner/runner.mjs` via `resolveRunnerPath`) per plan: runner asset shipped at package root / `files: [dist, runner]`; add regression tests in `src/runner/spawn-runner.spec.ts` and re-verify the built package (`contradicts`/`partial`)
+
+---
+
+## Phase 9: Post-review fixes (PR #6 code review)
+
+- [x] T027 Track all convention fixtures required by integration tests: negate `dist/` for `test/fixtures/app-convention/dist/` and `app-convention-broken/dist/` in `.gitignore` so a clean checkout reproduces US3/US4 (previously ignored → tests failed without untracked files)
+- [x] T028 Isolate the runner result from the application's stdout: result travels over a dedicated pipe (fd 3, `stdio: ['ignore','pipe','pipe','pipe']`); regression test `spawnRunner › still returns the document when the entry writes to stdout and stderr (console.log)` + safe-entry fixture logs during extraction
+- [x] T029 Sanitize extraction errors: runner failure markers carry no detail and parent error messages are deterministic (code + entry path) — app `err.message`/`err.stack`/stderr never reach `OpenApiExtractError`; regression test asserts a secret thrown by the entry never appears in the error
+- [x] T030 Add GitHub Actions CI (`.github/workflows/ci.yml`): `Test` (`pnpm test`), `Build` (`pnpm build`, plus `pnpm typecheck`), `Lint` (`pnpm lint` — new ESLint flat config + root `lint` script, the repo previously had no linter); clean-checkout, `pnpm install --frozen-lockfile`, Node 22

@@ -19,9 +19,11 @@ Additional edge coverage added during implementation:
 | Entry returns non-object | `extractOpenApi.errors › entry returns a non-object → ENTRY_RETURNED_INVALID` | ✅ green |
 | Runner spawn failure (invalid appRoot) | `extractOpenApi.errors › runner spawn failure → RUNNER_SPAWN_FAILED` | ✅ green |
 | Missing entry file | `spawnRunner › classifies a missing entry as ENTRY_LOAD_FAILED` | ✅ green |
-| Malformed stdout from child | `spawnRunner › classifies a child that writes malformed stdout as ENTRY_RETURNED_INVALID` | ✅ green |
+| Malformed result channel from child | `spawnRunner › classifies a child that writes malformed bytes on the result channel as ENTRY_RETURNED_INVALID` | ✅ green |
 | Convention entry without `buildYcsfOpenApi` export | `extractOpenApi.errors › dist/main exists but lacks buildYcsfOpenApi → ENTRY_LOAD_FAILED` | ✅ green |
+| User app logs to stdout/stderr (`console.log`) | `spawnRunner › still returns the document when the entry writes to stdout and stderr (console.log)`; safe-entry fixture also logs during entry execution | ✅ green |
+| Failure messages sanitized (no app payload leak) | `spawnRunner › classifies an entry that throws as ENTRY_EXECUTION_FAILED without exposing app error detail` (asserts `SUPER-SECRET-xyz` never appears) | ✅ green |
 
-Final gate: 23/23 composer tests green, `tsc --noEmit` clean, monorepo suite (`pnpm test`) green, zero runtime dependencies.
+Final gate: 26/26 composer tests green, `tsc --noEmit` clean, `pnpm lint` clean, monorepo suite (`pnpm test`) green — 523 total (composer 26 + pilot 55 + nest-bridge 442), zero runtime dependencies.
 
 > Fixture placement note: `quickstart.md` lists `app-broken-artifact/` separately; implementation keeps the broken-swagger variant in `test/fixtures/app-broken-artifact/` (with a valid `openapi.json` present to prove no fall-through), consistent with US2/AC3.

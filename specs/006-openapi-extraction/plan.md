@@ -11,7 +11,7 @@ Spec 006 adds the OpenAPI extraction phase to `@ycforge/composer` (Project B): o
 Key technical approach:
 - New package `packages/composer` (`@ycforge/composer`), greenfield, zero runtime dependencies (native `node:child_process`, `node:fs`, `node:path`)
 - Public contract `extractOpenApi(request): Promise<OpenApiDocument>` implementing the fallback chain
-- Runner subprocess (plain `.mjs` script, shipped with the package) that dynamic-imports the entry point, calls `buildYcsfOpenApi`, prints the JSON document to stdout; `child_process.spawn` with `{ env, cwd }`, kill-on-timeout, non-zero-exit ⇒ fail-fast error
+- Runner subprocess (plain `.mjs` script, shipped with the package) that dynamic-imports the entry point, calls `buildYcsfOpenApi`, serializes the JSON document over a dedicated result pipe (child fd 3) so the application's own stdout/stderr never contaminate the result; `child_process.spawn` with `{ env, cwd }`, kill-on-timeout, non-zero-exit ⇒ fail-fast error
 - Artifact read + minimal OpenAPI validation (object with `openapi` + `paths`)
 - Deterministic error codes per source and failure class (FR-006/007/008/011)
 
@@ -73,7 +73,7 @@ packages/composer/                         # NEW: @ycforge/composer (Project B)
 ├── package.json                           # NEW: public exports, files = [dist, runner]
 ├── tsconfig.json                          # NEW: ESNext modules, ES2022
 ├── runner/
-│   └── runner.mjs                         # NEW: steady child script — imports entry, calls buildYcsfOpenApi, prints JSON doc to stdout, errors to stderr
+│   └── runner.mjs                         # NEW: steady child script — imports entry, calls buildYcsfOpenApi, writes JSON doc to result fd (3), errors to stderr
 ├── src/
 │   ├── index.ts                           # NEW: public exports (extractOpenApi, types, error codes)
 │   ├── extract.ts                         # NEW: fallback chain orchestration (FR-001/004/005/006)
@@ -82,7 +82,7 @@ packages/composer/                         # NEW: @ycforge/composer (Project B)
 │   ├── artifacts.ts                       # NEW: swagger.json/openapi.json read + minimal validation (FR-004/007)
 │   ├── artifacts.spec.ts                  # NEW: artifact tests (valid, missing, broken, priority)
 │   └── runner/
-│       ├── spawn-runner.ts                # NEW: spawn + env + cwd + timeout kill + stdout protocol (FR-002/011)
+│       ├── spawn-runner.ts                # NEW: spawn + env + cwd + timeout kill + result-fd protocol (FR-002/011)
 │       └── spawn-runner.spec.ts           # NEW: runner tests (ok, crash, timeout, bad JSON)
 └── test/
     └── extraction.integration.spec.ts     # NEW: end-to-end against fixture apps (US1–US4)
@@ -99,7 +99,7 @@ All NEEDS CLARIFICATION items resolved:
 | # | Unknown | Resolution |
 |---|---------|------------|
 | R1 | Loading user entry (openapi_entry / dist/main) | Runner dynamic `import()` (works for CJS+ESM); entry must be Node-loadable JS. TS source transpilation is a builder concern (spec 018) — v1 rejects/errors with guidance; Node 22.6+ type-stripping usable opportunistically but not relied on |
-| R2 | Runner spawn + result transport | `child_process.spawn(process.execPath, [runnerPath, entry, mode], { env: {...processEnv, SERVERLESS_TOOLS_OPENAPI_BUILD:'1'}, cwd: appRoot })`; result JSON printed to stdout (exactly one object), errors to stderr; timeout kill (default 30s); non-zero exit ⇒ fail-fast |
+| R2 | Runner spawn + result transport | `child_process.spawn(process.execPath, [runnerPath, entry, mode], { env: {...processEnv, SERVERLESS_TOOLS_OPENAPI_BUILD:'1'}, cwd: appRoot })`, `stdio: ['ignore','pipe','pipe','pipe']`; result JSON written to the dedicated result fd (3) (exactly one object), errors to stderr; timeout kill (default 30s); non-zero exit ⇒ fail-fast |
 | R3 | Artifact validation | Minimal structural check: object with string `openapi` and object `paths`; broken JSON / wrong shape ⇒ fail-fast with path (FR-007) |
 | R4 | Error taxonomy | `OpenApiExtractError` with `code`: NO_SOURCE, INVALID_ARTIFACT, ENTRY_LOAD_FAILED, ENTRY_EXECUTION_FAILED, ENTRY_TIMEOUT, ENTRY_RETURNED_INVALID, RUNNER_SPAWN_FAILED; terminal FR-006 message carries NO_SOURCE |
 | R5 | Safe-mode env semantics | Set only in runner env before spawn (FR-002); parent process env untouched; value `"1"`; document that it is an advisory flag, primary defense is the safe entry contract (US1) |
@@ -113,7 +113,7 @@ Key design decisions:
 - **`extractOpenApi(request, options?)`** — single entry point; `request = { appRoot, openapiEntry? }`; returns `OpenApiDocument` (type-only `{ openapi, info, paths, ... }`); throws `OpenApiExtractError` on any failure (FR-001/004/005/006)
 - **Fixed source priority**: `openapiEntry` → `swagger.json` → `openapi.json` → `dist/main` → NO_SOURCE error (SC-003; edge cases in spec)
 - **Artifact source** is pure read + validate (no user code execution); broken artifact = fail-fast, never fall through (FR-007)
-- **Runner subprocess** (variant B): steady `.mjs` child; imports the entry, calls `buildYcsfOpenApi()`, serializes the document to stdout; failures/side channels on stderr; main process parses stdout with a size guard (FR-003/011)
+- **Runner subprocess** (variant B): steady `.mjs` child; imports the entry, calls `buildYcsfOpenApi()`, serializes the document over the dedicated result fd (3); failures/side channels on stderr; main process parses the result fd with a size guard (FR-003/011)
 - **Error codes**: deterministic per failure class, exported publicly for downstream (`ycsf-api`, spec 010) (FR-006/007/008/011)
 - **Document parity**: extracted document returned as-is (deep-cloned only for transport safety, no structural changes) — FR-009
 - **Backward compatible / greenfield**: new package, no changes to existing packages
