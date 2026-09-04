@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 import { extractOpenApi } from '../src/index.js';
+import { spawnRunner } from '../src/runner/spawn-runner.js';
+import { tmpdir } from 'node:os';
 
 const { spawnCalls } = vi.hoisted(() => ({ spawnCalls: [] as unknown[] }));
 
@@ -35,6 +37,7 @@ const NOTHING_ROOT = fileURLToPath(new URL('./fixtures/app-nothing/', import.met
 const BROKEN_CONVENTION_ROOT = fileURLToPath(
   new URL('./fixtures/app-convention-broken/', import.meta.url),
 );
+const INVALID_ENTRY_ROOT = fileURLToPath(new URL('./fixtures/app-invalid-entry/', import.meta.url));
 
 describe('extractOpenApi.success', () => {
   it('openapi_entry (explicit) resolves with the document unchanged (US1/AC1, FR-009 parity)', async () => {
@@ -104,6 +107,22 @@ describe('extractOpenApi.errors', () => {
   it('dist/main exists but lacks buildYcsfOpenApi → ENTRY_LOAD_FAILED, fail-fast (US3/AC2, FR-008)', async () => {
     await expect(extractOpenApi({ appRoot: BROKEN_CONVENTION_ROOT })).rejects.toMatchObject({
       code: 'ENTRY_LOAD_FAILED',
+    });
+  });
+
+  it('entry returns a non-object → ENTRY_RETURNED_INVALID (FR-008 edge)', async () => {
+    await expect(
+      extractOpenApi({
+        appRoot: INVALID_ENTRY_ROOT,
+        openapiEntry: 'src/openapi.entry.js',
+      }),
+    ).rejects.toMatchObject({ code: 'ENTRY_RETURNED_INVALID' });
+  });
+
+  it('runner spawn failure (invalid appRoot) → RUNNER_SPAWN_FAILED (FR-011)', async () => {
+    const missingRoot = join(tmpdir(), `yc-composer-no-such-${Date.now()}`);
+    await expect(spawnRunner(missingRoot, `${missingRoot}/main.js`, 1000)).rejects.toMatchObject({
+      code: 'RUNNER_SPAWN_FAILED',
     });
   });
 });

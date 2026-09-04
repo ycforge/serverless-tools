@@ -125,11 +125,11 @@
 
 **Purpose**: Edge-case coverage, zero-dep verification, quickstart runthrough, docs parity.
 
-- [ ] T021 [P] Add integration edge tests in `packages/composer/test/extraction.integration.spec.ts`: entry returns non-object / non-`OpenApiDocument` → `ENTRY_RETURNED_INVALID` (FR-008 edge); `Runner` spawn failure (invalid `appRoot`) → `RUNNER_SPAWN_FAILED` (FR-011)
-- [ ] T022 Run `packages/composer/quickstart.md` validation scenarios end-to-end (all 7 green) and record outcomes in the spec dir
-- [ ] T023 [P] Verify zero runtime dependencies: `packages/composer/package.json` has no `dependencies`; builtins only (`node:child_process`, `node:fs`, `node:path`, `node:url`) — grep the imports
-- [ ] T024 Verify document parity invariant (FR-009): assert deep-equality of returned doc vs source in at least one test per source (entry, artifact, dist/main) — extend existing tests if any source is missing
-- [ ] T025 Run final gate: `pnpm --filter @ycforge/composer test` green + `pnpm --filter @ycforge/composer typecheck` clean + no regressions elsewhere in the monorepo (`pnpm test` root); update `specs/README.md` if needed (no — status flip happens after merge)
+- [x] T021 [P] Add integration edge tests in `packages/composer/test/extraction.integration.spec.ts`: entry returns non-object / non-`OpenApiDocument` → `ENTRY_RETURNED_INVALID` (FR-008 edge); `Runner` spawn failure (invalid `appRoot`) → `RUNNER_SPAWN_FAILED` (FR-011)
+- [x] T022 Run `specs/006-openapi-extraction/quickstart.md` validation scenarios end-to-end (all 7 green) and record outcomes in the spec dir (`quickstart-outcomes.md`)
+- [x] T023 [P] Verify zero runtime dependencies: `packages/composer/package.json` has no `dependencies`; builtins only (`node:child_process`, `node:fs`, `node:path`, `node:url`) — grep the imports
+- [x] T024 Verify document parity invariant (FR-009): assert deep-equality of returned doc vs source in at least one test per source (entry, artifact, dist/main) — extend existing tests if any source is missing
+- [x] T025 Run final gate: `pnpm --filter @ycforge/composer test` green + `pnpm --filter @ycforge/composer typecheck` clean + no regressions elsewhere in the monorepo (`pnpm test` root); update `specs/README.md` if needed (no — status flip happens after merge)
 
 ---
 
