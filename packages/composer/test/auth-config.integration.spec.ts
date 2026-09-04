@@ -66,7 +66,10 @@ describe('validateAuthConfig — US1 self-validation on fixture roots', () => {
             issuer: 'https://auth.example.com',
             audience: ['my-api'],
           },
-          internal: { type: 'function', function: 'functions.internal_authorizer' },
+          internal: {
+            type: 'function',
+            function: { ref: 'functions.internal_authorizer', name: 'internal_authorizer' },
+          },
           frontend: { type: 'none' },
         },
       },
@@ -137,5 +140,86 @@ describe('validateAuthConfig — US2 security-reference cross-validation on fixt
     });
     expect(Object.keys(result)).toEqual(['authYaml']);
     expect(result.authYaml.defaultScheme).toBe('user');
+  });
+});
+
+describe('validateAuthConfig — US3 function-reference resolution on fixture roots', () => {
+  it('resolves functions.internal_authorizer against the composition functions set (US3/AC1, FR-012)', async () => {
+    const result = await validateAuthConfig({
+      appRoot: CANONICAL_ROOT,
+      openApi: CANONICAL_DOC,
+      functions: ['internal_authorizer'],
+    });
+    const internal =
+      result.authYaml.schemes.internal as { type: 'function'; function: { ref: string; name: string } };
+    expect(internal.function).toEqual({
+      ref: 'functions.internal_authorizer',
+      name: 'internal_authorizer',
+    });
+  });
+
+  it('rejects an unresolved function reference with the ref (US3/AC2)', async () => {
+    await expect(
+      validateAuthConfig({
+        appRoot: FIXTURE('openapi-app-unresolved-function'),
+        openApi: MINIMAL_DOC,
+        functions: ['internal_authorizer'],
+      }),
+    ).rejects.toMatchObject({
+      code: 'AUTH_FUNCTION_UNRESOLVED',
+      ref: 'functions.nope',
+    });
+  });
+
+  it('rejects an invalid function format with AUTH_FUNCTION_INVALID_REF', async () => {
+    await expect(
+      validateAuthConfig({
+        appRoot: FIXTURE('openapi-app-bad-function-format'),
+        openApi: MINIMAL_DOC,
+        functions: ['internal_authorizer'],
+      }),
+    ).rejects.toMatchObject({
+      code: 'AUTH_FUNCTION_INVALID_REF',
+      ref: 'internal_authorizer',
+    });
+  });
+
+  it('requires the functions set when a function scheme exists (FR-012, V)', async () => {
+    await expect(
+      validateAuthConfig({
+        appRoot: FIXTURE('openapi-app-no-functions'),
+        openApi: MINIMAL_DOC,
+      }),
+    ).rejects.toMatchObject({
+      code: 'AUTH_FUNCTION_SET_REQUIRED',
+      schemeName: 'internal',
+    });
+  });
+
+  it('produces ONLY the authYaml read-model — no provisioning/JWKS/Lockbox artifacts (US3/AC3, FR-011, SC-006)', async () => {
+    const result = await validateAuthConfig({
+      appRoot: CANONICAL_ROOT,
+      openApi: CANONICAL_DOC,
+      functions: ['internal_authorizer'],
+    });
+    expect(Object.keys(result)).toEqual(['authYaml']);
+    expect(result.authYaml).toEqual({
+      version: 1,
+      defaultScheme: 'user',
+      schemes: {
+        public: { type: 'none' },
+        user: {
+          type: 'jwt',
+          jwksUri: 'https://auth.example.com/jwks.json',
+          issuer: 'https://auth.example.com',
+          audience: ['my-api'],
+        },
+        internal: {
+          type: 'function',
+          function: { ref: 'functions.internal_authorizer', name: 'internal_authorizer' },
+        },
+        frontend: { type: 'none' },
+      },
+    });
   });
 });
