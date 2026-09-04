@@ -7,9 +7,17 @@ import {
 import { getYandexContextParameterIndexes } from "../context/yandex-context.decorator";
 import type { InvocationResolutionContext } from "../core/transport";
 import { ConnectorError } from "../core/connector-error";
+import type { QueueTransportOptions } from "../core/handler-options";
 import { getQueueHandlerMethodNames } from "./queue-handler.decorator";
 import { getQueueMessageParameterIndexes } from "./queue-message.decorator";
 import type { QueueBatch, QueueMessage } from "./message";
+import {
+  type BatchDispatchResult,
+  type MessageOutcome,
+  successOutcome,
+  failureOutcome,
+} from "./message-outcome";
+import { DlqSender } from "./dlq-sender";
 
 /**
  * Message Queue handler dispatch over the normalized batch (issue #8).
@@ -234,15 +242,74 @@ export async function dispatchQueueHandlers(
   invocationContainer: HandlerResolutionContainer,
   handlers: readonly DiscoveredQueueHandler[],
   batch: QueueBatch,
+  options?: QueueTransportOptions,
 ): Promise<void> {
   if (handlers.length === 0) {
     throw ConnectorError.noQueueHandler();
   }
 
+  const degradeEnabled = options?.partialFailure?.enabled === true;
+
+  if (!degradeEnabled) {
+    // Fail-fast path (spec 001): first failure rejects the entire invocation.
+    for (const message of batch.messages) {
+      await extendInvocationScope({ queueMessage: message }, () =>
+        deliverToAllHandlers(invocationContainer, handlers, message),
+      );
+    }
+    return;
+  }
+
+  // Degrade path (spec 005): catch per-message handler throws, collect
+  // outcomes, continue to the next message. DI resolution failures and
+  // deserialization failures are NOT caught — they remain whole-invocation
+  // failures (FR-005, FR-007). Only handler method throws are per-message.
+  const outcomes: MessageOutcome[] = [];
+  const failures: { messageId: string; body: string }[] = [];
+
   for (const message of batch.messages) {
-    await extendInvocationScope({ queueMessage: message }, () =>
-      deliverToAllHandlers(invocationContainer, handlers, message),
-    );
+    // Providers are resolved BEFORE entering the per-message catch: a DI
+    // resolution failure must abort the whole invocation (FR-005), never
+    // become a recorded per-message outcome. Each message resolves under its
+    // own context id, preserving one DI sub-tree per message.
+    const resolved = await resolveHandlers(invocationContainer, handlers);
+    try {
+      await extendInvocationScope({ queueMessage: message }, () =>
+        invokeHandlers(resolved, message),
+      );
+      outcomes.push(successOutcome(message.messageId));
+    } catch (error) {
+      const outcome = failureOutcome(message.messageId, error);
+      outcomes.push(outcome);
+      failures.push({ messageId: message.messageId, body: message.body });
+      // Per-message failure record correlated with this invocation's
+      // trace_id/awsRequestId, carrying only the messageId and error class —
+      // never payload/token/header/raw values (FR-009, FR-010, US2/AC2).
+      const executionContext = resolveInvocationExecutionContext();
+      console.warn(
+        `[partial-failure][${executionContext.awsRequestId}] message ${outcome.messageId} failed with ${outcome.error?.name ?? "Error"}`,
+      );
+    }
+  }
+
+  const result: BatchDispatchResult = {
+    outcomes,
+    failureCount: outcomes.filter((o) => !o.success).length,
+  };
+
+  // DLQ republishing: publish failed messages to the dead letter queue if
+  // configured, or log a warning about data loss if not.
+  if (result.failureCount > 0) {
+    const deadLetterQueueId = options?.partialFailure?.deadLetterQueueId;
+    if (deadLetterQueueId) {
+      const dlqSender = new DlqSender();
+      await dlqSender.sendBatch(failures, deadLetterQueueId);
+    } else {
+      const executionContext = resolveInvocationExecutionContext();
+      console.warn(
+        `[partial-failure][${executionContext.awsRequestId}] ${result.failureCount} message(s) failed but no deadLetterQueueId configured — messages will be lost`,
+      );
+    }
   }
 }
 
@@ -251,10 +318,24 @@ async function deliverToAllHandlers(
   handlers: readonly DiscoveredQueueHandler[],
   message: QueueMessage,
 ): Promise<void> {
-  // One DI sub-tree per message, created inside this message's scope
-  // extension so REQUEST/TRANSIENT provider lifecycles are bound to exactly
-  // that message. Sequential resolution keeps factory side effects ordered
-  // and stops at the first failure without starting later sub-trees.
+  const resolved = await resolveHandlers(invocationContainer, handlers);
+  await invokeHandlers(resolved, message);
+}
+
+/**
+ * Resolves every handler's provider instance under one fresh DI sub-tree
+ * (ContextIdFactory.create()); used by both the fail-fast and degrade paths.
+ *
+ * Resolution failures propagate verbatim — they are whole-invocation
+ * failures, never per-message outcomes (FR-005). One resolution pass per
+ * message keeps REQUEST/TRANSIENT provider lifecycles bound to exactly that
+ * message. Sequential resolution keeps factory side effects ordered and stops
+ * at the first failure without starting later sub-trees.
+ */
+async function resolveHandlers(
+  invocationContainer: HandlerResolutionContainer,
+  handlers: readonly DiscoveredQueueHandler[],
+): Promise<{ instance: unknown; methodName: string | symbol }[]> {
   const resolutionContext: InvocationResolutionContext = {
     contextId: ContextIdFactory.create(),
   };
@@ -265,7 +346,18 @@ async function deliverToAllHandlers(
       methodName: handler.methodName,
     });
   }
+  return resolved;
+}
 
+/**
+ * Runs every resolved handler method against one message inside its invocation
+ * scope extension. Handler throws are the ONLY per-message failure boundary:
+ * they are caught by the degrade path, never by this function.
+ */
+async function invokeHandlers(
+  resolved: readonly { instance: unknown; methodName: string | symbol }[],
+  message: QueueMessage,
+): Promise<void> {
   const executionContext = resolveInvocationExecutionContext();
   for (const { instance, methodName } of resolved) {
     const method = readHandlerMethod(instance, methodName);

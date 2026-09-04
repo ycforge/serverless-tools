@@ -20,6 +20,7 @@ import { BUILTIN_TRANSPORTS } from "../core/transports";
 import { httpApiGatewayV2Transport } from "../http/adapter";
 import type { QueueBatch } from "./message";
 import { messageQueueTransport } from "./adapter";
+import type { QueueTransportOptions } from "../core/handler-options";
 import { normalizeQueueBatch } from "./normalize-batch";
 import { QueueHandler } from "./queue-handler.decorator";
 // Merged export: the decorator factory plus the normalized message type.
@@ -444,5 +445,103 @@ describe("message queue transport through the runtime", () => {
     );
 
     expect(() => resolveInvocationQueueBatch()).toThrow(/no Message Queue delivery/);
+  });
+});
+
+describe("message queue transport — partial failure wiring through the runtime", () => {
+  const runtimes: ClosableYandexCloudFunctionHandler[] = [];
+  let bootstrapSpy: MockInstance;
+  let originalFetch: typeof globalThis.fetch;
+
+  const ATTEMPT_ORDER: string[] = [];
+  const FAILING_MESSAGE_ID = "8b2f-d02a3f5c7b94416ac2e10d8f-63e5f9";
+
+  class PartialFailureQueueConsumer {
+    handle(message: QueueMessage): void {
+      ATTEMPT_ORDER.push(message.messageId);
+      if (message.messageId === FAILING_MESSAGE_ID) {
+        throw new Error("poison message");
+      }
+    }
+  }
+
+  const CONSUMER_DESCRIPTOR = methodDescriptorOf(PartialFailureQueueConsumer.prototype, "handle");
+  QueueHandler()(PartialFailureQueueConsumer.prototype, "handle", CONSUMER_DESCRIPTOR);
+  QueueMessage()(PartialFailureQueueConsumer.prototype, "handle", 0);
+
+  class PartialFailureModule {}
+  Module({ providers: [PartialFailureQueueConsumer] })(PartialFailureModule);
+
+  beforeEach(() => {
+    bootstrapSpy = vi.spyOn(NestFactory, "create");
+    ATTEMPT_ORDER.length = 0;
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(async () => {
+    while (runtimes.length > 0) {
+      await runtimes.pop()?.close();
+    }
+    bootstrapSpy.mockRestore();
+    globalThis.fetch = originalFetch;
+  });
+
+  function makeDegradeRuntime(
+    partialFailure: QueueTransportOptions["partialFailure"],
+  ): ClosableYandexCloudFunctionHandler {
+    const runtime = createYandexHandler(PartialFailureModule, {
+      queue: { partialFailure },
+    });
+    runtimes.push(runtime);
+    return runtime;
+  }
+
+  it("forwards the transport-level partialFailure opt-in to dispatch", async () => {
+    // The degrade opt-in configured on QueueTransportOptions must reach the
+    // dispatch degrade path through the real runtime (FR-008): every message
+    // is attempted despite the poison message, failed ones are republished to
+    // the DLQ, and the invocation ack-successfully returns the batch.
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ access_token: "mock-token", expires_in: 3600 }),
+    });
+
+    const runtime = makeDegradeRuntime({
+      enabled: true,
+      deadLetterQueueId: "dlq-queue",
+    });
+    const delivery = makeQueueDelivery(EVENT_ID, FAILING_MESSAGE_ID, "c31a-e94b5f6d70a25271d3f21e9a04c6g1a");
+
+    const result = (await runtime(delivery, RUNTIME_CONTEXT)) as QueueBatch;
+
+    // All three messages were attempted despite the middle one failing.
+    expect(ATTEMPT_ORDER).toEqual([EVENT_ID, FAILING_MESSAGE_ID, "c31a-e94b5f6d70a25271d3f21e9a04c6g1a"]);
+    // The batch is acked (invocation returns normally) in degrade mode.
+    expect(result.messages).toHaveLength(3);
+
+    // Failed message was republished to the DLQ via Yandex MQ HTTP API.
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    const mqCalls = fetchMock.mock.calls.filter(
+      (call) => !String(call[0]).includes("169.254.169.254"),
+    );
+    expect(mqCalls.length).toBe(1);
+    expect(String(mqCalls[0]![0])).toContain("/queues/dlq-queue/messages");
+  });
+
+  it("default transport keeps fail-fast semantics without opt-in", async () => {
+    // Without partialFailure configured, a failing message rejects the whole
+    // invocation and the messages after it are never attempted (spec 001
+    // fail-fast parity through the real transport).
+    const runtime = createYandexHandler(PartialFailureModule);
+    runtimes.push(runtime);
+    const delivery = makeQueueDelivery(EVENT_ID, FAILING_MESSAGE_ID, "c31a-e94b5f6d70a25271d3f21e9a04c6g1a");
+
+    const failure = await capturedRejection(runtime(delivery, RUNTIME_CONTEXT));
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(ConnectorError);
+    expect(failure).toHaveProperty("message", "poison message");
+    expect(ATTEMPT_ORDER).toEqual([EVENT_ID, FAILING_MESSAGE_ID]);
   });
 });
