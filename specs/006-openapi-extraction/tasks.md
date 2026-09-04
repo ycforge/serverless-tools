@@ -73,12 +73,12 @@
 
 ### Tests for User Story 2 (write FIRST, confirm RED)
 
-- [ ] T013 [P] [US2] Add integration tests in `packages/composer/test/extraction.integration.spec.ts`: (a) without entry, `swagger.json` used and doc parity holds (US2/AC1); (b) both artifacts present → `swagger.json` wins (US2/AC2); (c) extraction of artifact path spawns NO child node process (US2/AC1 — user code never executed); (d) broken `swagger.json` → `INVALID_ARTIFACT`, does NOT fall through to `openapi.json` (US2/AC3, FR-007) — RED (chain currently `NO_SOURCE`)
+- [x] T013 [P] [US2] Add integration tests in `packages/composer/test/extraction.integration.spec.ts`: (a) without entry, `swagger.json` used and doc parity holds (US2/AC1); (b) both artifacts present → `swagger.json` wins (US2/AC2); (c) extraction of artifact path spawns NO child node process (US2/AC1 — user code never executed); (d) broken `swagger.json` → `INVALID_ARTIFACT`, does NOT fall through to `openapi.json` (US2/AC3, FR-007) — RED (chain currently `NO_SOURCE`)
 
 ### Implementation for User Story 2
 
-- [ ] T014 [P] [US2] Create fixture `packages/composer/test/fixtures/app-artifact/` with a valid `swagger.json` and a variant with both `swagger.json` + `openapi.json` (priority), and a broken-`swagger.json` variant
-- [ ] T015 [US2] Extend `packages/composer/src/extract.ts`: absent `openapiEntry` → `readOpenApiArtifact(appRoot)`; on document → return; on malformed broken artifact → throw `INVALID_ARTIFACT` (no fall-through); on null → continue to placeholder `NO_SOURCE` (replaced in US3) (FR-004/FR-007)
+- [x] T014 [P] [US2] Create fixture `packages/composer/test/fixtures/app-artifact/` with a valid `swagger.json` and a variant with both `swagger.json` + `openapi.json` (priority), and a broken-`swagger.json` variant
+- [x] T015 [US2] Extend `packages/composer/src/extract.ts`: absent `openapiEntry` → `readOpenApiArtifact(appRoot)`; on document → return; on malformed broken artifact → throw `INVALID_ARTIFACT` (no fall-through); on null → continue to placeholder `NO_SOURCE` (replaced in US3) (FR-004/FR-007)
 
 **Checkpoint**: US2 green — artifact path works with no user code execution.
 
@@ -92,12 +92,12 @@
 
 ### Tests for User Story 3 (write FIRST, confirm RED)
 
-- [ ] T016 [P] [US3] Add integration test in `packages/composer/test/extraction.integration.spec.ts`: `dist/main` convention resolves with doc parity and `SERVERLESS_TOOLS_OPENAPI_BUILD === '1'` inside (US3/AC1) — RED (chain still `NO_SOURCE` at this point)
+- [x] T016 [P] [US3] Add integration test in `packages/composer/test/extraction.integration.spec.ts`: `dist/main` convention resolves with doc parity and `SERVERLESS_TOOLS_OPENAPI_BUILD === '1'` inside (US3/AC1) — RED (chain still `NO_SOURCE` at this point)
 
 ### Implementation for User Story 3
 
-- [ ] T017 [P] [US3] Create fixture `packages/composer/test/fixtures/app-convention/dist/main.js` exporting `buildYcsfOpenApi()` (expected doc fixture)
-- [ ] T018 [US3] Extend `packages/composer/src/extract.ts`: absent entry + artifacts → `spawnRunner(appRoot, <appRoot>/dist/main, timeoutMs)`; conventions identical to US1 (FR-005/FR-002)
+- [x] T017 [P] [US3] Create fixture `packages/composer/test/fixtures/app-convention/dist/main.js` exporting `buildYcsfOpenApi()` (expected doc fixture)
+- [x] T018 [US3] Extend `packages/composer/src/extract.ts`: absent entry + artifacts → `spawnRunner(appRoot, <appRoot>/dist/main, timeoutMs)`; conventions identical to US1 (FR-005/FR-002)
 
 **Checkpoint**: US3 green — full fallback chain works.
 
@@ -111,11 +111,11 @@
 
 ### Tests for User Story 4 (write FIRST, confirm RED)
 
-- [ ] T019 [US4] Add integration tests in `packages/composer/test/extraction.integration.spec.ts`: (a) `app-nothing/` → `NO_SOURCE` with message `Specify openapi_entry in build_config.yaml or export buildYcsfOpenApi from your entry point.` (FR-006, US4/AC1); (b) `dist/main` exists but does not export `buildYcsfOpenApi` → `ENTRY_LOAD_FAILED` (US3/AC2, FR-008) — asserts fail-fast, no fall-through past a broken source
+- [x] T019 [US4] Add integration tests in `packages/composer/test/extraction.integration.spec.ts`: (a) `app-nothing/` → `NO_SOURCE` with message `Specify openapi_entry in build_config.yaml or export buildYcsfOpenApi from your entry point.` (FR-006, US4/AC1); (b) `dist/main` exists but does not export `buildYcsfOpenApi` → `ENTRY_LOAD_FAILED` (US3/AC2, FR-008) — asserts fail-fast, no fall-through past a broken source
 
 ### Implementation for User Story 4
 
-- [ ] T020 [US4] Finalize `packages/composer/src/extract.ts` terminal branch: emit `OpenApiExtractError` `NO_SOURCE` with the exact FR-006 message; verify dist/main-without-export is classified `ENTRY_LOAD_FAILED` (spawn-runner T008); verify broken sources never fall through (FR-006/FR-007/FR-008)
+- [x] T020 [US4] Finalize `packages/composer/src/extract.ts` terminal branch: emit `OpenApiExtractError` `NO_SOURCE` with the exact FR-006 message; verify dist/main-without-export is classified `ENTRY_LOAD_FAILED` (spawn-runner T008); verify broken sources never fall through (FR-006/FR-007/FR-008)
 
 **Checkpoint**: US4 green — entire fixed chain behaves deterministically.
 
