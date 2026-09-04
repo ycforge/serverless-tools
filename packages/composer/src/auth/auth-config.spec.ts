@@ -3,7 +3,18 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { validateAuthConfig, validateAuthReferences, type OpenApiDocument } from '../index.js';
+import {
+  validateAuthConfig,
+  validateAuthReferences,
+  type OpenApiDocument,
+} from '../index.js';
+import {
+  DEFAULT_SCHEME_VALIDATORS,
+  parseAuthYaml,
+  type RawAuthScheme,
+  type SchemeFieldValidator,
+} from './auth-yaml.js';
+import { AuthConfigError } from './auth-errors.js';
 
 function tempRoot(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'yc-composer-auth-config-'));
@@ -141,6 +152,82 @@ describe('validateAuthReferences — standalone cross-validation against a valid
       ),
     ).toThrowError(
       expect.objectContaining({ code: 'AUTH_SECURITY_UNDECLARED', schemeName: 'admin' }),
+    );
+  });
+});
+
+describe('extensibility — scheme-type validator registry (FR-005, SC-005)', () => {
+  const VALID_BASE_YAML = `version: 1
+defaultScheme: user
+schemes:
+  public:
+    type: none
+  user:
+    type: jwt
+    jwksUri: https://auth.example.com/jwks.json
+    issuer: https://auth.example.com
+    audience:
+      - my-api
+  internal:
+    type: function
+    function: functions.internal_authorizer
+`;
+
+  it('stays byte-for-byte unchanged through an extended registry', () => {
+    const extended: Readonly<Record<string, SchemeFieldValidator>> = {
+      ...DEFAULT_SCHEME_VALIDATORS,
+      basic: ((raw: RawAuthScheme, schemeName: string) => {
+        const realm = raw.realm;
+        if (typeof realm !== 'string' || realm === '') {
+          throw new AuthConfigError('AUTH_MISSING_FIELD', { schemeName, field: 'realm' });
+        }
+        return { type: 'basic', realm } as never;
+      }),
+    };
+    const base = parseAuthYaml(VALID_BASE_YAML, '/app/auth.yaml');
+    const viaExtended = parseAuthYaml(VALID_BASE_YAML, '/app/auth.yaml', extended);
+    expect(viaExtended).toEqual(base);
+  });
+
+  it('accepts a temporary custom scheme type and still fail-fasts on unknown types (SC-005, R1)', () => {
+    const extended: Readonly<Record<string, SchemeFieldValidator>> = {
+      ...DEFAULT_SCHEME_VALIDATORS,
+      basic: ((raw: RawAuthScheme, schemeName: string) => {
+        const realm = raw.realm;
+        if (typeof realm !== 'string' || realm === '') {
+          throw new AuthConfigError('AUTH_MISSING_FIELD', { schemeName, field: 'realm' });
+        }
+        return { type: 'basic', realm } as never;
+      }),
+    };
+    const withBasic = parseAuthYaml(
+      `version: 1
+defaultScheme: user
+schemes:
+  user:
+    type: none
+  basic:
+    type: basic
+    realm: example.com
+`,
+      '/app/auth.yaml',
+      extended,
+    );
+    expect(withBasic.schemes.basic).toEqual({ type: 'basic', realm: 'example.com' });
+
+    expect(() =>
+      parseAuthYaml(
+        `version: 1
+defaultScheme: user
+schemes:
+  user:
+    type: mystery
+`,
+        '/app/auth.yaml',
+        extended,
+      ),
+    ).toThrowError(
+      expect.objectContaining({ code: 'AUTH_UNKNOWN_SCHEME_TYPE', schemeName: 'user', type: 'mystery' }),
     );
   });
 });

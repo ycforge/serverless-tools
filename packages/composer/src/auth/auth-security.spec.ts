@@ -175,4 +175,37 @@ describe('validateSecurityReferences', () => {
       ),
     ).not.toThrow();
   });
+
+  it('rejects an undeclared scheme referenced from the document root (R6, FR-008)', () => {
+    expect(() => validateSecurityReferences(docWith({ security: [{ ghost: [] }] }), AUTH)).toThrowError(
+      expect.objectContaining({
+        code: 'AUTH_SECURITY_UNDECLARED',
+        schemeName: 'ghost',
+        route: 'root',
+      }),
+    );
+  });
+
+  it('never mutates the input openApi document (R5)', () => {
+    const input = {
+      openapi: '3.0.0',
+      info: { title: 't', version: '1.0.0' },
+      paths: { '/x': { get: { security: [{ user: [] }] } } },
+      components: { securitySchemes: { user: { type: 'http', scheme: 'bearer' } } },
+    } as OpenApiDocument;
+    const before = structuredClone(input);
+    const frozen = deepFreeze(input);
+    expect(() => validateSecurityReferences(frozen, AUTH)).not.toThrow();
+    expect(JSON.stringify(frozen)).toBe(JSON.stringify(before));
+  });
+
+  function deepFreeze<T>(value: T): T {
+    if (value === null || typeof value !== 'object') {
+      return value;
+    }
+    for (const key of Object.keys(value)) {
+      deepFreeze((value as Record<string, unknown>)[key]);
+    }
+    return Object.freeze(value);
+  }
 });

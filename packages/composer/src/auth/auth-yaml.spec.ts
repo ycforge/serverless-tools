@@ -250,3 +250,62 @@ schemes:
     expect((thrown as AuthConfigError).schemeName).toBe('user');
   });
 });
+
+describe('parseAuthYaml — edge cases (T025)', () => {
+  it('accepts defaultScheme: public with a declared public/none scheme (FR-009)', () => {
+    const doc = parseAuthYaml(
+      `version: 1
+defaultScheme: public
+schemes:
+  public:
+    type: none
+`,
+      SOURCE,
+    );
+    expect(doc.defaultScheme).toBe('public');
+    expect(doc.schemes.public).toEqual({ type: 'none' });
+  });
+
+  it('distinguishes Public from public (case-sensitive scheme names)', () => {
+    const doc = parseAuthYaml(
+      `version: 1
+defaultScheme: Public
+schemes:
+  Public:
+    type: none
+`,
+      SOURCE,
+    );
+    expect(doc).toEqual({
+      version: 1,
+      defaultScheme: 'Public',
+      schemes: { Public: { type: 'none' } },
+    });
+
+    expect(() =>
+      parseAuthYaml(
+        `version: 1
+defaultScheme: public
+schemes:
+  Public:
+    type: none
+`,
+        SOURCE,
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'AUTH_DEFAULT_UNRESOLVED',
+        schemeName: 'public',
+      }),
+    );
+  });
+
+  it('rejects an empty/corrupt document as AUTH_FILE_INVALID_YAML', () => {
+    expect(() => parseAuthYaml('', SOURCE)).toThrowError(
+      expect.objectContaining({ code: 'AUTH_FILE_INVALID_YAML', path: SOURCE }),
+    );
+    expect(() => parseAuthYaml('   \n\t\n', SOURCE)).toThrowError(
+      expect.objectContaining({ code: 'AUTH_FILE_INVALID_YAML', path: SOURCE }),
+    );
+  });
+});
