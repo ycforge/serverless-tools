@@ -57,6 +57,16 @@ describe('validateAuthConfig — fixed pipeline order (SC-003)', () => {
         { code: 'AUTH_SCHEMES_EMPTY', field: 'schemes' },
       ],
       [
+        'unresolved defaultScheme wins over an unknown scheme type',
+        {
+          'auth.yaml':
+            'version: 1\ndefaultScheme: ghost\nschemes:\n  user:\n    type: oauth2\n',
+        },
+        docWithSecurity('ghost'),
+        {},
+        { code: 'AUTH_DEFAULT_UNRESOLVED', schemeName: 'ghost' },
+      ],
+      [
         'missing jwt field wins over an undeclared security ref',
         {
           'auth.yaml':

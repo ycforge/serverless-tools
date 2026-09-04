@@ -104,17 +104,20 @@ Initial: request = { appRoot, openApi, functions? }
                  doc.errors (вкл. DUPLICATE_KEY) -> AUTH_FILE_INVALID_YAML /
                                                     AUTH_DUPLICATE_KEY / AUTH_DUPLICATE_SCHEME
                  корень не-объект           -> AUTH_FILE_INVALID_YAML
-  3. VERSION   version === 1               -> else AUTH_VERSION_UNSUPPORTED
+3. VERSION   version === 1               -> else AUTH_VERSION_UNSUPPORTED
   4. DEFAULT   defaultScheme присутствует   -> else AUTH_DEFAULT_MISSING
-                 defaultScheme ∈ schemes    -> else AUTH_DEFAULT_UNRESOLVED
+                 (только присутствие; разрешимость — на этапе 6)
   5. SCHEMES   schemes — непустой map       -> else AUTH_SCHEMES_EMPTY / AUTH_SCHEMES_NOT_MAP
-  6. TYPE      type ∈ {none,jwt,function}   -> else AUTH_UNKNOWN_SCHEME_TYPE
-  7. FIELDS    обязательные поля по типу    -> else AUTH_MISSING_FIELD
-  8. FUNC-REF  function-ссылки: грамматика, набор functions (если есть function-схемы)
-                                          -> else AUTH_FUNCTION_INVALID_REF /
-                                             AUTH_FUNCTION_UNRESOLVED /
-                                             AUTH_FUNCTION_SET_REQUIRED
-  9. SECURITY  scan root. + операций security-entries
+  6. DEFAULT   defaultScheme ∈ schemes      -> else AUTH_DEFAULT_UNRESOLVED
+                 (разрешимость defaultScheme; проверяется ПОСЛЕ формы schemes,
+                  чтобы поиск имени никогда не шёл по не-obj/пустой структуре)
+  7. TYPE      type ∈ {none,jwt,function}   -> else AUTH_UNKNOWN_SCHEME_TYPE
+  8. FIELDS    обязательные поля по типу    -> else AUTH_MISSING_FIELD
+  9. FUNC-REF  function-ссылки: грамматика, набор functions (если есть function-схемы)
+                                           -> else AUTH_FUNCTION_INVALID_REF /
+                                              AUTH_FUNCTION_UNRESOLVED /
+                                              AUTH_FUNCTION_SET_REQUIRED
+ 10. SECURITY  scan root. + операций security-entries
                  каждое имя объявлено?      -> else AUTH_SECURITY_UNDECLARED (scheme+route)
                  значение public?           -> else AUTH_SECURITY_PUBLIC_VIOLATION (route)
 
@@ -122,6 +125,7 @@ Final: AuthValidationResult { authYaml: AuthYamlDocument }  // валидиро�
 ```
 
 Инварианты перехода:
-- Приоритет строго фиксирован (SC-003): `version → defaultScheme → schemes → type → fields → function → security`.
+- Приоритет строго фиксирован (SC-003): `version → defaultScheme-presence → schemes-map/empty → defaultScheme-resolvability → type → fields → function → security`.
+- Следствия канонического порядка: документ с `schemes: {}` и `defaultScheme: user` даёт `AUTH_SCHEMES_EMPTY` (правило 8 раньше правила 7 — форма schemes проверяется до разрешимости); документ с непустым `schemes`, `defaultScheme: ghost` и схемой с неизвестным `type` даёт `AUTH_DEFAULT_UNRESOLVED` (правило 7 раньше правила 9 — разрешимость проверяется до типа схемы).
 - Существующий, но невалидный источник — fail-fast, никакие «мягкие» стадии (warnings) не предусмотрены (V).
 - Документ `auth.yaml` и входной `openApi` никогда не модифицируются (R5).
