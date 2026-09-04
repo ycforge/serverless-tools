@@ -1,0 +1,19 @@
+version: 1
+defaultScheme: user
+
+schemes:
+  public:
+    type: none
+
+  user:
+    type: jwt
+    jwksUri: https://auth.example.com/jwks.json
+    issuer: https://auth.example.com
+    audience: [my-api]
+
+  internal:
+    type: function
+    function: functions.internal_authorizer
+
+  frontend:
+    type: none

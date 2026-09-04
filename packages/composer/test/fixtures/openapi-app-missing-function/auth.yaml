@@ -1,0 +1,5 @@
+version: 1
+defaultScheme: internal
+schemes:
+  internal:
+    type: function
