@@ -496,6 +496,8 @@ export async function buildYcsfOpenApi(): Promise<OpenAPIObject> {
 
 B вызывает эту функцию, получает готовый `OpenAPIObject`. B не лезет в reflection самостоятельно — он читает обычный OpenAPI spec, где `security` уже проставлен стандартным `SwaggerModule`.
 
+> **Исполнение — в изолированном runner-процессе** (уточнено spec 006, clarify 2026-09-04): B порождает отдельный runner-процесс, который загружает entry point и вызывает `buildYcsfOpenApi`; основной процесс composer не импортирует и не исполняет user-код (Constitution I). Таймаут/падение runner — fail-fast ошибка извлечения.
+
 Рекомендация: в `buildYcsfOpenApi` не вызывать `app.init()`/`app.listen()` и по возможности использовать metadata-only генерацию (`SwaggerModule.createDocument` без полной инициализации провайдеров), чтобы избежать подключений к БД даже при импорте `AppModule` целиком. Холодный старт и размер бандла NestJS-функции — ответственность builder-а `nestjs-function` (bundling через esbuild/webpack, tree-shaking), а не пользователя (см. раздел 21).
 
 ### Fallback chain
