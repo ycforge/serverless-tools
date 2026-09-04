@@ -13,6 +13,7 @@ import { discoverQueueHandlers, dispatchQueueHandlers } from "./dispatch";
 import { normalizeQueueBatch } from "./normalize-batch";
 import { QueueHandler } from "./queue-handler.decorator";
 import { QueueMessage } from "./queue-message.decorator";
+import type { QueueTransportOptions } from "../core/handler-options";
 import type { RawQueueEvent, RawQueueMessageEvent } from "./raw-event";
 
 /**
@@ -769,5 +770,326 @@ describe("queue handler dispatch", () => {
     );
 
     expect((failure as Error).message).toContain("is no longer a function");
+  });
+});
+
+describe("queue handler dispatch — degrade mode (partial failure)", () => {
+  const DEGRADE_OPTIONS: QueueTransportOptions = {
+    partialFailure: { enabled: true },
+  };
+  const FAIL_FAST_OPTIONS: QueueTransportOptions = {};
+
+  function makeDispatchContext(rawEvent: RawQueueEvent) {
+    return buildYandexExecutionContext(rawEvent, RUNTIME_CONTEXT);
+  }
+
+  it("attempts all messages when one handler throw in degrade mode", async () => {
+    const delivery = makeQueueDelivery("m-ok", "m-fail", "m-later");
+    const batch = normalizeQueueBatch(delivery);
+    const handledBy: string[] = [];
+
+    const Handler = class {
+      async handle(): Promise<void> {
+        const msg = getInvocationScopeState()?.queueMessage;
+        handledBy.push(msg?.messageId ?? "unknown");
+        if (msg?.messageId === "m-fail") {
+          throw new Error("poison message");
+        }
+      }
+    };
+    decorateQueueHandler(Handler.prototype, "handle");
+
+    await runInInvocationScope({ executionContext: makeDispatchContext(delivery) }, () =>
+      dispatchQueueHandlers(
+        fakeInvocationContainer(new Map([[Handler, new Handler()]])),
+        [{ token: Handler, methodName: "handle" }],
+        batch,
+        DEGRADE_OPTIONS,
+      ),
+    );
+
+    // All three messages were attempted despite the middle one failing.
+    expect(handledBy).toEqual(["m-ok", "m-fail", "m-later"]);
+  });
+
+  it("invocation resolves normally (ack) in degrade mode even with failures", async () => {
+    const delivery = makeQueueDelivery("m-ok", "m-fail");
+    const batch = normalizeQueueBatch(delivery);
+
+    const Handler = class {
+      async handle(): Promise<void> {
+        const msg = getInvocationScopeState()?.queueMessage;
+        if (msg?.messageId === "m-fail") {
+          throw new Error("boom");
+        }
+      }
+    };
+    decorateQueueHandler(Handler.prototype, "handle");
+
+    // Degrade mode must NOT reject — it acks the batch.
+    await expect(
+      runInInvocationScope({ executionContext: makeDispatchContext(delivery) }, () =>
+        dispatchQueueHandlers(
+          fakeInvocationContainer(new Map([[Handler, new Handler()]])),
+          [{ token: Handler, methodName: "handle" }],
+          batch,
+          DEGRADE_OPTIONS,
+        ),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("collects outcomes in delivery order with messageId binding", async () => {
+    const delivery = makeQueueDelivery("m-a", "m-b", "m-c");
+    const batch = normalizeQueueBatch(delivery);
+
+    const Handler = class {
+      async handle(): Promise<void> {
+        const msg = getInvocationScopeState()?.queueMessage;
+        if (msg?.messageId === "m-b") {
+          throw new Error("fail-b");
+        }
+      }
+    };
+    decorateQueueHandler(Handler.prototype, "handle");
+
+    // We verify via the console.warn spy for the data loss warning as a proxy
+    // for outcome collection. The real outcome is internal to dispatch.
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(String(args[0]));
+    try {
+      await runInInvocationScope({ executionContext: makeDispatchContext(delivery) }, () =>
+        dispatchQueueHandlers(
+          fakeInvocationContainer(new Map([[Handler, new Handler()]])),
+          [{ token: Handler, methodName: "handle" }],
+          batch,
+            DEGRADE_OPTIONS,
+        ),
+      );
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    // Without deadLetterQueueId, the warning about data loss is emitted.
+    expect(warnings.some((w) => w.includes("failed"))).toBe(true);
+  });
+
+  it("gives identical result for all-success batch in degrade mode as fail-fast", async () => {
+    const delivery = makeQueueDelivery("m-ok");
+    const batch = normalizeQueueBatch(delivery);
+
+    const Handler = class {
+      handle(): void {}
+    };
+    decorateQueueHandler(Handler.prototype, "handle");
+
+    // Both paths resolve to undefined (successful ack).
+    await expect(
+      runInInvocationScope({ executionContext: makeDispatchContext(delivery) }, () =>
+        dispatchQueueHandlers(
+          fakeInvocationContainer(new Map([[Handler, new Handler()]])),
+          [{ token: Handler, methodName: "handle" }],
+          batch,
+          DEGRADE_OPTIONS,
+        ),
+      ),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      runInInvocationScope({ executionContext: makeDispatchContext(delivery) }, () =>
+        dispatchQueueHandlers(
+          fakeInvocationContainer(new Map([[Handler, new Handler()]])),
+          [{ token: Handler, methodName: "handle" }],
+          batch,
+          FAIL_FAST_OPTIONS,
+        ),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("still throws NO_QUEUE_HANDLER regardless of degrade mode", async () => {
+    const delivery = makeQueueDelivery();
+    const batch = normalizeQueueBatch(delivery);
+
+    const failure = (await capturedRejection(
+      runInInvocationScope({ executionContext: makeDispatchContext(delivery) }, () =>
+        dispatchQueueHandlers(fakeInvocationContainer(new Map()), [], batch, DEGRADE_OPTIONS),
+      ),
+    )) as { code?: string };
+
+    expect(failure.code).toBe("NO_QUEUE_HANDLER");
+  });
+
+  it("deadLetterQueueId without enabled:true stays fail-fast", async () => {
+    const delivery = makeQueueDelivery("m-ok", "m-fail");
+    const batch = normalizeQueueBatch(delivery);
+
+    const Handler = class {
+      async handle(): Promise<void> {
+        const msg = getInvocationScopeState()?.queueMessage;
+        if (msg?.messageId === "m-fail") {
+          throw new Error("boom");
+        }
+      }
+    };
+    decorateQueueHandler(Handler.prototype, "handle");
+
+    const FAIL_FAST_WITH_DLQ: QueueTransportOptions = {
+      partialFailure: { enabled: false, deadLetterQueueId: "dlq-id" },
+    };
+
+    // Without enabled:true, behaviour is fail-fast — the error propagates.
+    const failure = await capturedRejection(
+      runInInvocationScope({ executionContext: makeDispatchContext(delivery) }, () =>
+        dispatchQueueHandlers(
+          fakeInvocationContainer(new Map([[Handler, new Handler()]])),
+          [{ token: Handler, methodName: "handle" }],
+          batch,
+          FAIL_FAST_WITH_DLQ,
+        ),
+      ),
+    );
+
+    expect((failure as Error).message).toBe("boom");
+  });
+
+  it("two sequential dispatch calls in degrade mode yield independent results", async () => {
+    const delivery1 = makeQueueDelivery("d1-ok", "d1-fail");
+    const batch1 = normalizeQueueBatch(delivery1);
+    const delivery2 = makeQueueDelivery("d2-ok", "d2-fail");
+    const batch2 = normalizeQueueBatch(delivery2);
+
+    const Handler = class {
+      async handle(): Promise<void> {
+        const msg = getInvocationScopeState()?.queueMessage;
+        if (msg?.messageId?.includes("fail")) {
+          throw new Error(`fail:${msg.messageId}`);
+        }
+      }
+    };
+    decorateQueueHandler(Handler.prototype, "handle");
+
+    const firstWarnings: string[] = [];
+    const secondWarnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => firstWarnings.push(String(args[0]));
+    try {
+      // First dispatch — fails d1-fail, no interaction with the second batch.
+      await runInInvocationScope({ executionContext: makeDispatchContext(delivery1) }, () =>
+        dispatchQueueHandlers(
+          fakeInvocationContainer(new Map([[Handler, new Handler()]])),
+          [{ token: Handler, methodName: "handle" }],
+          batch1,
+          DEGRADE_OPTIONS,
+        ),
+      );
+
+      // Second dispatch — fails d2-fail, must not reuse the first batch's state.
+      console.warn = (...args: unknown[]) => secondWarnings.push(String(args[0]));
+      await runInInvocationScope({ executionContext: makeDispatchContext(delivery2) }, () =>
+        dispatchQueueHandlers(
+          fakeInvocationContainer(new Map([[Handler, new Handler()]])),
+          [{ token: Handler, methodName: "handle" }],
+          batch2,
+          DEGRADE_OPTIONS,
+        ),
+      );
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    // Each invocation's per-message failure record names ONLY its own failing
+    // message (no state leakage between invocations, FR-012).
+    expect(firstWarnings.some((w) => w.includes("d1-fail"))).toBe(true);
+    expect(firstWarnings.some((w) => w.includes("d2-fail"))).toBe(false);
+    expect(secondWarnings.some((w) => w.includes("d2-fail"))).toBe(true);
+    expect(secondWarnings.some((w) => w.includes("d1-fail"))).toBe(false);
+  });
+
+  it("continues after handler throw even with multiple failures", async () => {
+    const delivery = makeQueueDelivery("m-1", "m-2", "m-3", "m-4");
+    const batch = normalizeQueueBatch(delivery);
+    const handledBy: string[] = [];
+
+    const Handler = class {
+      async handle(): Promise<void> {
+        const msg = getInvocationScopeState()?.queueMessage;
+        handledBy.push(msg?.messageId ?? "unknown");
+        if (msg?.messageId === "m-2" || msg?.messageId === "m-4") {
+          throw new Error(`fail:${msg?.messageId}`);
+        }
+      }
+    };
+    decorateQueueHandler(Handler.prototype, "handle");
+
+    await runInInvocationScope({ executionContext: makeDispatchContext(delivery) }, () =>
+      dispatchQueueHandlers(
+        fakeInvocationContainer(new Map([[Handler, new Handler()]])),
+        [{ token: Handler, methodName: "handle" }],
+        batch,
+        DEGRADE_OPTIONS,
+      ),
+    );
+
+    // All 4 messages attempted despite 2 failures.
+    expect(handledBy).toEqual(["m-1", "m-2", "m-3", "m-4"]);
+  });
+
+  it("aborts the whole invocation when DI resolution fails in degrade mode", async () => {
+    const delivery = makeQueueDelivery("m-a", "m-b", "m-c");
+    const batch = normalizeQueueBatch(delivery);
+    const handledBy: string[] = [];
+
+    const Handler = class {
+      async handle(): Promise<void> {
+        const msg = getInvocationScopeState()?.queueMessage;
+        handledBy.push(msg?.messageId ?? "unknown");
+      }
+    };
+    decorateQueueHandler(Handler.prototype, "handle");
+    const instance = new Handler();
+
+    // Resolution succeeds for the first message, then fails on the second.
+    // A DI resolution failure must NOT be downgraded to a per-message failure
+    // — it aborts the whole invocation (FR-005), no continuation.
+    let resolveCalls = 0;
+    const flakyContainer = {
+      async resolve<T>(_token: unknown): Promise<T> {
+        resolveCalls += 1;
+        if (resolveCalls > 1) {
+          throw new Error("DI resolution failed on message 2");
+        }
+        return instance as T;
+      },
+    };
+
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(String(args[0]));
+    let failure: unknown;
+    try {
+      try {
+        await runInInvocationScope({ executionContext: makeDispatchContext(delivery) }, () =>
+          dispatchQueueHandlers(
+            flakyContainer,
+            [{ token: Handler, methodName: "handle" }],
+            batch,
+            DEGRADE_OPTIONS,
+          ),
+        );
+      } catch (error) {
+        failure = error;
+      }
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    // Only m-a is attempted — m-b/m-c never resolve, and the error propagates
+    // as a whole-invocation failure instead of a recorded per-message outcome.
+    expect(handledBy).toEqual(["m-a"]);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe("DI resolution failed on message 2");
+    expect(warnings).toHaveLength(0);
   });
 });

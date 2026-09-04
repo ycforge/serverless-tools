@@ -15,7 +15,7 @@
 // Core: runtime entry point and boundary error.
 export { createYandexHandler } from "./core/create-yandex-handler";
 export type { ClosableYandexCloudFunctionHandler } from "./core/create-yandex-handler";
-export type { CreateYandexHandlerOptions, QueueTransportOptions } from "./core/handler-options";
+export type { CreateYandexHandlerOptions, QueueTransportOptions, PartialFailureOptions } from "./core/handler-options";
 export { ConnectorError } from "./core/connector-error";
 
 // Core: transport SPI and shared invocation contracts.
@@ -48,6 +48,11 @@ export type {
   QueueEventMetadata,
   QueueMessageAttribute,
 } from "./mq/message";
+export type {
+  BatchDispatchResult,
+  MessageError,
+  MessageOutcome,
+} from "./mq/message-outcome";
 
 // Normalized execution context.
 export type { YandexExecutionContext } from "./context/yandex-execution-context";

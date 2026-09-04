@@ -85,6 +85,35 @@ packages/nest-bridge/
 
 **Structure Decision**: Changes are confined to `packages/nest-bridge/src/mq/` and `src/core/handler-options.ts`. New types go in a dedicated `message-outcome.ts` file; DLQ sender in `dlq-sender.ts`. No new packages or cross-package changes.
 
+## Phase 0: Research
+
+**Output**: [research.md](./research.md)
+
+All NEEDS CLARIFICATION items resolved:
+
+| # | Unknown | Resolution |
+|---|---------|------------|
+| R1 | DLQ republishing mechanism | Yandex MQ HTTP API via native `fetch` (Node 18+); POST to `/queues/{queue_id}/messages` with IAM token auth |
+| R2 | Dispatch loop modification strategy | Wrap per-message delivery in try/catch inside existing sequential loop; degrade path records `MessageOutcome`, continues on handler throw, invokes DLQ sender after loop |
+| R3 | MessageOutcome type design | Minimal: `{ messageId, success, error?: { name, message } }` — no payload/token/header leakage (FR-010) |
+| R4 | IAM token retrieval for DLQ sender | Lazy-fetch from metadata service with TTL caching (~1 hour, 5-minute refresh margin) |
+| R5 | Integration with spec 004 observability | Per-message failure records include `trace_id` from invocation context via `resolveInvocationExecutionContext()` |
+
+## Phase 1: Design & Contracts
+
+**Outputs**: [data-model.md](./data-model.md), [contracts/](./contracts/queue-transport-options.md), [quickstart.md](./quickstart.md)
+
+Key design decisions:
+
+- **PartialFailureOptions** extends `QueueTransportOptions` with `enabled: boolean` and optional `deadLetterQueueId: string`
+- **MessageOutcome** carries `messageId`, `success` flag, and sanitized `error` (name + message only)
+- **BatchDispatchResult** aggregates outcomes with `failureCount` for DLQ trigger decision
+- **DlqSender** class encapsulates IAM token management and Yandex MQ HTTP API calls (fail-open: warnings on failure, never throws)
+- **Dispatch modification**: optional `options` parameter on `dispatchQueueHandlers`; degrade path wraps `extendInvocationScope` in try/catch, collects outcomes, invokes DLQ sender, returns normally (ack)
+- **Backward compatible**: `partialFailure` is optional; default = fail-fast (spec 001 parity)
+
+**Post-design Constitution re-check**: ✅ No new violations. `QueueTransportOptions` extension is additive (non-breaking); changes confined to `packages/nest-bridge`.
+
 ## Complexity Tracking
 
 > No constitution violations requiring justification.

@@ -75,7 +75,7 @@ export function createMessageQueueTransport(
       // result of a successful delivery.
       return extendInvocationScope({ queueBatch: batch }, async () => {
         const handlers = discoverQueueHandlers(invocation.container.getApplication());
-        await dispatchQueueHandlers(invocation.container, handlers, batch);
+        await dispatchQueueHandlers(invocation.container, handlers, batch, options);
         return batch;
       });
     },
