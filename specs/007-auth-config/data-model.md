@@ -104,7 +104,7 @@ Initial: request = { appRoot, openApi, functions? }
                  doc.errors (вкл. DUPLICATE_KEY) -> AUTH_FILE_INVALID_YAML /
                                                     AUTH_DUPLICATE_KEY / AUTH_DUPLICATE_SCHEME
                  корень не-объект           -> AUTH_FILE_INVALID_YAML
-3. VERSION   version === 1               -> else AUTH_VERSION_UNSUPPORTED
+  3. VERSION   version === 1               -> else AUTH_VERSION_UNSUPPORTED
   4. DEFAULT   defaultScheme присутствует   -> else AUTH_DEFAULT_MISSING
                  (только присутствие; разрешимость — на этапе 6)
   5. SCHEMES   schemes — непустой map       -> else AUTH_SCHEMES_EMPTY / AUTH_SCHEMES_NOT_MAP
