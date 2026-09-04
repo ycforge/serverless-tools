@@ -44,7 +44,7 @@ A new session always starts the same way: read constitution → read `specs/READ
 ## Conventions
 
 - Specs and user-facing docs: Russian; code, identifiers, commit messages: English (project artifacts follow existing file conventions).
-- Clarification questions to the user in the spec-kit cycle (`/speckit-specify`, `/speckit-clarify`) MUST be asked in Russian.
+- Clarification questions to the user in the spec-kit cycle (`/speckit-specify`, `/speckit-clarify`) MUST be asked in Russian and MUST be illustrated with concrete examples: a small end-to-end scenario (who does what, ideally with a tiny code/config snippet and the observable outcome), not just abstract trade-off descriptions. If a question hinges on a boundary between components or on a CONSTITUTION/IDEA rule, show the concrete flow under each proposed option and what goes wrong under the rejected ones.
 - Package naming: artifact types use `<package-scope>:<kind>` (e.g. `ycforge:function`).
 - All `.ycsf/*.yaml` formats carry `version: 1` and are covered by contract versioning of `@ycforge/pilot/contracts` (semver; breaking change = major + migration guide).
 - Fail-fast over magic: collisions (artifact type, path/operationId, identity in both apps.yaml and resources.yaml) are errors, never silent merges.
