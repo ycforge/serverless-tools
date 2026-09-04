@@ -453,6 +453,7 @@ describe("core invocation runtime lifecycle", () => {
           message: "Cannot GET /fixture",
           error: "Not Found",
           statusCode: 404,
+          trace_id: "inv-public-http",
         }),
         isBase64Encoded: false,
       });

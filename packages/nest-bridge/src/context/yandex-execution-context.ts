@@ -37,6 +37,16 @@ export interface YandexExecutionContext {
   readonly logGroupName: string;
 
   /**
+   * Stable per-invocation correlation id exposed for observability
+   * (spec 004, FR-001..003; clarify Q1→A). Its value equals
+   * {@link awsRequestId} — the transport-neutral cross-invocation id observed
+   * in 97/97 captured invocations — exposed under a dedicated key so the
+   * connector, application logs and error envelopes correlate on one stable
+   * name. Not a secret; never redacted.
+   */
+  readonly trace_id: string;
+
+  /**
    * Function service account IAM token. **Secret**: must never be logged or
    * embedded in diagnostics (AGENTS.md section 6.2); {@link toJSON} redacts it
    * so accidental serialization cannot leak it. Optional because its presence

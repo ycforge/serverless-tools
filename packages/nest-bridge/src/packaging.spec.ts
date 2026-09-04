@@ -50,6 +50,11 @@ describe("npm package distribution contract", () => {
         import: "./dist/context/index.js",
         require: "./dist/context/index.cjs",
       },
+      "./logger": {
+        types: "./dist/logger/index.d.ts",
+        import: "./dist/logger/index.js",
+        require: "./dist/logger/index.cjs",
+      },
     });
   });
 

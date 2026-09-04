@@ -56,6 +56,14 @@ export type YandexHttpResponseFacade = ResponseSerializationAccess & {
   /** Finishes the response without a payload. */
   end(): void;
   redirect(statusCode: number, url: string): void;
+  /**
+   * Error-path correlation seam (spec 004, FR-016/017; research R5): once
+   * invoked, subsequent `json`/`send` object payloads receive `trace_id` at
+   * their root — unless the payload already carries one. Scalar
+   * string/Buffer bodies are never modified. Non-enumerable: invisible to
+   * serialization and `@Res()` consumers.
+   */
+  attachTraceId(traceId: string): void;
 };
 
 /**
@@ -72,10 +80,26 @@ function normalizeHeaderName(name: string): string {
   return name.toLowerCase();
 }
 
+/**
+ * Whether an error body may gain a `trace_id` root key (FR-017): a plain
+ * object that does not already define `trace_id`. Arrays are treated as
+ * opaque so a `trace_id` key is never injected into a list root; the merge
+ * happens before serialization, so a filter that already set `trace_id` wins.
+ */
+function isMergeableObject(payload: unknown): payload is Record<string, unknown> {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    !Array.isArray(payload) &&
+    !Object.prototype.hasOwnProperty.call(payload, "trace_id")
+  );
+}
+
 export function createResponseFacade(): YandexHttpResponseFacade {
   let statusCode = 200;
   let ended = false;
   let bodyPayload: string | Buffer | undefined = undefined;
+  let attachedTraceId: string | undefined = undefined;
   const headerValues = new Map<string, string[]>();
 
   const facade: YandexHttpResponseFacade = {
@@ -133,7 +157,7 @@ export function createResponseFacade(): YandexHttpResponseFacade {
       // failure (e.g. circular structures) then surfaces inside the route
       // proxy's try/catch and maps through Nest's exception filters to a
       // proper 500 response — exactly like platform servers.
-      bodyPayload = JSON.stringify(payload);
+      bodyPayload = JSON.stringify(withAttachedTrace(payload));
       ended = true;
     },
 
@@ -153,7 +177,7 @@ export function createResponseFacade(): YandexHttpResponseFacade {
         if (!facade.hasHeader("content-type")) {
           facade.setHeader("content-type", IMPLICIT_JSON_CONTENT_TYPE);
         }
-        bodyPayload = JSON.stringify(payload);
+        bodyPayload = JSON.stringify(withAttachedTrace(payload));
       }
       ended = true;
     },
@@ -171,7 +195,35 @@ export function createResponseFacade(): YandexHttpResponseFacade {
       bodyPayload = "";
       ended = true;
     },
+
+    attachTraceId(traceId) {
+      attachedTraceId = traceId;
+    },
   };
+
+  // The trace-id seam is invisible to serialization, iteration and instanceof
+  // style audits by @Res() consumers (research R5).
+  Object.defineProperty(facade, "attachTraceId", { enumerable: false });
+
+  /**
+   * Merges the attached `trace_id` into an object error body without
+   * overwriting a filter-supplied value (FR-017): a payload that already
+   * owns `trace_id` is returned untouched, scalar payloads pass through.
+   */
+  function withAttachedTrace(payload: unknown): unknown {
+    if (
+      attachedTraceId === undefined ||
+      // The trace_id rides only on error responses (FR-016/FR-017). Injection
+      // is gated on the final status so success replies (2xx/3xx) are never
+      // touched, regardless of which layer writes them — NestJS exception
+      // filters, the not-found handler or the last-resort 500 (research R5).
+      statusCode < 400 ||
+      !isMergeableObject(payload)
+    ) {
+      return payload;
+    }
+    return { ...payload, trace_id: attachedTraceId };
+  }
 
   // Live views over the closure state so the serializer always reads the
   // final values after the pipeline completes.

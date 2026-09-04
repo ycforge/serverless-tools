@@ -1,14 +1,18 @@
 import type { INestApplication, Type } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { buildYandexExecutionContext } from "../context/build-yandex-execution-context";
+import { buildYandexExecutionContext, readInvocationTraceId } from "../context/build-yandex-execution-context";
 import { runInInvocationScope } from "../context/invocation-scope";
 import { YandexHttpAdapter } from "../http/yandex-http-adapter";
+import { createLogWriter } from "../logger/writer";
+import { createInvocationLogger, contextFields } from "../logger/invocation-logger";
+import type { YandexExecutionContext } from "../context/yandex-execution-context";
 import { detectTransport } from "./detect-transport";
 import type {
   InjectableToken,
   InvocationContainer,
   InvocationResolutionContext,
   TransportAdapter,
+  TransportId,
   TransportInvocation,
   YandexCloudFunctionHandler,
 } from "./transport";
@@ -115,17 +119,46 @@ export function createInvocationRuntime(
   };
 
   const handler: YandexCloudFunctionHandler = async (rawEvent, rawContext) => {
+    // Boundary logging runs on the public invocation path (spec 004, FR-005):
+    // one stdout writer per call, fail-open and write-call-atomic (FR-010/011).
+    // Fatal pre-scope boundaries (detection/bootstrap) still emit an error
+    // record, correlating on the tolerant id read from the raw context when
+    // one exists (research R4 / edge case 1). Everything stays side-effect
+    // free with respect to the invocation result.
+    const logger = createInvocationLogger(createLogWriter());
+    const tolerantTraceId = readInvocationTraceId(rawContext);
+
     // Detection runs once, before any initialization cost, so events nobody
     // claims fail fast and predictably (docs/ARCHITECTURE.md section 4).
-    const transport = detectTransport(transports, rawEvent);
+    let transport: TransportAdapter;
+    try {
+      transport = detectTransport(transports, rawEvent);
+    } catch (error) {
+      logger.error({ trace_id: tolerantTraceId, error });
+      throw error;
+    }
 
-    const application = await getApplication();
+    let application: INestApplication;
+    try {
+      application = await getApplication();
+    } catch (error) {
+      // Cold-start bootstrap failure (FR-008): no normalized execution
+      // context exists, so only the tolerant id (when available) is emitted.
+      logger.error({ trace_id: tolerantTraceId, error });
+      throw error;
+    }
 
     // Normalized once per invocation from the untouched payloads: every
     // transport hands the identical context abstraction to user code, keeping
     // correlation ids and trace metadata consistent across HTTP and Message
     // Queue executions (issue #4).
-    const executionContext = buildYandexExecutionContext(rawEvent, rawContext);
+    let executionContext: YandexExecutionContext;
+    try {
+      executionContext = buildYandexExecutionContext(rawEvent, rawContext);
+    } catch (error) {
+      logger.error({ trace_id: tolerantTraceId, error });
+      throw error;
+    }
 
     // Fresh per-invocation record: transports receive the untouched raw
     // event/context plus a container view over the warm application. Errors
@@ -140,8 +173,25 @@ export function createInvocationRuntime(
     // Dispatch runs inside this invocation's scope: everything reachable from
     // the handler — including `@YandexContext()` parameter injection — reads
     // exactly this invocation's context. Concurrent invocations get isolated
-    // stores and nothing survives the call (AGENTS.md section 11).
-    return runInInvocationScope({ executionContext }, () => transport.invoke(invocation));
+    // stores and nothing survives the call (AGENTS.md section 11). Boundary
+    // start/finish/error books the `invoke` inside the scope so all records
+    // of one invocation carry the same normalized trace id (research R3).
+    return runInInvocationScope({ executionContext }, async () => {
+      const trace = contextFields(executionContext);
+      logger.start({ ...trace, transport: transport.id });
+      try {
+        const result = await transport.invoke(invocation);
+        logger.finish({
+          ...trace,
+          transport: transport.id,
+          status: boundaryStatus(transport.id, result),
+        });
+        return result;
+      } catch (error) {
+        logger.error({ ...trace, transport: transport.id, error });
+        throw error;
+      }
+    });
   };
 
   return Object.assign(handler, {
@@ -155,6 +205,21 @@ export function createInvocationRuntime(
       await application.close();
     },
   });
+}
+
+/**
+ * Transport-specific `finish` status (FR-006): the HTTP response status code
+ * for `http`; the number of delivered messages for `message-queue`. Fail-open:
+ * an unexpected result shape (transport returning an opaque value) yields 0
+ * rather than throwing inside the logging path.
+ */
+function boundaryStatus(transportId: TransportId, result: unknown): number {
+  if (transportId === "http") {
+    const statusCode = (result as { statusCode?: unknown } | null)?.statusCode;
+    return typeof statusCode === "number" ? statusCode : 0;
+  }
+  const messages = (result as { messages?: unknown } | null)?.messages;
+  return Array.isArray(messages) ? messages.length : 0;
 }
 
 function createInvocationContainer(application: INestApplication): InvocationContainer {

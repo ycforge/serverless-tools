@@ -23,6 +23,7 @@ const SUBPATH_DTS: Record<string, string> = {
   "@ycforge/nestjs-connector/auth": "dist/auth/index.d.ts",
   "@ycforge/nestjs-connector/queue": "dist/queue/index.d.ts",
   "@ycforge/nestjs-connector/context": "dist/context/index.d.ts",
+  "@ycforge/nestjs-connector/logger": "dist/logger/index.d.ts",
 };
 
 function compileFixture(fixtureName: string): void {
@@ -81,5 +82,9 @@ describe("subpath exports compile contract (US3, SC-003)", () => {
 
   it("keeps the root barrel compilable for existing applications (US3/AC3)", () => {
     compileFixture("import-root.ts");
+  });
+
+  it("compiles a consumer importing only the /logger subpath (spec 004, FR-012)", () => {
+    compileFixture("import-logger.ts");
   });
 });

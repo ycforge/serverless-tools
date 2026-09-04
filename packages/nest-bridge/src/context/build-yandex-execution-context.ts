@@ -30,9 +30,14 @@ export function buildYandexExecutionContext(
   const source = requireContextObject(rawContext);
   const token = readOptionalString(source, "token");
   const uberTraceId = readOptionalString(source, "uberTraceId");
+  // trace_id duplicates the observed cross-transport awsRequestId (spec 004,
+  // clarify Q1→A): one stable per-invocation id for context, logs and error
+  // envelopes. Always present because awsRequestId is required.
+  const awsRequestId = readRequiredString(source, "awsRequestId");
 
   const executionContext: YandexExecutionContext = Object.freeze({
-    awsRequestId: readRequiredString(source, "awsRequestId"),
+    awsRequestId,
+    trace_id: awsRequestId,
     functionName: readRequiredString(source, "functionName"),
     functionVersion: readRequiredString(source, "functionVersion"),
     functionFolderId: readRequiredString(source, "functionFolderId"),
@@ -53,6 +58,7 @@ export function buildYandexExecutionContext(
       // and absent fields stay absent rather than becoming null/undefined.
       const serialized: Record<string, unknown> = {
         awsRequestId: executionContext.awsRequestId,
+        trace_id: executionContext.trace_id,
         functionName: executionContext.functionName,
         functionVersion: executionContext.functionVersion,
         functionFolderId: executionContext.functionFolderId,
@@ -109,4 +115,21 @@ function readOptionalString(source: Record<string, unknown>, field: string): str
   // Presence depends on function configuration (service account, tracing);
   // anything but a string is treated as absent rather than coerced.
   return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * Tolerant trace id accessor for log records written BEFORE a normalized
+ * context is built (spec 004, edge case 1 / UNKNOWN_INVOCATION_EVENT).
+ *
+ * Unlike {@link buildYandexExecutionContext}, which fails loudly on a violated
+ * observed invariant, this reads `awsRequestId` as an optional string without
+ * throwing: bootstrap failures and pre-detection boundary errors still get a
+ * log record, and the field is simply omitted from the record when the
+ * runtime context is unavailable (FR-008).
+ */
+export function readInvocationTraceId(rawContext: unknown): string | undefined {
+  if (typeof rawContext !== "object" || rawContext === null) {
+    return undefined;
+  }
+  return readOptionalString(rawContext as Record<string, unknown>, "awsRequestId");
 }

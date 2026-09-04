@@ -76,3 +76,7 @@ export { AUTH_GUARD_KEY, AUTH_SCHEME_KEY } from "./auth/auth-metadata";
 export type { AuthGuardType } from "./auth/auth-metadata";
 export { GlobalAuthGuard } from "./auth/global-auth.guard";
 export type { ConnectorBootstrapOptions } from "./auth/connector-bootstrap-options";
+
+// Observability (spec 004): the application logger provider (FR-012) and its
+// contracts, mirrored by the `./logger` subpath export.
+export { YandexLogger, type YandexLogLevel, type YandexLogRecord } from "./logger/yandex-logger";

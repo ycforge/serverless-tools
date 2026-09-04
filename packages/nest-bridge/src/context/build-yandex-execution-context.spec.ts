@@ -166,6 +166,29 @@ describe("normalized execution context builder", () => {
     });
   });
 
+  describe("trace_id correlation (spec 004, FR-001..003)", () => {
+    it("exposes trace_id equal to the invocation's awsRequestId", () => {
+      const executionContext = buildFrom(OBSERVED_CONTEXT);
+
+      // Clarify Q1→A: trace_id duplicates the observed cross-transport id
+      // instead of introducing a W3C-style trace rule (IDEA §2).
+      expect(executionContext.trace_id).toBe("f18fed85-7096-4f0e-a6db-e2c5e37e925f");
+      expect(executionContext.trace_id).toBe(executionContext.awsRequestId);
+    });
+
+    it("includes trace_id in automatic serialization alongside token redaction", () => {
+      const executionContext = buildFrom(OBSERVED_CONTEXT);
+
+      const serialized = JSON.parse(JSON.stringify(executionContext)) as Record<string, unknown>;
+
+      expect(serialized["trace_id"]).toBe("f18fed85-7096-4f0e-a6db-e2c5e37e925f");
+      // FR-003: redaction and raw exclusion stay intact next to the new field.
+      expect(serialized["token"]).toBe("REDACTED_TOKEN");
+      expect(Object.keys(serialized)).not.toContain("raw");
+      expect(Object.keys(serialized)).not.toContain("rawEvent");
+    });
+  });
+
   describe("serialization guard", () => {
     it("redacts the IAM token when automatically serialized", () => {
       const executionContext = buildFrom(OBSERVED_CONTEXT);

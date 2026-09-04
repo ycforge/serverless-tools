@@ -207,6 +207,7 @@ describe("http api gateway v2 transport validation", () => {
         message: "Cannot GET /test/simple",
         error: "Not Found",
         statusCode: 404,
+        trace_id: "f18fed85-7096-4f0e-a6db-e2c5e37e925f",
       }),
       isBase64Encoded: false,
     });
@@ -265,6 +266,7 @@ describe("http api gateway v2 transport dispatch behavior", () => {
       message: "Cannot GET /test/simple",
       error: "Not Found",
       statusCode: 404,
+      trace_id: "f18fed85-7096-4f0e-a6db-e2c5e37e925f",
     }),
     isBase64Encoded: false,
   };
@@ -333,6 +335,7 @@ describe("http api gateway v2 transport dispatch behavior", () => {
         rawContext: RUNTIME_CONTEXT,
         executionContext: {
           awsRequestId: "req-fixture",
+          trace_id: "req-fixture",
           functionName: "fn-fixture",
           functionVersion: "$LATEST",
           functionFolderId: "folder-fixture",

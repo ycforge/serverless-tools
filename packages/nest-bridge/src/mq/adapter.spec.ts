@@ -396,6 +396,7 @@ describe("message queue transport through the runtime", () => {
     // real dispatch runs inside that scope.
     const executionContext: YandexExecutionContext = {
       awsRequestId: "req-fixture",
+      trace_id: "req-fixture",
       functionName: "fn-fixture",
       functionVersion: "$LATEST",
       functionFolderId: "folder-fixture",

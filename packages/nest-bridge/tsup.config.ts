@@ -6,6 +6,7 @@ export default defineConfig({
     'auth/index': 'src/auth/index.ts',
     'queue/index': 'src/queue/index.ts',
     'context/index': 'src/context/index.ts',
+    'logger/index': 'src/logger/index.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,
