@@ -6,6 +6,11 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+# Fixture dist outputs must stay tracked (convention-entry integration tests)
+!packages/composer/test/fixtures/app-convention/dist/
+!packages/composer/test/fixtures/app-convention/dist/*
+!packages/composer/test/fixtures/app-convention-broken/dist/
+!packages/composer/test/fixtures/app-convention-broken/dist/*
 
 # Test/coverage
 coverage/

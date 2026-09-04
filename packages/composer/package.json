@@ -1,0 +1,49 @@
+{
+  "name": "@ycforge/composer",
+  "version": "0.1.0",
+  "description": "OpenAPI extraction for serverless-tools (Project B): safe metadata-only OpenAPI retrieval in an isolated runner subprocess.",
+  "author": "ycforge (https://github.com/ycforge)",
+  "license": "MIT",
+  "homepage": "https://github.com/ycforge/serverless-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ycforge/serverless-tools.git",
+    "directory": "packages/composer"
+  },
+  "keywords": [
+    "openapi",
+    "yandex-cloud",
+    "api-gateway",
+    "serverless",
+    "ycforge"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "runner"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
