@@ -138,7 +138,6 @@ function extractTypeName(rawScheme: unknown): string | undefined {
 
 function validateSchemes(
   rawSchemes: Record<string, unknown>,
-  sourcePath: string,
   validators: Readonly<Record<string, SchemeFieldValidator>>,
 ): Readonly<Record<string, ParsedAuthScheme>> {
   const schemes: Record<string, ParsedAuthScheme> = {};
@@ -206,6 +205,6 @@ export function parseAuthYaml(
     throw new AuthConfigError('AUTH_DEFAULT_UNRESOLVED', { schemeName: defaultScheme });
   }
 
-  const schemes = validateSchemes(rawSchemes, sourcePath, validators);
+  const schemes = validateSchemes(rawSchemes, validators);
   return { version: 1, defaultScheme, schemes };
 }
