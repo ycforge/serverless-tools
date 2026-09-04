@@ -3,12 +3,16 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
-import { validateAuthConfig, type AuthConfigErrorCode } from '../src/index.js';
+import {
+  validateAuthConfig,
+  type AuthConfigErrorCode,
+  type OpenApiDocument,
+} from '../src/index.js';
 
 const FIXTURE = (name: string) => fileURLToPath(new URL(`./fixtures/${name}/`, import.meta.url));
 
-function readFixtureJson(name: string): unknown {
-  return JSON.parse(readFileSync(join(FIXTURE(name), 'openapi.json'), 'utf8'));
+function readFixtureJson(name: string): OpenApiDocument {
+  return JSON.parse(readFileSync(join(FIXTURE(name), 'openapi.json'), 'utf8')) as OpenApiDocument;
 }
 
 function deepFreeze<T>(value: T): T {
