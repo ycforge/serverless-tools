@@ -39,9 +39,9 @@ Fixture-овое openapi-приложение живёт под `packages/compos
 
 ### US1 — самовалидация `auth.yaml` целиком (P1)
 
-**Given** `openapi-app/auth.yaml` — `version: 1`, `defaultScheme: user`, схемы `public` (none), `user` (jwt без обязательных полей), `internal` (function), **When** `validateAuthConfig({ appRoot, openApi, functions: ['internal_authorizer'] })`, **Then** резолвится `AuthValidationResult { authYaml }` без ошибок и предупреждений.
+**Given** `openapi-app/auth.yaml` — `version: 1`, `defaultScheme: user`, схемы `public` (none), `user` (jwt с полными обязательными полями `jwksUri`/`issuer`/`audience`), `internal` (function), **When** `validateAuthConfig({ appRoot, openApi, functions: ['internal_authorizer'] })`, **Then** резолвится `AuthValidationResult { authYaml }` без ошибок и предупреждений.
 
-Expected: pass — `auth-yaml › valid document with none+jwt+function schemes` (SC-002).
+Expected: pass — `auth-yaml › accepts a document with none + jwt + function schemes and array audience` (SC-002).
 
 ### US1 — инвалидные варианты fail-fast (SC-003)
 
