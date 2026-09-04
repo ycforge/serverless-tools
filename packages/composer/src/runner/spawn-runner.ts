@@ -1,10 +1,19 @@
+import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { OpenApiExtractError, type ExtractErrorCode, type OpenApiDocument } from '../errors.js';
 import { isOpenApiDocument } from '../artifacts.js';
 
-const RUNNER_PATH = fileURLToPath(new URL('../../runner/runner.mjs', import.meta.url));
+export function resolveRunnerPath(currentUrl = import.meta.url): string {
+  const sourceCandidate = fileURLToPath(new URL('../../runner/runner.mjs', currentUrl));
+  if (existsSync(sourceCandidate)) {
+    return sourceCandidate;
+  }
+  return fileURLToPath(new URL('../runner/runner.mjs', currentUrl));
+}
+
+const RUNNER_PATH = resolveRunnerPath();
 
 const MAX_STDOUT_BYTES = 8 * 1024 * 1024;
 const MAX_STDERR_BYTES = 1024 * 1024;

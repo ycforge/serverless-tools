@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { spawnRunner } from './spawn-runner.js';
+import { resolveRunnerPath, spawnRunner } from './spawn-runner.js';
 
 const FIXTURES = fileURLToPath(new URL('../../test/fixtures/runner-apps/', import.meta.url));
 const APP_ROOT = fileURLToPath(new URL('../../test/fixtures/', import.meta.url));
+
+describe('resolveRunnerPath', () => {
+  it('resolves the shipped runner script from a source-layout import.meta.url', () => {
+    const sourceModule = new URL('../../src/runner/spawn-runner.js', import.meta.url).href;
+    const path = resolveRunnerPath(sourceModule);
+    expect(path).toBe(fileURLToPath(new URL('../../runner/runner.mjs', import.meta.url)));
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it('resolves the shipped runner script from a bundled dist/index.js import.meta.url', () => {
+    const distEntry = new URL('../../dist/index.js', import.meta.url).href;
+    const path = resolveRunnerPath(distEntry);
+    expect(path).toBe(fileURLToPath(new URL('../../runner/runner.mjs', import.meta.url)));
+    expect(existsSync(path)).toBe(true);
+  });
+});
 
 describe('spawnRunner', () => {
   it('returns the document produced by the entry, with the safe-mode env visible inside the child', async () => {

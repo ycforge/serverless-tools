@@ -208,3 +208,9 @@ Task: "Write integration tests (parity, env, no-init) in packages/composer/test/
 - Constitution II: verify tests fail (RED) before implementing each story's behavior
 - Commit after each task or logical group; do not mix spec 007 (`auth-config`) work into this branch
 - The extracted document is NEVER mutated (FR-009) — any normalization/merge belongs to spec 008
+
+---
+
+## Phase 8: Convergence
+
+- [x] T026 Fix runner-script path resolution so the bundled `dist/index.js` locates `runner/runner.mjs` (probe source-layout `../../runner/runner.mjs` then bundled-layout `../runner/runner.mjs` via `resolveRunnerPath`) per plan: runner asset shipped at package root / `files: [dist, runner]`; add regression tests in `src/runner/spawn-runner.spec.ts` and re-verify the built package (`contradicts`/`partial`)
