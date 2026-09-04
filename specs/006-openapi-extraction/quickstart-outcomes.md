@@ -23,7 +23,9 @@ Additional edge coverage added during implementation:
 | Convention entry without `buildYcsfOpenApi` export | `extractOpenApi.errors › dist/main exists but lacks buildYcsfOpenApi → ENTRY_LOAD_FAILED` | ✅ green |
 | User app logs to stdout/stderr (`console.log`) | `spawnRunner › still returns the document when the entry writes to stdout and stderr (console.log)`; safe-entry fixture also logs during entry execution | ✅ green |
 | Failure messages sanitized (no app payload leak) | `spawnRunner › classifies an entry that throws as ENTRY_EXECUTION_FAILED without exposing app error detail` (asserts `SUPER-SECRET-xyz` never appears) | ✅ green |
+| Failure classification immune to lookalike markers in user stderr | the EXEC fixture writes `SERVERLESS_TOOLS_RUNNER:INVALID` and a mid-line marker mention to stderr before throwing — classification still resolves to `ENTRY_EXECUTION_FAILED` via the trailing marker | ✅ green |
+| Bounded stream caps enforced in bytes (UTF-8) | `appendByteCapped › enforces the cap in bytes, not characters (multi-byte UTF-8)` and companions | ✅ green |
 
-Final gate: 26/26 composer tests green, `tsc --noEmit` clean, `pnpm lint` clean, monorepo suite (`pnpm test`) green — 523 total (composer 26 + pilot 55 + nest-bridge 442), zero runtime dependencies.
+Final gate: 29/29 composer tests green, `tsc --noEmit` clean, `pnpm lint` clean, monorepo suite (`pnpm test`) green — 526 total (composer 29 + pilot 55 + nest-bridge 442), zero runtime dependencies. `pnpm test` is self-sufficient from a clean checkout: `test` in nest-bridge runs `tsup && vitest run` because `subpath-exports.spec.ts` type-checks consumers against the built `dist/` declarations.
 
 > Fixture placement note: `quickstart.md` lists `app-broken-artifact/` separately; implementation keeps the broken-swagger variant in `test/fixtures/app-broken-artifact/` (with a valid `openapi.json` present to prove no fall-through), consistent with US2/AC3.

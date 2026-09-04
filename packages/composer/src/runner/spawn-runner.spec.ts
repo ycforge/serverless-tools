@@ -2,10 +2,43 @@ import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { resolveRunnerPath, spawnRunner } from './spawn-runner.js';
+import { appendByteCapped, resolveRunnerPath, spawnRunner } from './spawn-runner.js';
 
 const FIXTURES = fileURLToPath(new URL('../../test/fixtures/runner-apps/', import.meta.url));
 const APP_ROOT = fileURLToPath(new URL('../../test/fixtures/', import.meta.url));
+
+const OVERFLOW_NOTE = '\n<maximum bytes exceeded; rest omitted>';
+
+describe('appendByteCapped', () => {
+  it('enforces the cap in bytes, not characters (multi-byte UTF-8)', () => {
+    const acc = { text: '', bytes: 0 };
+    const euros = Buffer.from('€'.repeat(10), 'utf8');
+    expect(euros.length).toBe(30);
+    appendByteCapped(acc, euros, 12, OVERFLOW_NOTE);
+    expect(acc.bytes).toBe(12);
+    const payload = acc.text.slice(0, -OVERFLOW_NOTE.length);
+    expect(Buffer.byteLength(payload)).toBe(12);
+    expect(payload).toBe('€'.repeat(4));
+  });
+
+  it('keeps appending across chunks while under the cap and stops past it', () => {
+    const acc = { text: '', bytes: 0 };
+    appendByteCapped(acc, Buffer.from('abc'), 5, OVERFLOW_NOTE);
+    appendByteCapped(acc, Buffer.from('de'), 5, OVERFLOW_NOTE);
+    expect(acc.bytes).toBe(5);
+    expect(acc.text).toBe('abcde');
+    appendByteCapped(acc, Buffer.from('xyz'), 5, OVERFLOW_NOTE);
+    expect(acc.text).toBe('abcde');
+  });
+
+  it('appends the overflow note exactly once on a partial chunk', () => {
+    const acc = { text: '', bytes: 0 };
+    appendByteCapped(acc, Buffer.from('abcdef'), 4, OVERFLOW_NOTE);
+    appendByteCapped(acc, Buffer.from('ghi'), 4, OVERFLOW_NOTE);
+    expect(acc.bytes).toBe(4);
+    expect(acc.text).toBe(`abcd${OVERFLOW_NOTE}`);
+  });
+});
 
 describe('resolveRunnerPath', () => {
   it('resolves the shipped runner script from a source-layout import.meta.url', () => {
@@ -30,7 +63,7 @@ describe('spawnRunner', () => {
     expect(doc?.['x-env-observed']).toBe('1');
   });
 
-  it('classifies an entry that throws as ENTRY_EXECUTION_FAILED without exposing app error detail', async () => {
+  it('classifies an entry that throws as ENTRY_EXECUTION_FAILED without exposing app error detail, ignoring lookalike stderr markers', async () => {
     await expect(
       spawnRunner(APP_ROOT, `${FIXTURES}runner-throws.mjs`, 10000),
     ).rejects.toMatchObject({ code: 'ENTRY_EXECUTION_FAILED' });

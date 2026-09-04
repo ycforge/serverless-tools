@@ -223,3 +223,11 @@ Task: "Write integration tests (parity, env, no-init) in packages/composer/test/
 - [x] T028 Isolate the runner result from the application's stdout: result travels over a dedicated pipe (fd 3, `stdio: ['ignore','pipe','pipe','pipe']`); regression test `spawnRunner › still returns the document when the entry writes to stdout and stderr (console.log)` + safe-entry fixture logs during extraction
 - [x] T029 Sanitize extraction errors: runner failure markers carry no detail and parent error messages are deterministic (code + entry path) — app `err.message`/`err.stack`/stderr never reach `OpenApiExtractError`; regression test asserts a secret thrown by the entry never appears in the error
 - [x] T030 Add GitHub Actions CI (`.github/workflows/ci.yml`): `Test` (`pnpm test`), `Build` (`pnpm build`, plus `pnpm typecheck`), `Lint` (`pnpm lint` — new ESLint flat config + root `lint` script, the repo previously had no linter); clean-checkout, `pnpm install --frozen-lockfile`, Node 22
+
+---
+
+## Phase 10: Review fixes — CI Test green (PR #6 round 2)
+
+- [x] T031 Root cause of CI Test failure: `packages/nest-bridge/test/packaging/subpath-exports.spec.ts` type-checks consumer fixtures against the BUILT `dist/*.d.ts` declarations, which are gitignored and produced only by a prior `pnpm build`; on a clean checkout the suite's `beforeAll` threw `run pnpm build first`. Fix: nest-bridge `test` script is now `tsup && vitest run` (explicit, deterministic — pnpm does not auto-trigger `pretest` lifecycle scripts for `pnpm -r test`).
+- [x] T032 Enforce the `*_BYTES` stream caps in actual bytes (previously JS string `.length` = UTF-16 code units, up to 4× the intended byte budget for multi-byte UTF-8). Added `appendByteCapped` (Buffer.byte-length slicing) + unit tests with `€` (3 bytes/char).
+- [x] T033 Make runner-failure classification robust against arbitrary user stderr: markers only match as an exact whole line scanned from the end of stderr (the runner always emits its marker last); lookalike/mid-line `SERVERLESS_TOOLS_RUNNER:*` text from the app is ignored (extended `runner-throws.mjs` fixture + test).
