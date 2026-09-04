@@ -31,7 +31,7 @@ Specs создаются **перед реализацией соответст�
 | # | Spec | Scope | Статус | Зависимости |
 |---|------|-------|--------|-------------|
 | 003 | connector-require-auth — `@RequireAuth`, subpath exports `/auth`/`/queue`/`/context`, global guard | §11, §2 | ✅ | 001 |
-| 004 | connector-observability — unified logger в stdout, `trace_id` в контексте и error-ответе | §2 | ⬜ | 001 |
+| 004 | connector-observability — unified logger в stdout, `trace_id` в контексте и error-ответе | §2 | ✅ | 001 |
 | 005 | connector-mq-partial-failure — опциональная per-message семантика ошибок batch MQ | §2 | ⬜ | 001 |
 
 ## Волна 2 — Project B (API composition)

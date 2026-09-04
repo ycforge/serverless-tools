@@ -19,6 +19,7 @@ describe("public API surface", () => {
       "QueueMessage",
       "RequireAuth",
       "YandexContext",
+      "YandexLogger",
       "createYandexHandler",
     ]);
   });

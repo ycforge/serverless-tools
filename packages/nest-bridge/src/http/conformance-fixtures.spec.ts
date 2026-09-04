@@ -1,4 +1,5 @@
 import { All, Controller, Module } from "@nestjs/common";
+import { vi } from "vitest";
 import {
   resolveInvocationExecutionContext,
   resolveInvocationHttpRequest,
@@ -123,6 +124,9 @@ describe("HTTP conformance fixtures (issue #11)", () => {
       // wire-valid four-field envelope (statusCode/body/isBase64Encoded).
       expect(response).toMatchObject({ statusCode: 200, isBase64Encoded: false });
       expect(typeof (response as { body?: unknown }).body).toBe("string");
+      // FR-016/017 success-parity: a successful response never rides a
+      // trace_id — the field appears exclusively on >=400 error envelopes.
+      expect(JSON.stringify(response)).not.toContain("trace_id");
     }
     expect(CAPTURES).toHaveLength(ALL_HTTP_FIXTURE_NAMES.length);
   });
@@ -331,5 +335,42 @@ describe("HTTP conformance fixtures (issue #11)", () => {
     results.forEach((result, index) => {
       expect(result.captured.executionContext.awsRequestId).toBe(requestIds[index]);
     });
+  });
+
+  it("keeps the successful wire envelope unchanged by boundary logging (parity, T019)", async () => {
+    // Boundary logging must never alter the four-field success envelope or
+    // leak any payload value into the emitted records (spec 004, FR-006/009).
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    try {
+      for (const name of ALL_HTTP_FIXTURE_NAMES) {
+        const { response, fixture } = await replay(name);
+
+        // Exact parity: the fields a gateway accepts and their types are
+        // preserved from spec 001.
+        expect(response).toMatchObject({
+          statusCode: 200,
+          isBase64Encoded: false,
+          headers: expect.any(Object),
+        });
+        expect(typeof (response as { body?: unknown }).body).toBe("string");
+
+        // The emitted boundary records of this invocation must carry the
+        // fixture's per-invocation correlation id (correlate on it to ignore
+        // records from parallel test files).
+        const start = stdout.mock.calls
+          .map(([arg]) => arg)
+          .filter((arg): arg is string => typeof arg === "string")
+          .filter((raw) => raw.startsWith("{"))
+          .map((raw) => JSON.parse(raw) as Record<string, unknown>)
+          .find(
+            (record) =>
+              record["event"] === "start" && record["awsRequestId"] === fixture.context.awsRequestId,
+          );
+        expect(start).toBeDefined();
+        expect(start!["trace_id"]).toBe(fixture.context.awsRequestId);
+      }
+    } finally {
+      stdout.mockRestore();
+    }
   });
 });

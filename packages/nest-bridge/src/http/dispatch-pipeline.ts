@@ -6,6 +6,7 @@ import type { YandexHttpResponseFacade } from "./response-facade";
 import { createResponseFacade } from "./response-facade";
 import type { YandexFunctionHttpResponse } from "./response";
 import { serializeResponse } from "./serialize-response";
+import { resolveInvocationExecutionContext } from "../context/invocation-scope";
 
 /**
  * One entry of the in-memory dispatch stack.
@@ -134,11 +135,36 @@ export async function runDispatch(plan: DispatchPlan): Promise<YandexFunctionHtt
   const requestPath = plan.request.path;
   const requestMethod = plan.request.method.toUpperCase();
 
+// Spec 004, FR-016/017 (research R5): the trace_id rides on error responses
+  // exclusively. The id is captured HERE, at dispatch entry while the
+  // invocation scope is still synchronously active (the adapter's `invoke`
+  // runs dispatch inside the scope): Nest's asynchronous route/error machinery
+  // can escape the AsyncLocalStorage context, so re-reading it later would be
+  // unreliable. The id is handed to the response facade which injects it into
+  // any >=400 envelope it writes — covering last-resort 500s, the not-found
+  // 404 AND exceptions consumed by NestJS exception filters (which never
+  // surface through invokeErrorLayer).
+  let dispatchTraceId: string | undefined;
+  try {
+    dispatchTraceId = resolveInvocationExecutionContext().trace_id;
+    responseFacade.attachTraceId(dispatchTraceId);
+  } catch {
+    // Defensive: without a live invocation context, error envelopes simply
+    // proceed without a trace_id rather than failing the invocation.
+  }
+  const attachErrorTraceId = (): void => {
+    if (dispatchTraceId !== undefined) {
+      responseFacade.attachTraceId(dispatchTraceId);
+    }
+  };
+
   const respondWithCannotFind = (): void => {
+    attachErrorTraceId();
     writeLastResortResponse(responseFacade, 404, cannotFindMessage(requestMethod, requestPath));
   };
 
   const invokeErrorLayer = async (error: unknown): Promise<void> => {
+    attachErrorTraceId();
     if (plan.errorLayer === undefined) {
       writeLastResortResponse(responseFacade, 500, "Internal server error");
       return;
@@ -146,14 +172,17 @@ export async function runDispatch(plan: DispatchPlan): Promise<YandexFunctionHtt
     try {
       await plan.errorLayer(error, requestFacade, responseFacade, () => undefined);
       if (!responseFacade.headersSent) {
+        attachErrorTraceId();
         writeLastResortResponse(responseFacade, 500, "Internal server error");
       }
     } catch {
+      attachErrorTraceId();
       writeLastResortResponse(responseFacade, 500, "Internal server error");
     }
   };
 
   const invokeNotFound = async (): Promise<void> => {
+    attachErrorTraceId();
     if (plan.notFoundHandler === undefined) {
       respondWithCannotFind();
       return;

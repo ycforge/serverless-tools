@@ -276,7 +276,11 @@ describe("controller dispatch through the public runtime", () => {
     expect(result).toEqual({
       statusCode: 500,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ statusCode: 500, message: "Internal server error" }),
+      body: JSON.stringify({
+        statusCode: 500,
+        message: "Internal server error",
+        trace_id: "f18fed85-7096-4f0e-a6db-e2c5e37e925f",
+      }),
       isBase64Encoded: false,
     });
     expect(String(result.body)).not.toContain("controller-boom");
@@ -513,7 +517,10 @@ describe("framework semantics through the public runtime", () => {
     )) as Record<string, unknown>;
 
     expect(result.statusCode).toBe(418);
-    expect(JSON.parse(result.body as string)).toEqual({ handledBy: "framework-filter" });
+    expect(JSON.parse(result.body as string)).toEqual({
+      handledBy: "framework-filter",
+      trace_id: "f18fed85-7096-4f0e-a6db-e2c5e37e925f",
+    });
   });
 
   it("maps unserializable handler payloads to the platform 500 through the exception filters", async () => {
@@ -529,6 +536,7 @@ describe("framework semantics through the public runtime", () => {
     expect(JSON.parse(result.body as string)).toEqual({
       statusCode: 500,
       message: "Internal server error",
+      trace_id: "f18fed85-7096-4f0e-a6db-e2c5e37e925f",
     });
   });
 

@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 const packageRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const srcRoot = path.join(packageRoot, "src");
 const rootBarrel = path.join(srcRoot, "index.ts");
-const GUARDED_DIRS = ["auth", "queue", "context"];
+const GUARDED_DIRS = ["auth", "queue", "context", "logger"];
 
 const IMPORT_FROM = /(?:import|export)\s[^"']*?from\s+["']([^"']+)["']/g;
 

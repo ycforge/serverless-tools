@@ -42,6 +42,11 @@
       "types": "./dist/context/index.d.ts",
       "import": "./dist/context/index.js",
       "require": "./dist/context/index.cjs"
+    },
+    "./logger": {
+      "types": "./dist/logger/index.d.ts",
+      "import": "./dist/logger/index.js",
+      "require": "./dist/logger/index.cjs"
     }
   },
   "files": [
@@ -65,6 +70,7 @@
     "@nestjs/common": "^11.2.1",
     "@nestjs/core": "^11.2.1",
     "@nestjs/swagger": "^11.2.0",
+    "@swc/core": "^1.16.1",
     "@types/node": "^22.15.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",

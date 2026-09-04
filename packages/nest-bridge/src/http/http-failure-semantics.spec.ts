@@ -161,6 +161,36 @@ Module({
   providers: [{ provide: APP_FILTER, useClass: GlobalFailureFilter }],
 })(GlobalFilterModule);
 
+@Catch()
+class OwnTraceFailureFilter implements ExceptionFilter {
+  catch(_exception: unknown, host: ArgumentsHost): void {
+    const response = host.switchToHttp().getResponse<YandexHttpResponseFacade>();
+    response.status(507);
+    // An application filter already owns a trace_id in its error payload: the
+    // connector must never overwrite it (FR-017, merge-without-overwrite).
+    response.json({ handledBy: "global-filter-own", trace_id: "app-supplied-trace-id" });
+  }
+}
+
+class OwnTraceFailureController {
+  boom(): never {
+    throw new Error("own-trace-boom");
+  }
+}
+
+Controller("owntrace")(OwnTraceFailureController);
+Get("boom")(
+  OwnTraceFailureController.prototype,
+  "boom",
+  Object.getOwnPropertyDescriptor(OwnTraceFailureController.prototype, "boom")!,
+);
+
+class OwnTraceFilterModule {}
+Module({
+  controllers: [OwnTraceFailureController],
+  providers: [{ provide: APP_FILTER, useClass: OwnTraceFailureFilter }],
+})(OwnTraceFilterModule);
+
 class RemappingInterceptor implements NestInterceptor {
   intercept(_context: unknown, next: CallHandler): Observable<unknown> {
     // Application-level error translation: interceptors observe handler
@@ -232,10 +262,12 @@ describe("http failure semantics through the public runtime", () => {
 
     expect(result.statusCode).toBe(400);
     expect(result.headers).toEqual({ "content-type": "application/json" });
+    // FR-016/017: every error envelope carries the invocation trace_id.
     expect(JSON.parse(result.body as string)).toEqual({
       statusCode: 400,
       message: "Invalid order id",
       error: "Bad Request",
+      trace_id: "f18fed85-7096-4f0e-a6db-e2c5e37e925f",
     });
     expect(result.isBase64Encoded).toBe(false);
   });
@@ -254,6 +286,7 @@ describe("http failure semantics through the public runtime", () => {
     expect(JSON.parse(result.body as string)).toEqual({
       code: "ORDER_STALE",
       hint: "reload the order",
+      trace_id: "f18fed85-7096-4f0e-a6db-e2c5e37e925f",
     });
   });
 
@@ -278,7 +311,12 @@ describe("http failure semantics through the public runtime", () => {
     // 8.1, docs/ARCHITECTURE.md section 6.5).
     expect(result.statusCode).toBe(500);
     expect(result.headers).toEqual({ "content-type": "application/json" });
-    expect(result.body).toBe(JSON.stringify({ statusCode: 500, message: "Internal server error" }));
+    // FR-016/017: fragment value-free 500 but still traceable via trace_id.
+    expect(JSON.parse(result.body as string)).toEqual({
+      statusCode: 500,
+      message: "Internal server error",
+      trace_id: "f18fed85-7096-4f0e-a6db-e2c5e37e925f",
+    });
     expect(result.isBase64Encoded).toBe(false);
     const serialized = String(result.body) + JSON.stringify(result.headers);
     for (const secret of [
@@ -301,9 +339,30 @@ describe("http failure semantics through the public runtime", () => {
     );
 
     // The connector installs no parallel error framework: a global filter
-    // replaces the default mapping exactly like on any platform server.
+    // replaces the default mapping exactly like on any platform server. The
+    // filter-owned body keeps its shape; trace_id is merged (FR-017).
     expect(result.statusCode).toBe(503);
-    expect(JSON.parse(result.body as string)).toEqual({ handledBy: "global-filter" });
+    expect(JSON.parse(result.body as string)).toEqual({
+      handledBy: "global-filter",
+      trace_id: "f18fed85-7096-4f0e-a6db-e2c5e37e925f",
+    });
+  });
+
+  it("never overwrites a trace_id the application filter already put in its error body", async () => {
+    const runtime = createYandexHandler(OwnTraceFilterModule);
+    runtimes.push(runtime);
+
+    const result = expectEnvelope(
+      await runtime(makeHttpEvent({ path: "/owntrace/boom" }), RUNTIME_CONTEXT),
+    );
+
+    // FR-017: the trace_id merge is additive — when an error body already owns
+    // the key, the application-supplied value wins untouched.
+    expect(result.statusCode).toBe(507);
+    expect(JSON.parse(result.body as string)).toEqual({
+      handledBy: "global-filter-own",
+      trace_id: "app-supplied-trace-id",
+    });
   });
 
   it("keeps interceptors able to remap handler failures before exception mapping", async () => {
