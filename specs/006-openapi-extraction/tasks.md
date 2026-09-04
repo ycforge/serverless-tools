@@ -18,8 +18,8 @@
 
 **Purpose**: New `@ycforge/composer` package scaffold (Project B) mirroring `packages/nest-bridge` conventions (ESM, TS 5.x, vitest, tsup).
 
-- [ ] T001 Create `packages/composer/package.json` name=`@ycforge/composer`, `type: module`, `engines.node >=22`, `files: [dist, runner]`, `exports` → `./dist/index.js` (+types), `sideEffects: false`; and `packages/composer/tsconfig.json` (ESM, ES2022 target, strict, declaration: true) — mirror `packages/nest-bridge`
-- [ ] T002 [P] Add placeholder export in `packages/composer/src/index.ts` and `packages/composer/tsup.config.ts` (mirror `packages/nest-bridge/tsup.config.ts`) so `pnpm exec tsc --noEmit` and `pnpm exec vitest run` pass from `packages/composer`
+- [x] T001 Create `packages/composer/package.json` name=`@ycforge/composer`, `type: module`, `engines.node >=22`, `files: [dist, runner]`, `exports` → `./dist/index.js` (+types), `sideEffects: false`; and `packages/composer/tsconfig.json` (ESM, ES2022 target, strict, declaration: true) — mirror `packages/nest-bridge`
+- [x] T002 [P] Add placeholder export in `packages/composer/src/index.ts` and `packages/composer/tsup.config.ts` (mirror `packages/nest-bridge/tsup.config.ts`) so `pnpm exec tsc --noEmit` and `pnpm exec vitest run` pass from `packages/composer`
 
 ---
 
@@ -31,15 +31,15 @@
 
 ### Tests for Foundational (write FIRST, confirm RED)
 
-- [ ] T003 [P] Write `packages/composer/src/artifacts.spec.ts`: (a) valid `swagger.json` read OK; (b) `swagger.json` beats `openapi.json` when both exist; (c) neither exists → returns null; (d) broken JSON → `INVALID_ARTIFACT` with file path; (e) JSON object lacking `openapi` (string) / `paths` (object) → `INVALID_ARTIFACT` with path (FR-004/FR-007, R3)
-- [ ] T004 [P] Write `packages/composer/src/runner/spawn-runner.spec.ts` driving a real `node` child with fixture entry modules: (a) successful doc returned with correct parity; (b) entry throws → `ENTRY_EXECUTION_FAILED`; (c) entry never resolves + `timeoutMs: 250` → `ENTRY_TIMEOUT` and main process stays alive; (d) malformed stdout JSON → `ENTRY_RETURNED_INVALID`; (e) env snapshot shows `SERVERLESS_TOOLS_OPENAPI_BUILD === '1'` inside the child (FR-002/FR-008/FR-011, R2/R4)
+- [x] T003 [P] Write `packages/composer/src/artifacts.spec.ts`: (a) valid `swagger.json` read OK; (b) `swagger.json` beats `openapi.json` when both exist; (c) neither exists → returns null; (d) broken JSON → `INVALID_ARTIFACT` with file path; (e) JSON object lacking `openapi` (string) / `paths` (object) → `INVALID_ARTIFACT` with path (FR-004/FR-007, R3)
+- [x] T004 [P] Write `packages/composer/src/runner/spawn-runner.spec.ts` driving a real `node` child with fixture entry modules: (a) successful doc returned with correct parity; (b) entry throws → `ENTRY_EXECUTION_FAILED`; (c) entry never resolves + `timeoutMs: 250` → `ENTRY_TIMEOUT` and main process stays alive; (d) malformed stdout JSON → `ENTRY_RETURNED_INVALID`; (e) env snapshot shows `SERVERLESS_TOOLS_OPENAPI_BUILD === '1'` inside the child (FR-002/FR-008/FR-011, R2/R4)
 
 ### Implementation for Foundational
 
-- [ ] T005 Create `packages/composer/src/errors.ts`: `ExtractErrorCode` union (`NO_SOURCE`, `INVALID_ARTIFACT`, `ENTRY_LOAD_FAILED`, `ENTRY_EXECUTION_FAILED`, `ENTRY_RETURNED_INVALID`, `ENTRY_TIMEOUT`, `RUNNER_SPAWN_FAILED`), `OpenApiExtractError extends Error` (`code`, `sourcePath?`, `cause?`), public types `ExtractionRequest { appRoot: string; openapiEntry?: string }`, `ExtractOptions { timeoutMs?: number }`, `OpenApiDocument { openapi: string; info: unknown; paths: Record<string, unknown>; components?: unknown; [key: string]: unknown }` (contract `contracts/openapi-extraction.md`)
-- [ ] T006 [P] Create `packages/composer/runner/runner.mjs` (steady child script): args `[entryPath]`; dynamic `import()`; call exported `buildYcsfOpenApi()`; print exactly ONE JSON object (the document) to stdout and exit 0; ALL diagnostics/throws → stderr + exit 1; never write non-JSON to stdout (R1/R2)
-- [ ] T007 Create `packages/composer/src/artifacts.ts`: `readOpenApiArtifact(appRoot)` — check `<app>/swagger.json` then `<app>/openapi.json`; minimal validation (object, string `openapi`, object `paths`); none → null; malformed → `INVALID_ARTIFACT` with path; NO user code involved (FR-004/FR-007, R3)
-- [ ] T008 Create `packages/composer/src/runner/spawn-runner.ts`: `spawnRunner(appRoot, entryPath, timeoutMs)` — `child_process.spawn(process.execPath, [runnerPath, entryPath], { env: { ...process.env, SERVERLESS_TOOLS_OPENAPI_BUILD: '1' }, cwd: appRoot })`, no shell; resolve runner path via `fileURLToPath(new URL('../../runner/runner.mjs', import.meta.url))` (stable from `src/runner` and `dist/runner`); stdout size guard + JSON parse; classify failures → `ENTRY_LOAD_FAILED`/`ENTRY_EXECUTION_FAILED`/`ENTRY_TIMEOUT` (kill on timeout, default 30000)/`RUNNER_SPAWN_FAILED` (FR-002/FR-011, R2/R4)
+- [x] T005 Create `packages/composer/src/errors.ts`: `ExtractErrorCode` union (`NO_SOURCE`, `INVALID_ARTIFACT`, `ENTRY_LOAD_FAILED`, `ENTRY_EXECUTION_FAILED`, `ENTRY_RETURNED_INVALID`, `ENTRY_TIMEOUT`, `RUNNER_SPAWN_FAILED`), `OpenApiExtractError extends Error` (`code`, `sourcePath?`, `cause?`), public types `ExtractionRequest { appRoot: string; openapiEntry?: string }`, `ExtractOptions { timeoutMs?: number }`, `OpenApiDocument { openapi: string; info: unknown; paths: Record<string, unknown>; components?: unknown; [key: string]: unknown }` (contract `contracts/openapi-extraction.md`)
+- [x] T006 [P] Create `packages/composer/runner/runner.mjs` (steady child script): args `[entryPath]`; dynamic `import()`; call exported `buildYcsfOpenApi()`; print exactly ONE JSON object (the document) to stdout and exit 0; ALL diagnostics/throws → stderr + exit 1; never write non-JSON to stdout (R1/R2)
+- [x] T007 Create `packages/composer/src/artifacts.ts`: `readOpenApiArtifact(appRoot)` — check `<app>/swagger.json` then `<app>/openapi.json`; minimal validation (object, string `openapi`, object `paths`); none → null; malformed → `INVALID_ARTIFACT` with path; NO user code involved (FR-004/FR-007, R3)
+- [x] T008 Create `packages/composer/src/runner/spawn-runner.ts`: `spawnRunner(appRoot, entryPath, timeoutMs)` — `child_process.spawn(process.execPath, [runnerPath, entryPath], { env: { ...process.env, SERVERLESS_TOOLS_OPENAPI_BUILD: '1' }, cwd: appRoot })`, no shell; resolve runner path via `fileURLToPath(new URL('../../runner/runner.mjs', import.meta.url))` (stable from `src/runner` and `dist/runner`); stdout size guard + JSON parse; classify failures → `ENTRY_LOAD_FAILED`/`ENTRY_EXECUTION_FAILED`/`ENTRY_TIMEOUT` (kill on timeout, default 30000)/`RUNNER_SPAWN_FAILED` (FR-002/FR-011, R2/R4)
 
 **Checkpoint**: Foundational tests green; primitives testable in isolation. User stories can begin.
 
@@ -53,13 +53,13 @@
 
 ### Tests for User Story 1 (write FIRST, confirm RED)
 
-- [ ] T009 [P] [US1] Create fixture `packages/composer/test/fixtures/app-safe-entry/`: a module exporting `buildYcsfOpenApi()` (returns an expected OpenAPI doc) plus a module whose initialization would throw (simulating DB connect / `onModuleInit`); the entry records `process.env.SERVERLESS_TOOLS_OPENAPI_BUILD` and asserts the doc (expected.json fixture)
-- [ ] T010 [P] [US1] Write integration tests in `packages/composer/test/extraction.integration.spec.ts`: (a) `extractOpenApi({ appRoot, openapiEntry })` resolves with doc deep-equal to expected.json (parity, FR-009); (b) entry observed `SERVERLESS_TOOLS_OPENAPI_BUILD === '1'` (FR-002); (c) the init-throwing module was never initialized (US1/AC1, SC-002) — RED (extract does not exist yet)
+- [x] T009 [P] [US1] Create fixture `packages/composer/test/fixtures/app-safe-entry/`: a module exporting `buildYcsfOpenApi()` (returns an expected OpenAPI doc) plus a module whose initialization would throw (simulating DB connect / `onModuleInit`); the entry records `process.env.SERVERLESS_TOOLS_OPENAPI_BUILD` and asserts the doc (expected.json fixture)
+- [x] T010 [P] [US1] Write integration tests in `packages/composer/test/extraction.integration.spec.ts`: (a) `extractOpenApi({ appRoot, openapiEntry })` resolves with doc deep-equal to expected.json (parity, FR-009); (b) entry observed `SERVERLESS_TOOLS_OPENAPI_BUILD === '1'` (FR-002); (c) the init-throwing module was never initialized (US1/AC1, SC-002) — RED (extract does not exist yet)
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Implement `packages/composer/src/extract.ts` entry source: when `openapiEntry` present → resolve it under `appRoot` and dispatch via `spawnRunner`; return the document unchanged (FR-001/FR-003/FR-009); for the absent-entry case return/throw placeholder `NO_SOURCE` (replaced in US2/US3)
-- [ ] T012 [US1] Update `packages/composer/src/index.ts`: export `extractOpenApi`, `ExtractionRequest`, `ExtractOptions`, `OpenApiDocument`, `OpenApiExtractError`, `ExtractErrorCode` per `contracts/openapi-extraction.md`
+- [x] T011 [US1] Implement `packages/composer/src/extract.ts` entry source: when `openapiEntry` present → resolve it under `appRoot` and dispatch via `spawnRunner`; return the document unchanged (FR-001/FR-003/FR-009); for the absent-entry case return/throw placeholder `NO_SOURCE` (replaced in US2/US3)
+- [x] T012 [US1] Update `packages/composer/src/index.ts`: export `extractOpenApi`, `ExtractionRequest`, `ExtractOptions`, `OpenApiDocument`, `OpenApiExtractError`, `ExtractErrorCode` per `contracts/openapi-extraction.md`
 
 **Checkpoint**: US1 fully functional — `extractOpenApi` MVP works for the explicit-entry path.
 
