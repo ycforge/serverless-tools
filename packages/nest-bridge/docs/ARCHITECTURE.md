@@ -599,6 +599,8 @@ Defined now (exported from `src/index.ts`):
 | `AUTH_SCHEME_KEY`, `AUTH_GUARD_KEY`                                                          | value | Stable auth metadata keys (spec 003)                                                                        |
 | `AuthGuardType`, `ConnectorBootstrapOptions`                                                 | type  | Auth metadata value type; bootstrap options (`defaultAuthGuard`) (spec 003)                                 |
 | `GlobalAuthGuard`                                                                            | value | Global guard registered by the bootstrap; delegates to declared guards via DI, method > controller (spec 003) |
+| `YandexLogger`                                                                               | value | DI application logger provider: `debug/info/warn/error(message, context?)`, auto-reads `trace_id`/`awsRequestId` from the invocation scope, redacts secret context keys, fail-open outside a scope (spec 004) |
+| `YandexLogLevel`, `YandexLogRecord`                                                          | type  | Provider log level union; one structured record contract (spec 004)                                             |
 
 The default JSON policy and payload memoization mechanics
 (`src/mq/body-deserialization.ts`) are deliberately internal: consumers shape
@@ -608,7 +610,13 @@ Spec 003 additionally exposes subpath entry points `./auth`, `./queue`,
 `./context` (`src/auth/index.ts`, `src/queue/index.ts`, `src/context/index.ts`)
 as focused re-exports of the surface above; the root barrel is unchanged for
 existing consumers. Subpath modules never import the root barrel (FR-008,
-pinned by `test/packaging/no-root-barrel-import.spec.ts`).
+pinned by `test/packaging/no-root-barrel-import.spec.ts`). Spec 004 adds
+`./logger` (`src/logger/index.ts`) mirroring the `YandexLogger` provider
+surface.
+
+Observability (spec 004) rides a single correlation id across every HTTP/MQ
+error envelope (`trace_id`, merged onto >= 400 responses) and every boundary
+and provider log record; see `specs/004-connector-observability/contracts/observability.md`.
 
 The runtime value exports are pinned in two places that must stay in sync with
 this table: `src/index.spec.ts` and `src/packaging.spec.ts` (exports map).

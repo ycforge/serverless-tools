@@ -150,6 +150,7 @@ describe("execution context contract", () => {
   it("keeps memoryLimitInMB a string exactly as observed on the runtime", () => {
     const executionContext: YandexExecutionContext = {
       awsRequestId: "req-fixture",
+      trace_id: "req-fixture",
       functionName: "fn-fixture",
       functionVersion: "$LATEST",
       functionFolderId: "folder-fixture",
@@ -172,6 +173,7 @@ describe("execution context contract", () => {
     const rawEventFixture = { version: "2.0", rawPath: "/example" };
     const executionContext: YandexExecutionContext = {
       awsRequestId: "req-fixture",
+      trace_id: "req-fixture",
       functionName: "fn-fixture",
       functionVersion: "$LATEST",
       functionFolderId: "folder-fixture",

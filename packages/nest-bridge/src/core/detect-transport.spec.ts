@@ -32,6 +32,7 @@ const UNUSED_CONTAINER: InvocationContainer = {
 
 const FIXTURE_EXECUTION_CONTEXT: YandexExecutionContext = Object.freeze({
   awsRequestId: "req-fixture",
+  trace_id: "req-fixture",
   functionName: "fn-fixture",
   functionVersion: "$LATEST",
   functionFolderId: "folder-fixture",

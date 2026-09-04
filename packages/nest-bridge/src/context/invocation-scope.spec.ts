@@ -74,6 +74,27 @@ describe("invocation scope", () => {
     expect(observedIds).toEqual(["inv-1", undefined, "inv-2"]);
   });
 
+  it("never reuses a trace_id between warm sequential invocations (FR-004)", async () => {
+    const first = stateFor("warm-1");
+    const second = stateFor("warm-2");
+
+    const observedTraceIds: (string | undefined)[] = [];
+
+    await runInInvocationScope(first, () => {
+      observedTraceIds.push(resolveInvocationExecutionContext().trace_id);
+      return Promise.resolve();
+    });
+    observedTraceIds.push(getInvocationScopeState()?.executionContext.trace_id);
+    await runInInvocationScope(second, () => {
+      observedTraceIds.push(resolveInvocationExecutionContext().trace_id);
+      return Promise.resolve();
+    });
+
+    // trace_id of call N must never be observable in call N+1 (spec 004,
+    // US1/AC2): distinct warming ids, and nothing ambient between calls.
+    expect(observedTraceIds).toEqual(["warm-1", undefined, "warm-2"]);
+  });
+
   it("isolates concurrent invocations interleaving on the same event loop", async () => {
     const slow = stateFor("inv-slow");
     const fast = stateFor("inv-fast");

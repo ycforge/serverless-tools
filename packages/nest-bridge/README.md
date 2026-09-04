@@ -293,7 +293,51 @@ cached), and `handler.close()` stays idempotent.
 expected types, transport ids and route patterns only. Deserialization errors
 drop `JSON.parse` details because they can quote body fragments; automatic
 serialization of the execution context replaces the IAM token with
-`REDACTED_TOKEN` and excludes raw payloads; the connector itself logs nothing.
+`REDACTED_TOKEN` and excludes raw payloads.
+
+## Observability
+
+Every invocation surfaces a single correlation id — `trace_id` (equal to the
+function `awsRequestId`) — across stdout logs and error responses.
+
+**Error envelopes carry `trace_id`.** Any HTTP error response with status
+`>= 400` — last-resort 500, mapped 400/409/503, not-found 404, and responses
+produced by Nest exception filters — includes `trace_id` in its JSON body,
+merged without overwriting a filter-provided id. Successful responses
+(2xx/3xx) never carry it.
+
+**Boundary logs.** The connector writes one structured JSON line per event to
+`stdout`: a `start` at entry and a `finish` (or `error`) at exit, sharing the
+invocation's `trace_id`/`awsRequestId`. `finish` carries `transport`, the HTTP
+`status` (or MQ message count) and `durationMs`. Diagnostics are redacted —
+no token, header, body or raw fragments ever reach the log.
+
+**Application logging with `YandexLogger`.** Inject the provider anywhere Nest
+runs user code; records are one JSON line to `stdout` with `trace_id`/
+`awsRequestId` auto-filled from the active invocation, and secret `context`
+keys (`token`, `authorization`, `cookie`, nested) redacted:
+
+```ts
+import { YandexLogger } from "@ycforge/nestjs-connector/logger";
+import { Controller, Inject } from "@nestjs/common";
+
+@Controller("orders")
+export class OrdersController {
+  constructor(@Inject(YandexLogger) private readonly logger: YandexLogger) {}
+
+  @Get()
+  list(): string {
+    this.logger.info("listing orders", { userId: "u-1" });
+    return "[]";
+  }
+}
+```
+
+`YandexLogger` is auto-registered by the connector bootstrap module
+(`@Global()`), so no manual provider registration is needed. Outside an
+invocation scope (bootstrap, teardown) logging is fail-open: it never throws
+and omits `trace_id`/`awsRequestId`. Log level/filter configuration and custom
+sinks are out of scope in v1.
 
 ## Architecture
 
