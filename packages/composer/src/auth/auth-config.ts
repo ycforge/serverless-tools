@@ -1,5 +1,7 @@
+import type { OpenApiDocument } from '../errors.js';
 import type { AuthValidationRequest, AuthValidationResult, AuthYamlDocument } from './types.js';
 import { loadAuthYaml, parseAuthYaml } from './auth-yaml.js';
+import { validateSecurityReferences } from './auth-security.js';
 
 export async function validateAuthConfig(
   request: AuthValidationRequest,
@@ -7,6 +9,15 @@ export async function validateAuthConfig(
   const { appRoot, openApi } = request;
   const { text, sourcePath } = await loadAuthYaml(appRoot);
   const parsed = parseAuthYaml(text, sourcePath);
-  void openApi;
-  return { authYaml: parsed as unknown as AuthYamlDocument };
+  const authYaml = parsed as unknown as AuthYamlDocument;
+  validateSecurityReferences(openApi, authYaml);
+  return { authYaml };
+}
+
+export function validateAuthReferences(
+  openApi: OpenApiDocument,
+  authYaml: AuthYamlDocument,
+): AuthValidationResult {
+  validateSecurityReferences(openApi, authYaml);
+  return { authYaml };
 }

@@ -7,7 +7,7 @@ export {
   type OpenApiDocument,
   type OpenApiExtractErrorOptions,
 } from './errors.js';
-export { validateAuthConfig } from './auth/auth-config.js';
+export { validateAuthConfig, validateAuthReferences } from './auth/auth-config.js';
 export { AuthConfigError, AUTH_CONFIG_ERROR_CODES } from './auth/auth-errors.js';
 export type { AuthConfigErrorCode, AuthConfigErrorContext } from './auth/auth-errors.js';
 export type {
