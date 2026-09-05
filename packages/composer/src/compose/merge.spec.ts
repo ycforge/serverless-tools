@@ -67,6 +67,123 @@ describe('mergeDocuments — US1 merge (FR-002/016/017)', () => {
   });
 });
 
+function expectComposeError(fn: () => void, expected: Record<string, unknown>): void {
+  try {
+    fn();
+  } catch (err) {
+    expect(err).toMatchObject({ name: 'ComposeError', ...expected });
+    return;
+  }
+  throw new Error(`expected ComposeError ${JSON.stringify(expected)} but no error was thrown`);
+}
+
+describe('mergeDocuments — conflict matrix (US2, FR-004/005/006)', () => {
+  it('same path string across two apps → COMPOSE_PATH_COLLISION with both apps (US2/AC1)', () => {
+    expectComposeError(
+      () =>
+        mergeDocuments([
+          { appId: 'user_service', doc: doc('3.0.0', { '/users': { get: {} } }) },
+          { appId: 'analytics', doc: doc('3.0.0', { '/users': { post: {} } }) },
+        ]),
+      { code: 'COMPOSE_PATH_COLLISION', path: '/users', apps: ['analytics', 'user_service'] },
+    );
+  });
+
+  it('same path with only DIFFERENT methods is STILL a collision (strict path partition)', () => {
+    expectComposeError(
+      () =>
+        mergeDocuments([
+          { appId: 'user_service', doc: doc('3.0.0', { '/users': { get: {} } }) },
+          { appId: 'analytics', doc: doc('3.0.0', { '/users': { delete: {} } }) },
+        ]),
+      { code: 'COMPOSE_PATH_COLLISION', path: '/users' },
+    );
+  });
+
+  it('same operationId on different paths across apps → COMPOSE_OPERATIONID_COLLISION (US2/AC2)', () => {
+    expectComposeError(
+      () =>
+        mergeDocuments([
+          { appId: 'user_service', doc: doc('3.0.0', { '/a': { get: { operationId: 'listX' } } }) },
+          { appId: 'analytics', doc: doc('3.0.0', { '/b': { post: { operationId: 'listX' } } }) },
+        ]),
+      {
+        code: 'COMPOSE_OPERATIONID_COLLISION',
+        operationId: 'listX',
+        paths: ['/a', '/b'],
+        apps: ['analytics', 'user_service'],
+      },
+    );
+  });
+
+  it('duplicate operationId WITHIN a single app (self-collision) → same code (edge)', () => {
+    expectComposeError(
+      () =>
+        mergeDocuments([
+          {
+            appId: 'user_service',
+            doc: doc('3.0.0', {
+              '/a': { get: { operationId: 'dup' } },
+              '/b': { post: { operationId: 'dup' } },
+            }),
+          },
+        ]),
+      { code: 'COMPOSE_OPERATIONID_COLLISION', operationId: 'dup', paths: ['/a', '/b'] },
+    );
+  });
+
+  it('same component name in two apps → COMPOSE_COMPONENT_COLLISION (US2/AC3)', () => {
+    expectComposeError(
+      () =>
+        mergeDocuments([
+          { appId: 'user_service', doc: doc('3.0.0', {}, { schemas: { UserDto: {} } }) },
+          { appId: 'analytics', doc: doc('3.0.0', {}, { schemas: { UserDto: {} } }) },
+        ]),
+      { code: 'COMPOSE_COMPONENT_COLLISION', componentName: 'UserDto', apps: ['analytics', 'user_service'] },
+    );
+  });
+});
+
+describe('mergeDocuments — order independence of conflict reports (US2, FR-017, V)', () => {
+  it('the SAME conflict in either participant order reports the same code and context', () => {
+    const forward = [
+      { appId: 'user_service', doc: doc('3.0.0', { '/users': { get: { operationId: 'listX' } }, '/b': {} }) },
+      { appId: 'analytics', doc: doc('3.0.0', { '/a': { get: { operationId: 'listX' } } }) },
+    ];
+    const backward = [...forward].reverse();
+
+    let forwardErr: Record<string, unknown> = {};
+    let backwardErr: Record<string, unknown> = {};
+    try {
+      mergeDocuments(forward);
+    } catch (err) {
+      forwardErr = {
+        code: (err as { code: string }).code,
+        operationId: (err as { operationId: string }).operationId,
+        paths: (err as { paths: string[] }).paths.slice().sort(),
+        apps: (err as { apps: string[] }).apps.slice().sort(),
+      };
+    }
+    try {
+      mergeDocuments(backward);
+    } catch (err) {
+      backwardErr = {
+        code: (err as { code: string }).code,
+        operationId: (err as { operationId: string }).operationId,
+        paths: (err as { paths: string[] }).paths.slice().sort(),
+        apps: (err as { apps: string[] }).apps.slice().sort(),
+      };
+    }
+    expect(forwardErr).toEqual(backwardErr);
+    expect(forwardErr).toMatchObject({
+      code: 'COMPOSE_OPERATIONID_COLLISION',
+      operationId: 'listX',
+      paths: ['/a', '/users'],
+      apps: ['analytics', 'user_service'],
+    });
+  });
+});
+
 describe('sortRecordKeys — canonical normalization helper', () => {
   it('returns a new record with lexicographically sorted keys', () => {
     const sorted = sortRecordKeys({ b: 1, a: 2, c: 3 });

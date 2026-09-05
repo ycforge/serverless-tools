@@ -100,3 +100,97 @@ describe('compose — integration fixtures (US1, FR-001/002/017)', () => {
     expect(result.provenance.get('/users')).toBe('user_service');
   });
 });
+
+describe('compose — conflict fixtures (US2, FR-004/005/006/016)', () => {
+  const FIXTURE_ROOT = (name: string) => FIXTURE(name);
+  const participant = (name: string, app: string) =>
+    `${FIXTURE_ROOT(name)}participants/${app}`;
+
+  it('two apps declaring the same path → COMPOSE_PATH_COLLISION (US2/AC1)', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE_ROOT('compose-app-path-collision'),
+        apps: [
+          { appRoot: participant('compose-app-path-collision', 'user_service') },
+          { appRoot: participant('compose-app-path-collision', 'analytics') },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      name: 'ComposeError',
+      code: 'COMPOSE_PATH_COLLISION',
+      path: '/users',
+      apps: ['analytics', 'user_service'],
+    });
+  });
+
+  it('same operationId on different paths of two apps → COMPOSE_OPERATIONID_COLLISION (US2/AC2)', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE_ROOT('compose-app-opid-collision'),
+        apps: [
+          { appRoot: participant('compose-app-opid-collision', 'user_service') },
+          { appRoot: participant('compose-app-opid-collision', 'analytics') },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      code: 'COMPOSE_OPERATIONID_COLLISION',
+      operationId: 'listX',
+      paths: ['/a', '/b'],
+      apps: ['analytics', 'user_service'],
+    });
+  });
+
+  it('duplicate operationId within ONE app → COMPOSE_OPERATIONID_COLLISION (edge)', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE_ROOT('compose-app-opid-self-collision'),
+        apps: [{ appRoot: participant('compose-app-opid-self-collision', 'user_service') }],
+      }),
+    ).rejects.toMatchObject({
+      code: 'COMPOSE_OPERATIONID_COLLISION',
+      operationId: 'dup',
+      paths: ['/a', '/b'],
+    });
+  });
+
+  it('shared component name → COMPOSE_COMPONENT_COLLISION (US2/AC3)', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE_ROOT('compose-app-component-collision'),
+        apps: [
+          { appRoot: participant('compose-app-component-collision', 'user_service') },
+          { appRoot: participant('compose-app-component-collision', 'analytics') },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      code: 'COMPOSE_COMPONENT_COLLISION',
+      componentName: 'UserDto',
+      apps: ['analytics', 'user_service'],
+    });
+  });
+
+  it('openapi version mismatch → COMPOSE_OPENAPI_VERSION_MISMATCH (FR-016)', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE_ROOT('compose-app-version-mismatch'),
+        apps: [
+          { appRoot: participant('compose-app-version-mismatch', 'user_service') },
+          { appRoot: participant('compose-app-version-mismatch', 'analytics') },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      code: 'COMPOSE_OPENAPI_VERSION_MISMATCH',
+      apps: ['analytics', 'user_service'],
+      versions: ['3.0.0', '3.1.0'],
+    });
+  });
+
+  it('empty apps list → COMPOSE_NO_PARTICIPANTS before any extraction (US2/AC4)', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE_ROOT('compose-app-no-participants'),
+        apps: [],
+      }),
+    ).rejects.toMatchObject({ code: 'COMPOSE_NO_PARTICIPANTS' });
+  });
+});

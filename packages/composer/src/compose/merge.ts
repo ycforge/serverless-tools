@@ -38,8 +38,8 @@ function assertVersionConsensus(participants: readonly MergeParticipant[]): stri
   for (const { doc } of participants) {
     if (doc.openapi !== expected) {
       throw new ComposeError('COMPOSE_OPENAPI_VERSION_MISMATCH', {
-        apps: participants.map((p) => p.appId),
-        versions: participants.map((p) => p.doc.openapi),
+        apps: participants.map((p) => p.appId).sort(),
+        versions: participants.map((p) => p.doc.openapi).sort(),
       });
     }
   }
@@ -125,7 +125,7 @@ export function mergeDocuments(participants: readonly MergeParticipant[]): Merge
   for (const path of [...pathApps.keys()].sort()) {
     const apps = distinct(pathApps.get(path) ?? []);
     if (apps.length > 1) {
-      throw new ComposeError('COMPOSE_PATH_COLLISION', { path, apps });
+      throw new ComposeError('COMPOSE_PATH_COLLISION', { path, apps: apps.sort() });
     }
   }
 
@@ -134,8 +134,8 @@ export function mergeDocuments(participants: readonly MergeParticipant[]): Merge
     if (refs.length > 1) {
       throw new ComposeError('COMPOSE_OPERATIONID_COLLISION', {
         operationId,
-        paths: refs.map((ref) => ref.path),
-        apps: distinct(refs.map((ref) => ref.appId)),
+        paths: refs.map((ref) => ref.path).sort(),
+        apps: distinct(refs.map((ref) => ref.appId)).sort(),
       });
     }
   }
@@ -144,7 +144,7 @@ export function mergeDocuments(participants: readonly MergeParticipant[]): Merge
     const separatorIndex = key.indexOf(COMPONENT_KEY_SEPARATOR);
     const name =
       separatorIndex === -1 ? key : key.slice(separatorIndex + COMPONENT_KEY_SEPARATOR.length);
-    const apps = distinct(componentApps.get(key) ?? []);
+    const apps = distinct(componentApps.get(key) ?? []).sort();
     if (apps.length > 1) {
       throw new ComposeError('COMPOSE_COMPONENT_COLLISION', { componentName: name, apps });
     }
