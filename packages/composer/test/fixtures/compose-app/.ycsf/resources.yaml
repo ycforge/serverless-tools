@@ -1,0 +1,3 @@
+version: 1
+functions:
+  internal_authorizer: {}

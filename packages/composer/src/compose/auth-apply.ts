@@ -1,4 +1,8 @@
 import type { AuthYamlDocument, AuthScheme } from '../auth/types.js';
+import { ResourceRefError } from '../resource/errors.js';
+import { emptyResourceIndex } from '../resource/resource-index.js';
+import { makeTemplate } from '../resource/refs/template.js';
+import type { ResourceIndex } from '../resource/types.js';
 import { ComposeError } from './compose-errors.js';
 import type { GatewayDocument } from './types.js';
 import { isRecord } from './merge.js';
@@ -36,13 +40,23 @@ function jwtSchemeRecord(scheme: Extract<AuthScheme, { type: 'jwt' }>): Record<s
 
 function functionSchemeRecord(
   scheme: Extract<AuthScheme, { type: 'function' }>,
+  resourceIndex: ResourceIndex,
 ): Record<string, unknown> {
+  const name = scheme.function.name;
+  const reference = makeTemplate({ domain: 'functions', name, property: 'id' });
+  if (!resourceIndex.validateProperty('functions', name, 'id')) {
+    throw new ResourceRefError('RESOURCE_REF_NOT_DECLARED', {
+      domain: 'functions',
+      name,
+      reference,
+    });
+  }
   return {
     type: 'http',
     scheme: 'bearer',
     'x-yc-apigateway-authorizer': {
       type: 'function',
-      function_id: scheme.function.ref,
+      function_id: reference,
     },
   };
 }
@@ -81,7 +95,11 @@ function assertNoNoneRefs(document: GatewayDocument, authYaml: AuthYamlDocument)
   }
 }
 
-export function applyAuth(document: GatewayDocument, authYaml: AuthYamlDocument): void {
+export function applyAuth(
+  document: GatewayDocument,
+  authYaml: AuthYamlDocument,
+  resourceIndex: ResourceIndex = emptyResourceIndex(),
+): void {
   assertNoNoneRefs(document, authYaml);
 
   if (authYaml.defaultScheme !== undefined) {
@@ -109,7 +127,7 @@ export function applyAuth(document: GatewayDocument, authYaml: AuthYamlDocument)
     if (scheme.type === 'jwt') {
       securitySchemes[schemeName] = jwtSchemeRecord(scheme);
     } else {
-      securitySchemes[schemeName] = functionSchemeRecord(scheme);
+      securitySchemes[schemeName] = functionSchemeRecord(scheme, resourceIndex);
     }
   }
 }

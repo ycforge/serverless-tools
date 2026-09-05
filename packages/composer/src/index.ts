@@ -49,3 +49,29 @@ export type {
   AuthYamlDocument,
   FunctionReference,
 } from './auth/types.js';
+
+// spec 009 — logical resource references (IDL/IDT/IDR, `${resources...}` template, ENV-only)
+export {
+  parseResourceReference,
+  formatResourceReference,
+} from './resource/refs/parser.js';
+export type { ParsedResourceReference, ResourceReference } from './resource/refs/parser.js';
+export { makeTemplate, TEMPLATE_RE } from './resource/refs/template.js';
+export type { TemplateParts } from './resource/refs/template.js';
+export { ResourceRefError, RESOURCE_REF_ERROR_CODES } from './resource/errors.js';
+export type { ResourceRefErrorCode, ResourceRefErrorContext } from './resource/errors.js';
+export {
+  DOMAIN_PROPERTIES,
+  REFERENCE_BEARER_FIELDS,
+  RESOURCE_DOMAINS,
+} from './resource/types.js';
+export type {
+  EnvMapping,
+  ReferenceBearerField,
+  ResourceDomain,
+  ResourceIndex,
+} from './resource/types.js';
+export { emptyResourceIndex, loadResourceIndex, parseResourceIndex } from './resource/resource-index.js';
+export { loadEnvMapping, parseEnvMapping } from './resource/env-mapping.js';
+export { resolveReferences, validateResourceReference } from './resource/reference-resolver.js';
+export type { ResourceReferenceValidation } from './resource/reference-resolver.js';

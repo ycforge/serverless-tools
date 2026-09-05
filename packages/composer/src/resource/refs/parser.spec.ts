@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatResourceReference, parseResourceReference } from './parser.js';
-import type { ParsedResourceReference } from './parser.js';
 
 describe('parser — 002 re-export (T006, FR-005, SC-003)', () => {
   it('round-trips canonical references: format(parse(x)) === x', () => {

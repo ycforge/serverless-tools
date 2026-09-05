@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { loadResourceIndex, parseResourceIndex } from './resource-index.js';
-import { ResourceRefError } from './errors.js';
 
 const FIXTURE = (name: string) => fileURLToPath(new URL(`../../test/fixtures/${name}/`, import.meta.url));
 

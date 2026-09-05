@@ -338,7 +338,7 @@ describe('compose — auth application (US4, FR-011/012/013)', () => {
       scheme: 'bearer',
       'x-yc-apigateway-authorizer': {
         type: 'function',
-        function_id: 'functions.internal_authorizer',
+        function_id: '${resources.functions.internal_authorizer.id}',
       },
     });
   });
@@ -405,7 +405,7 @@ describe('compose — auth application (US4, FR-011/012/013)', () => {
     });
   });
 
-  it('output contains no ${resources...} / provisioning artifacts (SC-006, FR-013/018)', async () => {
+  it('output carries ${resources...} template (NOT bare functions.<name>, NOT IDR) and no provisioning artifacts (SC-004/006, FR-013/015/018)', async () => {
     const result = await compose({
       compositionRoot: FIXTURE('compose-app'),
       apps: [
@@ -416,7 +416,8 @@ describe('compose — auth application (US4, FR-011/012/013)', () => {
     });
 
     const serialized = JSON.stringify(result.document);
-    expect(serialized).not.toMatch(/\$\{resources/);
+    expect(serialized).toContain('${resources.functions.internal_authorizer.id}');
+    expect(serialized).not.toMatch(/\$\$\{/);
     expect(serialized).not.toMatch(/service_account_id/);
     expect(serialized).not.toMatch(/x-yc-apigateway-integration/);
   });
