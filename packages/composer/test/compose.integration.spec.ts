@@ -399,3 +399,32 @@ describe('compose — auth application (US4, FR-011/012/013)', () => {
     expect(serialized).not.toMatch(/x-yc-apigateway-integration/);
   });
 });
+
+describe('compose — delegation of 006/007 errors (US5, FR-015, SC-007)', () => {
+  const participant = (name: string, app: string) =>
+    `${FIXTURE(name)}participants/${app}`;
+
+  it('missing auth.yaml surfaces as AuthConfigError AUTH_FILE_MISSING, NOT ComposeError', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE('compose-app-bad-auth'),
+        apps: [{ appRoot: participant('compose-app-bad-auth', 'user_service') }],
+      }),
+    ).rejects.toMatchObject({
+      name: 'AuthConfigError',
+      code: 'AUTH_FILE_MISSING',
+    });
+  });
+
+  it('participant without source surfaces as OpenApiExtractError NO_SOURCE, NOT ComposeError', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE('compose-app-bad-extract'),
+        apps: [{ appRoot: participant('compose-app-bad-extract', 'user_service') }],
+      }),
+    ).rejects.toMatchObject({
+      name: 'OpenApiExtractError',
+      code: 'NO_SOURCE',
+    });
+  });
+});

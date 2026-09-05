@@ -191,3 +191,13 @@ describe('sortRecordKeys — canonical normalization helper', () => {
     expect(sorted).toEqual({ a: 2, b: 1, c: 3 });
   });
 });
+
+describe('mergeDocuments — documented path-template limitation (T037, Edge cases)', () => {
+  it('path-template differences (/users/{id} vs /users/{name}) are NOT detected as a collision — string equality only', () => {
+    const merged = mergeDocuments([
+      { appId: 'user_service', doc: doc('3.0.0', { '/users/{id}': { get: {} } }) },
+      { appId: 'analytics', doc: doc('3.0.0', { '/users/{name}': { get: {} } }) },
+    ]);
+    expect(Object.keys(merged.paths).sort()).toEqual(['/users/{id}', '/users/{name}']);
+  });
+});

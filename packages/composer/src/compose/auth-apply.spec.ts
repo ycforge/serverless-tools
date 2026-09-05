@@ -199,3 +199,25 @@ describe('applyAuth — none-reference invariant and emission collision (US4, FR
     );
   });
 });
+
+describe('applyAuth — no-provisioning / no-MVP scope regression (T038, FR-013/018, SC-006)', () => {
+  it('emitted document contains no integration, IAM, JWKS-publishing, Lockbox/OS, or ${resources} artifacts', () => {
+    const doc = baseDoc({
+      '/users': {
+        get: {
+          operationId: 'listUsers',
+          security: [{ internal: [] }],
+          responses: { 200: { description: 'ok' } },
+        },
+      },
+    });
+    applyAuth(doc, AUTH_YAML);
+
+    const serialized = JSON.stringify(doc);
+    expect(serialized).not.toMatch(/\$\{resources/);
+    expect(serialized).not.toMatch(/x-yc-apigateway-integration/);
+    expect(serialized).not.toMatch(/service_account_id/);
+    expect(serialized).not.toMatch(/"(tag)"/);
+    expect(serialized).not.toMatch(/lockbox|object_storage|yandex\.container-registry/);
+  });
+});

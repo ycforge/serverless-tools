@@ -172,3 +172,75 @@ describe('compose — pipeline order, delegation, immutability (US1, FR-001/015/
     expect(hoisted.extractCalls).toEqual([]);
   });
 });
+
+describe('compose — delegation/boundary regression (T035, FR-015, quickstart §US5)', () => {
+  it('compose never reimplements extraction/auth: fake app roots only resolve via the 006/007 mocks (research R1/R7)', async () => {
+    const fakeA = '/nonexistent/pool/app-a';
+    const fakeB = '/nonexistent/pool/app-b';
+    hoisted.docs.set(fakeA, frozenDoc({ '/a': { get: { operationId: 'getA' } } }, 'ADto'));
+    hoisted.docs.set(fakeB, frozenDoc({ '/b': { get: { operationId: 'getB' } } }, 'BDto'));
+    const result = await compose({
+      compositionRoot: '/composition-root',
+      apps: [{ appRoot: fakeA }, { appRoot: fakeB }],
+    });
+    expect(hoisted.extractCalls).toEqual([fakeA, fakeB]);
+    expect(hoisted.authConfigCalls).toEqual(['/composition-root']);
+    expect(result.document.openapi).toBe('3.0.0');
+  });
+
+  it('surfaces 006/007 errors untransformed as their own types across the whole pipeline (FR-015)', async () => {
+    hoisted.failAuth.value = true;
+    await expect(
+      compose({ ...REQUEST, compositionRoot: '/root-with-bad-auth' }),
+    ).rejects.toMatchObject({
+      name: 'AuthConfigError',
+      code: 'AUTH_FILE_MISSING',
+      path: '/root-with-bad-auth',
+    });
+    hoisted.failAuth.value = false;
+
+    hoisted.docs.delete(APP_B);
+    await expect(
+      compose({ ...REQUEST, apps: [{ appRoot: APP_A }, { appRoot: APP_B }] }),
+    ).rejects.toMatchObject({ name: 'OpenApiExtractError', code: 'NO_SOURCE' });
+  });
+});
+
+describe('compose — edge cases (T037, FR-002/004)', () => {
+  it('single-participant composition is a valid gateway with the same override/auth rules (US1/AC4)', async () => {
+    const result = await compose({
+      compositionRoot: '/composition-root',
+      apps: [{ appRoot: APP_A }],
+    });
+    expect(result.document.openapi).toBe('3.0.0');
+    expect(result.document.info).toEqual({ title: 'gateway', version: '1.0.0' });
+    const paths = result.document.paths as Record<string, unknown>;
+    expect(Object.keys(paths)).toEqual(['/a']);
+    expect(result.provenance.get('/a')).toBe('app-a');
+  });
+
+  it('an empty-app participant (no paths) contributes an empty set, not an error — other participants complete (FR-002)', async () => {
+    hoisted.docs.set(APP_B, frozenDoc({}, 'BDto'));
+    const result = await compose({
+      compositionRoot: '/composition-root',
+      apps: [{ appRoot: APP_A }, { appRoot: APP_B }],
+    });
+    const paths = result.document.paths as Record<string, unknown>;
+    expect(Object.keys(paths)).toEqual(['/a']);
+    expect(result.provenance.get('/a')).toBe('app-a');
+  });
+
+  it('duplicate appRoot in apps → fail-fast (data-model §НЕ ошибки, optimistic-duplicate rule)', async () => {
+    await expect(
+      compose({
+        compositionRoot: '/composition-root',
+        apps: [{ appRoot: APP_A }, { appRoot: APP_A }],
+      }),
+    ).rejects.toMatchObject({
+      name: 'ComposeError',
+      code: 'COMPOSE_NO_PARTICIPANTS',
+      app: APP_A,
+    });
+    expect(hoisted.extractCalls).toEqual([]);
+  });
+});
