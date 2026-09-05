@@ -1,0 +1,7 @@
+version: 1
+functions:
+  legacy_authorizer: {}
+queues:
+  events: {}
+buckets:
+  frontend: {}

@@ -5,6 +5,10 @@ import type { OpenApiDocument } from '../errors.js';
 import type { AuthYamlDocument } from '../auth/types.js';
 import { validateAuthConfig, validateAuthReferences } from '../auth/auth-config.js';
 import { applyAuth } from './auth-apply.js';
+import { loadResourceIndex } from '../resource/resource-index.js';
+import { loadEnvMapping } from '../resource/env-mapping.js';
+import { resolveReferences, REFERENCE_BEARER_FIELDS } from '../resource/index.js';
+import type { ResourceIndex } from '../resource/types.js';
 import { ComposeError } from './compose-errors.js';
 import { mergeDocuments, sortRecordKeys } from './merge.js';
 import { applyOverrides } from './overrides/apply.js';
@@ -75,6 +79,8 @@ export async function compose(request: ComposeRequest): Promise<ComposeResult> {
     request.functions,
   );
 
+  const resourceIndex: ResourceIndex = await loadResourceIndex(request.compositionRoot);
+
   const merged = mergeDocuments(participants);
 
   const document: GatewayDocument = {
@@ -85,7 +91,7 @@ export async function compose(request: ComposeRequest): Promise<ComposeResult> {
     document.components = merged.components;
   }
 
-  applyAuth(document, authYaml);
+  applyAuth(document, authYaml, resourceIndex);
 
   const globalOverrides = await loadOverrideFile(request.compositionRoot);
   const localOverrideRoots: string[] = request.apps.map((app) => app.appRoot);
@@ -105,8 +111,16 @@ export async function compose(request: ComposeRequest): Promise<ComposeResult> {
     throw new ComposeError('COMPOSE_INFO_MISSING', {});
   }
 
+  const envMapping = await loadEnvMapping(request.compositionRoot, resourceIndex);
+  const resolved = resolveReferences(
+    document as unknown as Record<string, unknown>,
+    envMapping,
+    REFERENCE_BEARER_FIELDS,
+    resourceIndex,
+  ) as unknown as GatewayDocument;
+
   const provenance: ReadonlyMap<string, RouteOwner> = merged.ownership.ownerByPath;
-  return { document, provenance };
+  return { document: resolved, provenance };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

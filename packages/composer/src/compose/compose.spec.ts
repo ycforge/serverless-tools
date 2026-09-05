@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { OpenApiDocument } from '../errors.js';
 import type { AuthScheme, AuthYamlDocument } from '../auth/types.js';
+import type { ResourceIndex } from '../resource/types.js';
 
 import { compose } from './compose.js';
 
@@ -12,6 +13,17 @@ const hoisted = vi.hoisted(() => {
   const docs = new Map<string, OpenApiDocument>();
   const failAuth = { value: false };
   const compositionRoot = '/composition-root';
+  const resourceIndex: ResourceIndex = {
+    domains: new Set(['functions']),
+    resources: new Map(),
+    entries: new Map(),
+    has: (domain, name) => domain === 'functions' && name === 'internal_authorizer',
+    getProperties: (domain, name) =>
+      domain === 'functions' && name === 'internal_authorizer' ? new Set(['id']) : undefined,
+    validateProperty: (domain, name, property) =>
+      domain === 'functions' && name === 'internal_authorizer' && property === 'id',
+    isValidProperty: (domain, property) => domain === 'functions' && property === 'id',
+  };
   const authYaml: AuthYamlDocument = {
     version: 1,
     defaultScheme: 'user',
@@ -30,7 +42,7 @@ const hoisted = vi.hoisted(() => {
       frontend: { type: 'none' },
     },
   };
-  return { extractCalls, authConfigCalls, authRefCalls, docs, failAuth, authYaml, compositionRoot };
+  return { extractCalls, authConfigCalls, authRefCalls, docs, failAuth, authYaml, compositionRoot, resourceIndex };
 });
 
 vi.mock('../extract.js', () => ({
@@ -79,6 +91,10 @@ vi.mock('./overrides/override-yaml.js', () => ({
           ],
         }
       : null,
+}));
+
+vi.mock('../resource/resource-index.js', () => ({
+  loadResourceIndex: async () => hoisted.resourceIndex,
 }));
 
 function frozenDoc(paths: Record<string, unknown>, schemaName: string): OpenApiDocument {
@@ -242,5 +258,29 @@ describe('compose — edge cases (T037, FR-002/004)', () => {
       app: APP_A,
     });
     expect(hoisted.extractCalls).toEqual([]);
+  });
+});
+
+describe('compose — deterministic template emission (T015, US3/AC4, FR-018)', () => {
+  it('same inputs & resource index → byte-identical document incl. ${resources...} templates', async () => {
+    const a = await compose({ ...REQUEST, compositionRoot: '/composition-root' });
+    const b = await compose({ ...REQUEST, compositionRoot: '/composition-root' });
+    expect(JSON.stringify(a.document)).toBe(JSON.stringify(b.document));
+    const components = a.document.components as Record<string, Record<string, unknown>>;
+    const internalScheme = components['securitySchemes']?.['internal'] as Record<string, unknown>;
+    const authorizer = internalScheme?.['x-yc-apigateway-authorizer'] as Record<string, unknown>;
+    expect(authorizer?.function_id).toBe('${resources.functions.internal_authorizer.id}');
+  });
+
+  it('participant reorder → byte-identical template references (FR-018)', async () => {
+    const ordered = await compose({
+      ...REQUEST,
+      apps: [{ appRoot: APP_A }, { appRoot: APP_B }],
+    });
+    const reversed = await compose({
+      ...REQUEST,
+      apps: [{ appRoot: APP_B }, { appRoot: APP_A }],
+    });
+    expect(JSON.stringify(ordered.document)).toBe(JSON.stringify(reversed.document));
   });
 });

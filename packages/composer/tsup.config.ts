@@ -9,5 +9,5 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   minify: false,
-  noExternal: ['yaml'],
+  noExternal: ['yaml', '@ycforge/pilot'],
 });

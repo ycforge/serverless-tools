@@ -37,11 +37,13 @@
   },
   "scripts": {
     "build": "tsup",
+    "pretest": "pnpm --filter @ycforge/pilot build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "@ycforge/pilot": "workspace:*",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0",
