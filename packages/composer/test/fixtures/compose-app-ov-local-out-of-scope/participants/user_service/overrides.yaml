@@ -1,0 +1,9 @@
+version: 1
+rules:
+  - op: replace
+    target:
+      kind: operation
+      path: /analytics/{id}
+      method: get
+    value:
+      summary: foreign

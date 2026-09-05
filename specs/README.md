@@ -40,7 +40,7 @@ Specs создаются **перед реализацией соответст�
 |---|------|-------|--------|-------------|
 | 006 | openapi-extraction — `openapi_entry`, fallback chain, `SERVERLESS_TOOLS_OPENAPI_BUILD=1`, metadata-only | §10 | ✅ | 002 |
 | 007 | auth-config — `auth.yaml`, scheme types none/jwt/function, валидация ссылок | §11–12 | ✅ | 002 |
-| 008 | api-composition — merge specs, fail-fast конфликты, provenance (internal), overrides global/local | §13–14 | ⬜ | 006, 007 |
+| 008 | api-composition — merge specs, fail-fast конфликты, provenance (internal), overrides global/local | §13–14 | 🚧 | 006, 007 |
 | 009 | resource-references — IDL/IDT/IDR, `${resources...}` template syntax, ENV-only mode | §15–19 | ⬜ | 002 |
 | 010 | ycsf-api-cli — `ycsf-api compile` / `ycsf-api check` | §3 | ⬜ | 008, 009 |
 

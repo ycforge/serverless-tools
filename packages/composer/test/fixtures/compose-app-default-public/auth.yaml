@@ -1,0 +1,11 @@
+version: 1
+defaultScheme: public
+
+schemes:
+  public:
+    type: none
+  user:
+    type: jwt
+    jwksUri: https://auth.example.com/jwks.json
+    issuer: https://auth.example.com
+    audience: [my-api]
