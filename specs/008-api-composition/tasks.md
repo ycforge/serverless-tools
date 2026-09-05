@@ -151,6 +151,14 @@
 
 ---
 
+## Phase 8: Convergence
+
+**Purpose**: converge-аудит (2026-09-05) выявил детерминизм-пробел FINALIZE: `compose.ts` не выполняет каноническую сортировку ключей `paths` ПОСЛЕ OVERRIDES (data-model, шаг 8; research R2). При локальных `add`-правилах у ДВУХ участников новые пути вставляются в порядке обработки локальных файлов (порядок ввода участников), а не лексикографически → `document.paths` может быть байт-различным при перестановке участников (FR-017, US1/AC2, SC-002). Также задокументировано (не требует кода): `compose-app-no-info/` fixture из plan/quickstart не создан, но `COMPOSE_INFO_MISSING` покрыт через `compose-app-path-collision`.
+
+- [x] T042 [P] FINALIZE-детерминизм: в `packages/composer/src/compose/compose.ts` ПОСЛЕ OVERRIDES (stage 7) добавить каноническую сортировку ключей `document.paths` (`sortRecordKeys` из `./merge.js`) — локальные/глобальные override-добавленные пути гарантированно лексикографически упорядочены независимо от порядка участников; `components`/`securitySchemes` НЕ пересортировывать (порядок эмиссии = порядок map `schemes`, FR-012/T031). Добавить fixture `compose-app-ov-local-add/` (global info-override + `user_service` и `analytics` с ЛОКАЛЬНЫМИ `add path`) и RED→GREEN регрессию в `test/compose.integration.spec.ts`: композиция в двух порядках участников → байт-идентичный `document` и лексикографический порядок ключей `paths` (FR-017; US1/AC2; SC-002; research R2; data-model FINALIZE) — RED: `document.paths` разные при обратном порядке участников (доказано probe-скриптом converge-аудита)
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

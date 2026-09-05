@@ -241,6 +241,28 @@ describe('compose — overrides (US3, FR-007/008/009)', () => {
     expect(result.provenance.get('/analytics/{id}')).toBe('analytics');
   });
 
+  it('local-override-added paths from two apps: byte-identical across participant order (FR-017, T042)', async () => {
+    const composeRoot = FIXTURE('compose-app-ov-local-add');
+    const userService = `${composeRoot}participants/user_service`;
+    const analytics = `${composeRoot}participants/analytics`;
+
+    const forward = await compose({
+      compositionRoot: composeRoot,
+      apps: [{ appRoot: userService }, { appRoot: analytics }],
+    });
+    const reversed = await compose({
+      compositionRoot: composeRoot,
+      apps: [{ appRoot: analytics }, { appRoot: userService }],
+    });
+
+    const expectedKeys = ['/analytics-extra', '/analytics/{id}', '/users', '/users-extra'];
+    expect(Object.keys(forward.document.paths)).toEqual(expectedKeys);
+    expect(Object.keys(reversed.document.paths)).toEqual(expectedKeys);
+    expect(JSON.stringify(forward.document)).toBe(JSON.stringify(reversed.document));
+    expect(forward.provenance.get('/analytics-extra')).toBe('analytics');
+    expect(forward.provenance.get('/users-extra')).toBe('user_service');
+  });
+
   it('absence of override files (global and local) is not an OVERRIDE_* error — pipeline reaches the info gate (T023)', async () => {
     await expect(
       compose({

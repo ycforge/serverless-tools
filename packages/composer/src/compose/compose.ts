@@ -6,7 +6,7 @@ import type { AuthYamlDocument } from '../auth/types.js';
 import { validateAuthConfig, validateAuthReferences } from '../auth/auth-config.js';
 import { applyAuth } from './auth-apply.js';
 import { ComposeError } from './compose-errors.js';
-import { mergeDocuments } from './merge.js';
+import { mergeDocuments, sortRecordKeys } from './merge.js';
 import { applyOverrides } from './overrides/apply.js';
 import { loadOverrideFile } from './overrides/override-yaml.js';
 import type {
@@ -98,6 +98,8 @@ export async function compose(request: ComposeRequest): Promise<ComposeResult> {
   }
 
   applyOverrides(document, merged.ownership, globalOverrides, localOverrides);
+
+  document.paths = sortRecordKeys(document.paths);
 
   if (!isRecord(document.info)) {
     throw new ComposeError('COMPOSE_INFO_MISSING', {});

@@ -1,0 +1,12 @@
+version: 1
+rules:
+  - op: add
+    target:
+      kind: path
+      path: /users-extra
+    value:
+      get:
+        operationId: listUsersExtra
+        responses:
+          "200":
+            description: extra
