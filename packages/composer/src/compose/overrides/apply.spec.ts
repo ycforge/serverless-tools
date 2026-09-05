@@ -243,10 +243,12 @@ describe('applyOverrides — local scope (US3/AC5, FR-008) and provenance', () =
 
   it('local rule addressing root info/component → OVERRIDE_OUT_OF_SCOPE (targetKind)', () => {
     expectComposeError(
-      () =>
+      () => {
+        const ownership = ownershipOf({ '/users': {} }, 'other');
+        ownership.assignApp('app', {});
         applyOverrides(
           baseDocument(),
-          ownershipOf({ '/users': {} }, 'other').assignApp('app', {}),
+          ownership,
           null,
           [
             {
@@ -256,7 +258,8 @@ describe('applyOverrides — local scope (US3/AC5, FR-008) and provenance', () =
               ]),
             },
           ],
-        ),
+        );
+      },
       { code: 'OVERRIDE_OUT_OF_SCOPE', app: 'app', targetKind: 'info' },
     );
 

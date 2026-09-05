@@ -10,6 +10,7 @@ export {
   loadOverrideFile,
   parseOverrideFile,
   applyOverrides,
+  applyAuth,
 } from './compose/index.js';
 export type {
   ComposeApp,

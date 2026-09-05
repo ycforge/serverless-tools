@@ -1,4 +1,5 @@
 export { compose, appIdOf } from './compose.js';
+export { applyAuth } from './auth-apply.js';
 export { ComposeError, COMPOSE_ERROR_CODES } from './compose-errors.js';
 export type { ComposeErrorCode, ComposeErrorContext } from './compose-errors.js';
 export { mergeDocuments, sortRecordKeys, type MergeResult } from './merge.js';

@@ -66,8 +66,26 @@ describe('compose — integration fixtures (US1, FR-001/002/017)', () => {
       functions: FUNCTIONS,
     });
 
-    const serialized = JSON.stringify(result.document);
-    expect(serialized).not.toMatch(/own|owner|provenance|app_id|appId/i);
+    const keys: string[] = [];
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          walk(item);
+        }
+        return;
+      }
+      if (typeof value === 'object' && value !== null) {
+        for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+          keys.push(key);
+          walk(child);
+        }
+      }
+    };
+    walk(result.document);
+    expect(keys).not.toContain('owner');
+    expect(keys).not.toContain('app');
+    expect(keys).not.toContain('appId');
+    expect(keys.filter((key) => /provenance/i.test(key))).toEqual([]);
   });
 
   it('exposes path → owner provenance for every merged path (FR-003, US1/AC3)', async () => {
@@ -259,5 +277,125 @@ describe('compose — overrides (US3, FR-007/008/009)', () => {
         name,
       ).rejects.toMatchObject(expected);
     }
+  });
+});
+
+describe('compose — auth application (US4, FR-011/012/013)', () => {
+  const participant = (name: string, app: string) =>
+    `${FIXTURE(name)}participants/${app}`;
+
+  it('canonical fixture (defaultScheme user/jwt) → root security [{ user: [] }] and exact jwt/function authorizers (US4/AC1/AC3)', async () => {
+    const result = await compose({
+      compositionRoot: FIXTURE('compose-app'),
+      apps: [
+        { appRoot: participant('compose-app', 'user_service') },
+        { appRoot: participant('compose-app', 'analytics') },
+      ],
+      functions: ['internal_authorizer'],
+    });
+
+    expect(result.document.security).toEqual([{ user: [] }]);
+
+    const securitySchemes = (result.document.components as Record<string, Record<string, unknown>>)[
+      'securitySchemes'
+    ] as Record<string, unknown>;
+    expect(Object.keys(securitySchemes)).toEqual(['user', 'internal']);
+    expect(securitySchemes['user']).toEqual({
+      type: 'openIdConnect',
+      openIdConnectUrl: 'https://auth.example.com/.well-known/openid-configuration',
+      'x-yc-apigateway-authorizer': {
+        type: 'jwt',
+        jwksUri: 'https://auth.example.com/jwks.json',
+        issuers: ['https://auth.example.com'],
+        audiences: ['my-api'],
+        identitySource: { in: 'header', name: 'Authorization', prefix: 'Bearer ' },
+      },
+    });
+    expect(securitySchemes['internal']).toEqual({
+      type: 'http',
+      scheme: 'bearer',
+      'x-yc-apigateway-authorizer': {
+        type: 'function',
+        function_id: 'functions.internal_authorizer',
+      },
+    });
+  });
+
+  it('none schemes → no securitySchemes entry, no authorizer (US4/AC4)', async () => {
+    const result = await compose({
+      compositionRoot: FIXTURE('compose-app'),
+      apps: [
+        { appRoot: participant('compose-app', 'user_service') },
+        { appRoot: participant('compose-app', 'analytics') },
+      ],
+      functions: ['internal_authorizer'],
+    });
+
+    const securitySchemes = (result.document.components as Record<string, Record<string, unknown>>)[
+      'securitySchemes'
+    ] as Record<string, unknown> | undefined;
+    expect(securitySchemes?.['public']).toBeUndefined();
+    expect(securitySchemes?.['frontend']).toBeUndefined();
+  });
+
+  it('root security + explicit op security preserved, replaced ops inherit via root (US4/AC1)', async () => {
+    const result = await compose({
+      compositionRoot: FIXTURE('compose-app'),
+      apps: [
+        { appRoot: participant('compose-app', 'user_service') },
+        { appRoot: participant('compose-app', 'analytics') },
+      ],
+      functions: ['internal_authorizer'],
+    });
+
+    const paths = result.document.paths as Record<string, Record<string, { security?: unknown }>>;
+    expect(paths['/users/{id}']?.['get']?.security).toEqual([{ user: [] }]);
+    expect(paths['/analytics/{id}']?.['get']?.security).toEqual([{ user: [] }]);
+    const overridden = paths['/users']?.['get'];
+    expect(overridden).toEqual({ summary: 'user list' });
+    expect(result.document.security).toEqual([{ user: [] }]);
+  });
+
+  it('defaultScheme type none → no root security emitted (US4/AC2)', async () => {
+    const result = await compose({
+      compositionRoot: FIXTURE('compose-app-default-public'),
+      apps: [{ appRoot: participant('compose-app-default-public', 'user_service') }],
+    });
+
+    expect(result.document.security).toBeUndefined();
+    const securitySchemes = (result.document.components as Record<string, Record<string, unknown>>)[
+      'securitySchemes'
+    ] as Record<string, unknown> | undefined;
+    expect(securitySchemes?.['user']).toBeDefined();
+  });
+
+  it('operation referencing a none-type scheme → COMPOSE_SECURITY_REF_NONE_SCHEME (rule 9)', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE('compose-app-none-ref'),
+        apps: [{ appRoot: participant('compose-app-none-ref', 'user_service') }],
+      }),
+    ).rejects.toMatchObject({
+      name: 'ComposeError',
+      code: 'COMPOSE_SECURITY_REF_NONE_SCHEME',
+      route: 'GET /users',
+      schemeName: 'anon',
+    });
+  });
+
+  it('output contains no ${resources...} / provisioning artifacts (SC-006, FR-013/018)', async () => {
+    const result = await compose({
+      compositionRoot: FIXTURE('compose-app'),
+      apps: [
+        { appRoot: participant('compose-app', 'user_service') },
+        { appRoot: participant('compose-app', 'analytics') },
+      ],
+      functions: ['internal_authorizer'],
+    });
+
+    const serialized = JSON.stringify(result.document);
+    expect(serialized).not.toMatch(/\$\{resources/);
+    expect(serialized).not.toMatch(/service_account_id/);
+    expect(serialized).not.toMatch(/x-yc-apigateway-integration/);
   });
 });

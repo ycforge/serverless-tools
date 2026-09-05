@@ -2,7 +2,9 @@ import { basename, resolve } from 'node:path';
 
 import { extractOpenApi } from '../extract.js';
 import type { OpenApiDocument } from '../errors.js';
+import type { AuthYamlDocument } from '../auth/types.js';
 import { validateAuthConfig, validateAuthReferences } from '../auth/auth-config.js';
+import { applyAuth } from './auth-apply.js';
 import { ComposeError } from './compose-errors.js';
 import { mergeDocuments } from './merge.js';
 import { applyOverrides } from './overrides/apply.js';
@@ -32,7 +34,7 @@ async function validateCompositionAuth(
   compositionRoot: string,
   participants: readonly MergeParticipant[],
   functions?: readonly string[],
-): Promise<void> {
+): Promise<AuthYamlDocument> {
   const first = participants[0];
   if (first === undefined) {
     throw new ComposeError('COMPOSE_NO_PARTICIPANTS', {});
@@ -49,6 +51,7 @@ async function validateCompositionAuth(
       validateAuthReferences(participant.doc, authYaml);
     }
   }
+  return authYaml;
 }
 
 export async function compose(request: ComposeRequest): Promise<ComposeResult> {
@@ -66,7 +69,11 @@ export async function compose(request: ComposeRequest): Promise<ComposeResult> {
   }
 
   const participants = await extractParticipants(request.apps);
-  await validateCompositionAuth(request.compositionRoot, participants, request.functions);
+  const authYaml = await validateCompositionAuth(
+    request.compositionRoot,
+    participants,
+    request.functions,
+  );
 
   const merged = mergeDocuments(participants);
 
@@ -77,6 +84,8 @@ export async function compose(request: ComposeRequest): Promise<ComposeResult> {
   if (Object.keys(merged.components).length > 0) {
     document.components = merged.components;
   }
+
+  applyAuth(document, authYaml);
 
   const globalOverrides = await loadOverrideFile(request.compositionRoot);
   const localOverrideRoots: string[] = request.apps.map((app) => app.appRoot);
