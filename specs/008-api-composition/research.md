@@ -1,0 +1,117 @@
+# Research: api-composition — merge, конфликты, provenance, overrides, auth-применение (Project B)
+
+**Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
+
+Все «Точки неоднозначности» spec.md закрыты информированными дефолтами на этапе specify (см. таблицу в spec); ниже — проектные решения уровня plan, вытекающие из них, плюс внешнее research реального формата Yandex API Gateway (R5). Формат каждого решения: Decision / Rationale / Alternatives considered. Единственное отложенное решение (дескриптор securityScheme для `jwt`, R5) разрешено автором 2026-09-05 в пользу варианта A (см. `spec.md`, секция «Clarifications») и зафиксировано в R5 как решённый контракт.
+
+## R1 — Форма composition input/output: `ComposeRequest` / `ComposeResult` (FR-001, Assumptions «Публичный контракт композиции»)
+
+- **Decision**:
+  - Вход — `ComposeRequest { compositionRoot: string; apps: readonly ComposeApp[]; functions?: readonly string[] }`, где `ComposeApp { appRoot: string }`. `compositionRoot` — корень openapi-приложения (composition), тот же `appRoot`, из которого 007 читает `auth.yaml`; там же лежит глобальный `overrides.yaml`. `apps` — явный, caller-provided список корней приложений-участников в порядке ввода; `functions` — набор функций композиции, прокидывается в 007 (FR-012).
+  - Выход — `ComposeResult { document: GatewayDocument; provenance: ReadonlyMap<string, RouteOwner> }`, где `document` — скомпилированный gateway-артефакт БЕЗ каких-либо следов provenance (FR-003/FR-017), а `provenance` возвращается отдельно как внутренняя read-map (для тестов на отсутствие утечки и для post-hoc диагностики вызвавшей стороны, напр. C).
+- **Rationale**: стиль request/options 006 (`appRoot`) и 007 (`{ appRoot, openApi, functions? }`) — composition получает тот же `compositionRoot`, а участники перечислены явно в запросе. Повторение линии 007/R3: B не читает `apps.yaml` (поле `apps` — зона C/011, Constitution I); «сколько и каких приложений» решает вызвавший (pipeline C или standalone-автор), а не парсинг B-ом user-файлов вне извлечённого OpenAPI. Возврат provenance отдельно от артефакта делает отсутствие утечки проверяемым инвариантом контракта, а не скрытой деталью.
+- **Alternatives considered**: (a) **B сам читает список участников из `apps.yaml`** — отвергнут: формат `apps.yaml` формализуется в 011 и принадлежит C; чтение B-ом user-конфигурации вне 006/007-цепочки нарушает границу I (007 предпочёл caller-provided `functions` по тем же причинам); (b) **вход — готовые документы (pre-extracted OpenApiDocument[]) без appRoot** — отвергнут: FR-001 прямо требует извлечение по цепочке 006 внутри B, а передача готовых документов размыла бы ownership источника и byte-parity (SC-002/SC-007); (c) **provenance только внутри позиции** — отвергнут: тестам (SC-004) и C нужен способ убедиться в отсутствии утечки; отдельное поле `result.provenance` (никогда не внутри `document`) — явный и проверяемый контракт.
+
+## R2 — Структура внутреннего provenance и детерминизм (FR-003, FR-017)
+
+- **Decision**: provenance — две внутренние структуры, построенные на этапе merge и поддерживаемые на этапе overrides:
+  - `path → owner`, где `owner: appId | 'global'` — т.к. строгий path-partition (FR-004) делает путь единицей владения (весь pathItem из одного приложения), локальный override адресует subtree по этому отображению;
+  - индекс `operationId → { path, appId }` (для локальной адресации по `operationId` и для диагностики FR-005).
+  - Глобально добавленные override-правилом пути получают owner `'global'`; локально добавленные — owner приложения (FR-008). Детерминизм артефакта (FR-017) достигается канонической нормализацией ключей: перед финализацией ключи `paths` и `components` сортируются лексикографически; порядок участников влияет только на порядок обработки, не на результат. Входные per-app документы не мутируются (FR-014) — merge работает на глубоких копиях.
+- **Rationale**: при строгом path-partition владение на уровне пути — минимально-достаточная модель: операций-адресов владельца достаточно, чтобы локальный override (пути/операции своего path-space) и диагностика конфликтов (FR-004/005/006) работали однозначно. Индекс по `operationId` нужен потому, что адресация `kind: operationId` однозначна только после глобальной уникальности FR-005. Сортировка ключей — единственный способ гарантировать byte-идентичность при перестановке участников (SC-002: «перестановка порядка даёт идентичный результат»): объектный порядок ключей JS = порядок вставки, поэтому build без нормализации недетерминирован.
+- **Alternatives considered**: (a) **пооперационное владение (method+path → app)** — отвергнуто: при path-partition избыточно (методы одного pathItem всегда из одного приложения) и усложнило бы локальный override-скоуп; (b) **provenance поверх артефакта** — отвергнуто FR-003/FR-017 (никаких ключей/метаданных принадлежности в артефакте); (c) **сохранять порядок вставки участников без сортировки** — отвергнуто: недетерминированный байтовый вывод (AC2), прямое нарушение FR-017.
+
+## R3 — Грамматика override-файлов (FR-007/008/010/016, Assumptions «YAML-структура override-файлов»)
+
+- **Decision**: каждый override-файл (`<compositionRoot>/overrides.yaml` глобальный, `<appRoot>/overrides.yaml` локальный) — документ `version: 1` c плоским списком правил:
+  ```yaml
+  version: 1
+  rules:
+    - op: replace           # replace | add | remove
+      target:               # явно адресуемая цель, дискриминатор `kind`
+        kind: info          # корневой info
+      value: { title: "...", version: "1.0.0" }   # только для replace/add
+
+    - op: replace
+      target: { kind: operation, path: /users, method: get }
+      value: { ... }        # атомарно заменяет ВСЁ тело операции
+
+    - op: add
+      target: { kind: path, path: /_health }
+      value: { get: { responses: ... } }          # pathItem
+
+    - op: remove
+      target: { kind: operationId, operationId: getUsers }
+
+    - op: replace
+      target: { kind: component, name: UserDto }
+      value: { ... }
+  ```
+  - Адресация — дискриминированный `target.kind ∈ {info, path, operation, operationId, component}`; концептуальные формы §14 `path` / `METHOD /path` / `operationId` / `info` / `components.<name>` отображаются на структурные `{kind: path}`, `{kind: operation, path, method}`, `{kind: operationId}`, `{kind: info}`, `{kind: component}` (без разбора строк; `method` — строчная буква из множества HTTP-methods).
+  - Операции — атомарные `replace`/`add`/`remove`; глубокое слияние value с целью НЕ выполняется (FR-010): `replace` кладёт value целиком, `add` вставляет отсутствующую цель, `remove` удаляет цель.
+  - Семантика последовательности детерминирована: правила одного файла применяются по порядку файла (позднее правило «видит» результат раннего); пересечение global↔local на одной цели — это ВТОРОЙ проход (local после global), т.е. приоритет local > global (FR-009), а не конфликт.
+  - Границы уровня (FR-008): локальный override умеет адресовать ТОЛЬКО path-space своего приложения (`kind: path/operation/operationId`, где результат резолва цели — путь своего owner) либо добавлять новые пути в свой path-space; адресация `kind: info`, `kind: component` и чужого пути из локального файла — fail-fast.
+  - Несовместимость цели (apply-time, FR-007/AC6): `replace`/`remove` на отсутствующей цели, `add` на существующей — fail-fast.
+  - Файл отсутствует = правил нет (не ошибка); файл есть, но битый/не по грамматике — fail-fast. `rules: []`/отсутствие `rules` — fail-fast (по симметрии с 007 `/schemes: {}`; пустой override-файл — бессмысленная магия).
+  - `version: 1` — единая поддержанная версия (Constitution III; override-файлы — app-artifacts семейства `.ycsf/*.yaml`, как `auth.yaml` в 007).
+- **Rationale**: плоский список правил «адрес + атомарная операция» моделирует формулировку spec прямо («каждое правило — явно адресованные... с атомарной операцией»), даёт единообразную и исчерпываемую валидацию всех классов адресов и детерминированный порядок. Структурный `target` исключает парсинг строк (`METHOD /path`), а дискриминатор `kind` обеспечивает fail-fast на неизвестном классе адреса. Атомарные операции + последовательное применение = без deep merge, все результаты детерминированы (FR-010).
+- **Alternatives considered**: (a) **map-образный документ** (`info:`/`paths:`/`components:` с вложенными `op`/`value`) — отвергнут: адресация по `operationId` и единообразная проверка «правило→цель» в map-форме неудобны (пришлись бы отдельные вложенности по каждому классу), меньше соответствие идее «правило адресует цель»; (b) **строковый адрес `METHOD /path` и `components.<name>`** — отвергнут: парсинг строк добавляет класс ошибок, а структурный target явнее (V); (c) **двухуровневый формат (global rules + local rules в одном файле)** — отвергнут: уровни — это файлы в определённых корнях (Assumptions, FR-007/008), смешение уровней в одном файле запутало бы provenance.
+- **Открытый вопрос до /speckit-tasks**: нет — грамматика полностью определена; значения `value` считаются opaque JSON-значениями (валидируется только их наличие/отсутствие по op) и валидируются на целостность документа финальным gate (info), а не deep-validation B-ом.
+
+## R4 — Merge и детекция конфликтов (FR-004/005/006/016)
+
+- **Decision**: merge объединяет `paths` и `components` участников в порядке ввода, но конфликт-детекция и результат инвариантны порядку:
+  - **path**: совпадение СТРОКИ пути у ≥2 приложений (независимо от набора методов) — fail-fast `COMPOSE_PATH_COLLISION` c путём и обоими appId (FR-004; операционный-level merge и семантические пересечения шаблонных путей — post-MVP вместе с semantic merge/IR, см. Assumptions).
+  - **operationId**: любой дубликат в объединении — и между приложениями, и ВНУТРИ одного приложения (self-collision) — fail-fast `COMPOSE_OPERATIONID_COLLISION` с operationId, путями обеих операций и appId (FR-005 + Edge cases).
+  - **components**: совпадение имени компонента у ≥2 приложений — fail-fast `COMPOSE_COMPONENT_COLLISION` с именем и appId (FR-006). Включается и пересечение уже слитых `components.securitySchemes` приложений с auth-эмиссией (FR-012): эмиссия проверяет коллизию по общему правилу — fail-fast, не тихий приоритет.
+  - **openapi-версия**: поля `openapi` всех извлечённых документов обязаны совпадать; несовпадение — fail-fast `COMPOSE_OPENAPI_VERSION_MISMATCH` с набором значений и appId (FR-016). Значение объединённого документа = уникальное общее значение участников (Constitution V: B не «выбирает» версию — её задаёт единогласие участников; выбор другой версии — авторский глобальный override вне MVP, см. R4-note).
+  - Детерминизм: после merge-и overrides ключи `paths`/`components` нормализуются сортировкой (R2); порядок участников влияет только на порядок обработки, не на состав/содержимое.
+- **Rationale**: строгий path-partition — зафиксированный MVP-дефолт (резолюция «Точки неоднозначности» №1): один path = одно приложение делает локальный override однозначным (FR-004) и конфликт-диагностику детерминированной (FR-015, AC2 — «независимо от способа вызова»). operationId-коллизия — конституционный fail-fast (V): «один operationId — два app» никогда не silent merge. Версия — fail-fast по V: документ с разными версиями неоднозначен.
+- **Alternatives considered**: (a) **operation-level merge общих путей (разные методы от разных приложений)** — отвергнут: Assumptions явно переносят его в semantic merge/IR post-MVP и пересмотр модели коллизий; (b) **детекция семантических пересечений шаблонных путей (`/users/{id}` vs `/users/{name}`)** — отвергнута: post-MVP (documented limitation, Edge cases); (c) **last-wins на коллизиях** — отвергнут Constitution V; (d) **порядок участников как источник приоритета конфликтов** — отвергнут FR-017: нормализованная сортировка + fail-fast делают порядок нерелевантным.
+- **R4-note (версия)**: спецификация не включает класс адреса `openapi` в override-грамматику; при необходимости принудительно иной версии, чем у участников (напр. 3.1.0 при участинках 3.0.0), — см. `CLARIFY`? Нет — это осознанный MVP-дефолт: версия наследуется от единогласия участников (FR-016). Введение адреса `{kind: openapi}` — аддитивное контрактное расширение при его появлении, в 008 не закладывается.
+
+## R5 — Скомпилированный артефакт: реальный формат Yandex API Gateway, securitySchemes и authorizers (FR-012/013, FR-018, Constitution I/IV)
+
+**Research факт (Yandex Cloud docs, 2026, docs.yandex.cloud/en/docs/api-gateway/concepts/extensions)**: спецификация API Gateway — стандартный OpenAPI 3.0 с расширениями `x-yc-*`. Топ-уровень `x-yc-apigateway` (variables, service_account_id, validator, cors, rateLimit). Интеграции — per-operation `x-yc-apigateway-integration`/`components: x-yc-apigateway-integrations`. **Authorizers** размещаются ВНУТРИ `components.securitySchemes.<name>.x-yc-apigateway-authorizer`:
+- **jwt**: родительская схема должна иметь тип `openIdConnect`; параметры `x-yc-apigateway-authorizer: { type: jwt, jwksUri, issuers: string[], audiences: string[], identitySource: { in, name, prefix } (required), requiredClaims?, caching... }`. `openIdConnectUrl` (стандартное поле OAS) можно опустить, если задан `jwksUri`.
+- **function**: родительская схема `type: http` (scheme basic/bearer) или `apiKey`; `x-yc-apigateway-authorizer: { type: function, function_id, tag? (default $latest), service_account_id?, caching... }`.
+
+- **Decision**:
+  - (a) **Да**: 008 эмитит стандартные OAS 3.x `components.securitySchemes` — одна запись на каждую схему не-`none` из `auth.yaml` (FR-012); authorizer-конфигурация кладётся в реальную позицию Yandex — вложенное `x-yc-apigateway-authorizer` внутри записи схемы (не отдельная top-level секция и не отдельная структура вне документа).
+  - (b) **function**: схема-дескриптор `{ type: http, scheme: bearer }` + `x-yc-apigateway-authorizer: { type: function, function_id: functions.<name> }`, где `function_id` = логическая ссылка §12/007 verbatim (FR-013: без `${resources...}`, без key-provisioning/Lockbox/JWKS; `service_account_id`/`tag` НЕ эмитятся — это IAM-зона provisioning). **Шов 019**: материализатор Yandex (019) заменяет значения `function_id`, совпадающие с грамматикой `functions.<name>`, реальными IDR после `terraform apply`; до формализации 009 синтаксис `${resources...}` не используется (Assumptions), при его введении контракт обновляется аддитивно.
+  - (c) **jwt**: **РЕШЕНО (plan clarify, 2026-09-05): родительская securityScheme — `{ type: openIdConnect, openIdConnectUrl: <issuer>/.well-known/openid-configuration }`**, т.е. выводимый от `issuer` OIDC discovery-URL (вариант A); inside — `x-yc-apigateway-authorizer: { type: jwt, ... }`. Параметры §12 отображаются детерминированно: `jwksUri`→`jwksUri`, `issuer`→`issuers: [issuer]`, `audience` (scalar|array) → `audiences: [...]` (scalar оборачивается в одноэлементный массив); обязательный для Yandex `identitySource` эмитится фиксированным дефолтом `{ in: header, name: Authorization, prefix: "Bearer " }` (детерминировано; кастомизация — вне MVP). Кэширующие параметры (`authorizer_result_ttl_in_seconds`, `jwkTtlInSeconds`) не эмитятся (deploy-детали, вне §12). **Контрактная нота к выводу URL**: `openIdConnectUrl` — конвенция `<issuer>/.well-known/openid-configuration`, зафиксированная в контракте (аддитивно-отменяемая расширением контракта 007, вне MVP); рантайм-следствие — IdP обязан хостить OIDC discovery по этому адресу, иначе API Gateway не сможет получить `jwks_uri`/публичные ключи (JWT-авторизация отдаст ошибку получения конфигурации). Yandex допускает опущение `openIdConnectUrl` при заданном `jwksUri` (authorizer работает без discovery-вызова), однако контракт 008 фиксирует ВЫВОД для детерминированности и проверяемости артефакта.
+  - **none**: нет securitySchemes-записи и нет authorizer (FR-012/AC4). Артефакт НЕ содержит `x-yc-apigateway-integration` на операциях (FR-018: интеграции — зона 009/019) — он является корректным внутренним документом композиции, пригодным для отображения материализатором 019, а не финальным деплоябельным spec-ом в отрыве от интеграций (документируется в контракте, см. seam 009/019).
+- **Rationale**: реальный формат Yandex (authorizer внутри securitySchemes) — проверен по актуальной документации; размещение в реальной позиции удерживает B «композицией» (I): B отвечает за OpenAPI/auth-семантику и структуру документа, 019 — за подстановку конкретных идентификаторов (IAM/provisioning). Эмиссия фиксированного `identitySource` и опускание «служебных» полей — детерминированные MVP-дефолты без расширения контракта 007 (identitySource не выражается в `auth.yaml`, а значение по умолчанию совпадает с каноническим использованием bearer-токенов в Yandex).
+- **Alternatives considered**: (a) **authorizers как отдельная структура вне документа** — отвергнут: Yandex читает authorizer-конфигурацию только из spec; отдельная секция заставила бы 019 РЕКОНСТРУИРОВАТЬ документ (утечка композиции из B в materializer); (b) **top-level `x-yc-apigateway: authorizers:` мапа** — отвергнут как несоответствующий текущему реальному формату (устаревшая форма); (c) **эмиссия `${resources...}`-шаблонов** — отвергнута FR-013/Assumptions (009 не формализован); (d) **B подставляет реальные IDR/дочитывает IAM-идентификаторы** — отвергнуто Constitution I/IV (B не Terraform compiler, идентификаторы существуют только после `terraform apply`); (e) **jwt-descriptor: `openIdConnect` + выводимый `openIdConnectUrl` (вариант A)** vs **`http/bearer` (вариант B, дословно FR-012)** vs **явный `openIdConnectUrl` из нового поля auth.yaml (вариант C)** — РЕШЕНО в пользу A (plan clarify): максимальная совместимость с реальным деплоем при нуле новой конфигурации; B отвергнут как недокументированная для Yandex пара scheme/authorizer (риск отказа валидации спецификации при деплое), C отвергнут как расширение контракта 007 ради одного поля. Отклонённые варианты зафиксированы в `spec.md` (таблица «Точки неоднозначности» и секция «Clarifications»).
+
+## R6 — Auth-применение (шов 007): defaultScheme, securitySchemes, authorizers (FR-011/012/013, FR-006)
+
+- **Decision**: этап auth-применения работает поверх валидированного 007 `authYaml` (read-model) и слитых (пока ещё без auth) paths/components:
+  - **defaultScheme**:
+    - тип не-`none` → в документ эмитится корневый `security: [{ <defaultScheme>: [] }]` (FR-011); операция с явным `security` сохраняет собственное требование (OAS-семантика: op-level переопределяет root), операция без `security` наследует root; `security: []` в операции сохраняется как «явно без auth».
+    - тип `none` (в т.ч. `defaultScheme: public`) → корневый `security` НЕ эмитится; «голые» операции остаются без auth (US4/AC2).
+  - **securitySchemes**: для каждой схемы не-`none` из `authYaml.schemes` эмитится запись (FR-012, порядок = порядок map `schemes` — документ composition-owned, порядок участников не влияет). Коллизия с существующим (слитым из приложений или уже эмитированным) именем — fail-fast `COMPOSE_COMPONENT_COLLISION` по общему правилу FR-006.
+  - **authorizers**: FR-013, форма по R5.
+  - **Инвариант «неэмитабельной ссылки»**: operation-level `security` из извлечённого документа может ссылаться на объявленную схему типа `none` (007 допускает любые объявленные, кроме `public`). Такая ссылка не может получить securitySchemes-запись → эмиссия даст невалидный документ. По Constitution V такое состояние — fail-fast `COMPOSE_SECURITY_REF_NONE_SCHEME` с маршрутом операции (никогда не «тихое опускание» требования). Ссылки на схемы не-`none` всегда резолвятся: 007 гарантирует объявление, FR-012 эмитит запись для каждой объявленной не-`none`.
+  - Корневый `security` per-app документов НЕ переносится (Assumptions «info шлюза»): root-требования приложений приватны; gateway-root выводится только из `defaultScheme`.
+- **Rationale**: 007/008 seam оставляет auth-ПРИМЕНЕНИЕ за 008 и работает с уже валидированной read-model (007/R5: 008 получает `{ appRoot, authYaml, openApi }`); эмиссия «для всех не-`none`, а не только используемых» — специфицированный детерминированный дефолт (Assumptions: focus-эмиссия — пост-MVP). OAS-семантика root/op `security` используется как есть (FR-011 прямо на неё ссылается), это знание OpenAPI-смысла, а не магия.
+- **Alternatives considered**: (a) **эмитировать securitySchemes только для используемых схем** — отвергнута Assumptions (детерминированно и просто — все не-`none`; focus — пост-MVP); (b) **молча пропускать ссылку операции на none-схему** — отвергнута: Silent drop требования = V-нарушение; фиксируется как новый fail-fast код 008; (c) **переносить root `security` приложений в документ** — отвергнут Assumptions (иначе неявный «чей-то победитель»); (d) **в 007 запретить не-`public` none-схему в security** — отклонено: это расширило бы контракт 007 нега-правилом под кейс 008; fail-fast в 008 точнее по месту.
+
+## R7 — Фиксированная pipeline и поверхность ошибок (Assumptions «Пайплайн в B», FR-001/015, Constitution V)
+
+- **Decision**: порядок этапов фиксирован и тестируется (SC-001/SC-005):
+  ```
+  READ(compositionRoot + участники)
+    → EXTRACT  per app через extractOpenApi (006)            // fail-fast: OpenApiExtractError
+    → AUTH     validateAuthConfig(compositionRoot, app1) →
+               validateAuthReferences(app_i, authYaml) (007)  // fail-fast: AuthConfigError
+    → VERSION  FR-016 consensus
+    → MERGE    paths/components + конфликты FR-004/005/006
+    → AUTH-APPLY defaultScheme/securitySchemes/authorizers (R6)
+    → OVERRIDES global файл, затем LOCAL по приложениям в порядке ввода (R3)
+    → FINALIZE info-gate (COMPOSE_INFO_MISSING), нормализация ключей (R2), provenance отдельно
+  ```
+  первый нарушенный инвариант даёт детерминированную ошибку; после ошибки никаких частичных результатов наружу не выдаётся.
+- **Поверхность ошибок**: новые композиционные сбои — единый тип `ComposeError` с собственным набором кодов (таксономия в `contracts/api-composition.md`). Ошибки делегированных этапов (006 extraction, 007 auth-валидация) НЕ переупаковываются: наружу всплывает исходный `OpenApiExtractError`/`AuthConfigError` того же кода и контекста — «переиспользование где этапы делегируют», гарантирующее байт-идентичную диагностику в standalone и в pipeline C (FR-015). `ComposeError` используется только для зон, принадлежащих самой композиции: конфликты (FR-004/005/006/016), override-грамматика и apply-несовместимости (FR-007/008/010), info-gate, инвариант none-ссылки (R6).
+- **Rationale**: отдельный `ComposeError` (а не расширение `AuthConfigError`) сохраняет чистую таксономию: коды 007 описывают валидность `auth.yaml`/ссылок, коды 008 — корректность композиции; при этом делегирование не ремапит чужие коды, поэтому диагностика конфликтов идентична в любом режиме вызова (US2/AC4, FR-015) и фикстуры 006/007 переиспользуются без дублирования (SC-007). Fail-fast с первым нарушенным инвариантом — общий стиль 006/007 (SC-003).
+- **Alternatives considered**: (a) **расширить `AuthConfigError` кодами композиции** — отвергнут: один класс на две семантически разные зоны (auth-конфигурация vs композиция) размывает контекстные поля и сообщения; (b) **обернуть упавшие 006/007 в `ComposeError` с `cause`** — отвергнут: теряется прямой код делегированного этапа, а FR-015 требует «ту же диагностику»; (c) **после конфликта возвращать частичный результат + ошибку** — отвергнут FR-015 («ошибка не маскирует частичные результаты» — она и есть финальный результат вызова).
