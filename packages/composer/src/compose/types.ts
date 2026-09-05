@@ -19,7 +19,7 @@ export interface ComposeResult {
 
 export interface GatewayDocument {
   openapi: string;
-  info: Record<string, unknown>;
+  info?: Record<string, unknown>;
   security?: Array<Record<string, readonly unknown[]>>;
   paths: Record<string, unknown>;
   components?: Record<string, unknown>;

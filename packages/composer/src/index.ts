@@ -1,3 +1,26 @@
+export {
+  compose,
+  ComposeError,
+  COMPOSE_ERROR_CODES,
+  mergeDocuments,
+  PathOwnership,
+  sortRecordKeys,
+  walkJsonKeys,
+  appIdOf,
+} from './compose/index.js';
+export type {
+  ComposeApp,
+  ComposeErrorCode,
+  ComposeErrorContext,
+  ComposeRequest,
+  ComposeResult,
+  GatewayDocument,
+  MergeParticipant,
+  MergeResult,
+  OperationIdRef,
+  RouteOwner,
+} from './compose/index.js';
+
 export { extractOpenApi, NO_SOURCE_MESSAGE } from './extract.js';
 export {
   OpenApiExtractError,
