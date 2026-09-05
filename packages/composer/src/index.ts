@@ -7,6 +7,9 @@ export {
   sortRecordKeys,
   walkJsonKeys,
   appIdOf,
+  loadOverrideFile,
+  parseOverrideFile,
+  applyOverrides,
 } from './compose/index.js';
 export type {
   ComposeApp,
@@ -18,6 +21,11 @@ export type {
   MergeParticipant,
   MergeResult,
   OperationIdRef,
+  OverrideFile,
+  OverrideRule,
+  OverrideRuleOp,
+  OverrideTarget,
+  OverrideTargetKind,
   RouteOwner,
 } from './compose/index.js';
 

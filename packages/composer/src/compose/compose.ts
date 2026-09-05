@@ -5,6 +5,8 @@ import type { OpenApiDocument } from '../errors.js';
 import { validateAuthConfig, validateAuthReferences } from '../auth/auth-config.js';
 import { ComposeError } from './compose-errors.js';
 import { mergeDocuments } from './merge.js';
+import { applyOverrides } from './overrides/apply.js';
+import { loadOverrideFile } from './overrides/override-yaml.js';
 import type {
   ComposeRequest,
   ComposeResult,
@@ -76,6 +78,26 @@ export async function compose(request: ComposeRequest): Promise<ComposeResult> {
     document.components = merged.components;
   }
 
+  const globalOverrides = await loadOverrideFile(request.compositionRoot);
+  const localOverrideRoots: string[] = request.apps.map((app) => app.appRoot);
+  const localOverrides = [];
+  for (const appRoot of localOverrideRoots) {
+    localOverrides.push({
+      appId: appIdOf(appRoot),
+      file: await loadOverrideFile(appRoot),
+    });
+  }
+
+  applyOverrides(document, merged.ownership, globalOverrides, localOverrides);
+
+  if (!isRecord(document.info)) {
+    throw new ComposeError('COMPOSE_INFO_MISSING', {});
+  }
+
   const provenance: ReadonlyMap<string, RouteOwner> = merged.ownership.ownerByPath;
   return { document, provenance };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -194,3 +194,70 @@ describe('compose — conflict fixtures (US2, FR-004/005/006/016)', () => {
     ).rejects.toMatchObject({ code: 'COMPOSE_NO_PARTICIPANTS' });
   });
 });
+
+describe('compose — overrides (US3, FR-007/008/009)', () => {
+  const participant = (name: string, app: string) =>
+    `${FIXTURE(name)}participants/${app}`;
+
+  it('canonical fixture: global override sets info + adds /_health (owner "global"), local rules apply (US3/AC1/AC2/AC3)', async () => {
+    const result = await compose({
+      compositionRoot: FIXTURE('compose-app'),
+      apps: [
+        { appRoot: participant('compose-app', 'user_service') },
+        { appRoot: participant('compose-app', 'analytics') },
+      ],
+      functions: ['internal_authorizer'],
+    });
+
+    expect(result.document.info).toEqual({ title: 'compose-app gateway', version: '1.0.0' });
+
+    const paths = result.document.paths as Record<string, Record<string, unknown>>;
+    expect(paths['/_health']).toEqual({
+      get: { operationId: 'health', responses: { '200': { description: 'ok' } } },
+    });
+    expect(result.provenance.get('/_health')).toBe('global');
+
+    expect(paths['/users']?.['get']).toEqual({ summary: 'user list' });
+    expect(paths['/legacy']?.['get']).toBeUndefined();
+    expect(result.provenance.get('/legacy')).toBe('user_service');
+    expect(result.provenance.get('/analytics/{id}')).toBe('analytics');
+  });
+
+  it('absence of override files (global and local) is not an OVERRIDE_* error — pipeline reaches the info gate (T023)', async () => {
+    await expect(
+      compose({
+        compositionRoot: FIXTURE('compose-app-path-collision'),
+        apps: [{ appRoot: participant('compose-app-path-collision', 'user_service') }],
+      }),
+    ).rejects.toMatchObject({
+      name: 'ComposeError',
+      code: 'COMPOSE_INFO_MISSING',
+    });
+  });
+
+  it('negative override fixtures → expected OVERRIDE_* codes', async () => {
+    const cases: Array<[string, Record<string, unknown>, string[]]> = [
+      ['compose-app-ov-bad-version', { code: 'OVERRIDE_VERSION_UNSUPPORTED' }, ['user_service']],
+      ['compose-app-ov-rules-empty', { code: 'OVERRIDE_RULES_EMPTY' }, ['user_service']],
+      ['compose-app-ov-value-missing', { code: 'OVERRIDE_VALUE_REQUIRED' }, ['user_service']],
+      ['compose-app-ov-target-missing', { code: 'OVERRIDE_TARGET_MISSING' }, ['user_service']],
+      ['compose-app-ov-add-existing', { code: 'OVERRIDE_TARGET_ALREADY_EXISTS' }, ['user_service']],
+      [
+        'compose-app-ov-local-out-of-scope',
+        { code: 'OVERRIDE_OUT_OF_SCOPE', app: 'user_service' },
+        ['user_service', 'analytics'],
+      ],
+      ['compose-app-ov-local-info', { code: 'OVERRIDE_OUT_OF_SCOPE', app: 'user_service' }, ['user_service']],
+    ];
+
+    for (const [name, expected, apps] of cases) {
+      await expect(
+        compose({
+          compositionRoot: FIXTURE(name),
+          apps: apps.map((app) => ({ appRoot: participant(name, app) })),
+        }),
+        name,
+      ).rejects.toMatchObject(expected);
+    }
+  });
+});
