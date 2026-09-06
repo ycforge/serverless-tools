@@ -15,3 +15,4 @@ export * from './resource-reference.js';
 export * from './project-model.js';
 export * from './build-env.js';
 export * from './registry.js';
+export * from './materialize.js';

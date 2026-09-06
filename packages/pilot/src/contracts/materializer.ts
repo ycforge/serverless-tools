@@ -40,7 +40,7 @@ export interface MaterializationContext {
  * `materialize` returns {@link TerraformResource} directly — there is no
  * intermediate abstraction layer (IDEA §22).
  */
-export interface Materializer<A extends Artifact = Artifact> {
+export interface Materializer<A = Artifact> {
   /**
    * Synchronous selection by `artifact.type` (and anything else the
    * materializer considers). Must stay pure and cheap: C calls it for every
