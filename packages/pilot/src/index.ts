@@ -12,3 +12,11 @@ export { dispatch } from './materialize/dispatch.js';
 export type { ArtifactDescriptor, DispatchResult, DispatchOptions } from './contracts/index.js';
 export { writeGeneratedTerraform } from './materialize/write.js';
 export type { GeneratedTfFile } from './contracts/index.js';
+export { loadExtensions, applyExtensions, deepMerge } from './extensions/index.js';
+export type {
+  ExtensionRule,
+  ExtensionsYaml,
+  ExtensionsLoadResult,
+  ApplyExtensionsResult,
+  ExtensionsDiagnostic,
+} from './contracts/index.js';
