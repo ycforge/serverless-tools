@@ -132,6 +132,7 @@ export const PML_DEPENDS_UNKNOWN = 'PML_DEPENDS_UNKNOWN';
 export const PML_DEPENDS_CYCLE = 'PML_DEPENDS_CYCLE';
 export const PML_IDENTITY_COLLISION = 'PML_IDENTITY_COLLISION';
 export const PML_ENV_NOT_SET = 'PML_ENV_NOT_SET';
+export const PML_ENV_UNRESOLVED = 'PML_ENV_UNRESOLVED';
 
 /**
  * Pure predicate: is `value` an `{{$NAME}}` interpolation reference

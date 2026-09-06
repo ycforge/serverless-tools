@@ -116,7 +116,8 @@
       "PML_DEPENDS_UNKNOWN": { "type": "string", "const": "PML_DEPENDS_UNKNOWN", "description": "depends_on references unknown app_id." },
       "PML_DEPENDS_CYCLE": { "type": "string", "const": "PML_DEPENDS_CYCLE", "description": "Cycle in depends_on graph (involved chain in message)." },
       "PML_IDENTITY_COLLISION": { "type": "string", "const": "PML_IDENTITY_COLLISION", "description": "Same logical identity in apps.yaml and resources.yaml." },
-      "PML_ENV_NOT_SET": { "type": "string", "const": "PML_ENV_NOT_SET", "description": "Required {{$ENV}} / null build_env variable missing from process env." }
+      "PML_ENV_NOT_SET": { "type": "string", "const": "PML_ENV_NOT_SET", "description": "Required {{$ENV}} / null build_env variable missing from process env." },
+      "PML_ENV_UNRESOLVED": { "type": "string", "const": "PML_ENV_UNRESOLVED", "description": "A {{$NAME}} in build_config/build_env could not be resolved to a non-empty process-env value, or a residual {{$NAME}} remains, at runtime-prep (spec 012)." }
     },
     "required": [
       "PML_VERSION",
@@ -129,7 +130,8 @@
       "PML_DEPENDS_UNKNOWN",
       "PML_DEPENDS_CYCLE",
       "PML_IDENTITY_COLLISION",
-      "PML_ENV_NOT_SET"
+      "PML_ENV_NOT_SET",
+      "PML_ENV_UNRESOLVED"
     ],
     "additionalProperties": false
   }
