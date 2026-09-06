@@ -348,7 +348,7 @@ Registry загружена, но нет materializer entries (пустой `mat
 
 - **DispatchResult**: discriminated union `DispatchResultOk | DispatchResultInvalid`. Public API type; содержит `resources`, `generatedFiles` (ok) или `errors` (invalid).
 
-- **DispatchDiagnostic**: `{ code: string, message: string, artifactId?: string, materializerIds?: string[] }` — diagnostic для dispatch failures. Codes: `MTL_*`.
+- **DispatchDiagnostic**: `{ code, message, artifactId?, materializerIds?, materializerId?, type?, name?, outputName?, filename? }` — diagnostic для dispatch failures (полный набор optional-полей см. data-model.md / `contracts/materialize.json`). Codes: `MTL_*`.
 
 ---
 
@@ -376,6 +376,7 @@ Registry загружена, но нет materializer entries (пустой `mat
 - **Terraform JSON syntax**: `.tf.json` формат — валидный JSON, читаемый Terraform как module config. `{ "resource": { <type>: { <name>: <config> } } }` — standard Terraform JSON syntax.
 - **Dispatch не вызывает Terraform CLI**: Spec 014 заканчивается на `.tf.json` generation на disk (или in-memory GeneratedTfFile structs). Plan/apply — spec 021.
 - **`context.output` — transient per-dispatch-call**: OutputBuilder создаётся на вызов dispatch; outputs accumulated, then serialized. Output names глобально уникальны (collision = error).
+- **Cross-spec contract refinement (Constitution III, additive)**: dispatch передаёт materializer-ам `ArtifactDescriptor` (spec 014), а не `Artifact` (spec 002 built value). Контрактный generic в файле spec-002 `packages/pilot/src/contracts/materializer.ts` аддитивно расширяется: `Materializer<A extends Artifact = Artifact>` → `Materializer<A = Artifact>` (default прежний, non-breaking; существующие plugin-ы и `fr-014-dispatch.test-d.ts` остаются green; имплементируется в T050). Это осознанная аддитивная правка контракта 002, а не новый контракт.
 - **Regeneration deletes orphaned generated files**: Write operation удаляет generated files, которые были в предыдущем generated set, но отсутствуют в текущем (removed apps). Implementation: maintain manifest of generated filenames; on write, delete orphans.
 
 ---

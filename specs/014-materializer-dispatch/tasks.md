@@ -235,19 +235,13 @@ Task: "Implement dispatch.ts (T058) + materialize/index.ts + src/index.ts export
 
 **A3 (RESOLVED — THROW, aligned with A2).** Path-traversal / invalid filename on `writeGeneratedTerraform(infraDir, files)` input → **throw** `Error` (I/O-layer convention; `MTL_INVALID_TERRAFORM_ADDRESS` remains on the serialize-side compute-time guard only). T025 asserts `rejects.toThrow()` + no file created outside `infraDir`. Not a silent drop (Constitution V).
 
-**LOCKED defaults (flagged earlier; confirmed, no user ask needed):**
+**LOCKED defaults (flagged earlier; confirmed at analyze, no user ask needed):**
 
-**A4 (LOCKED default, confirmed).** `MTL_OUTPUT_NAME_COLLISION` detected on serialize-step after full Phase 2 (neither selection-all-or-nothing nor materialize-abort-on-first). Locked per data-model; T014/T058 encode it.
+**A4 (LOCKED default, confirmed at analyze). Timing `MTL_OUTPUT_NAME_COLLISION`.** Spec говорит только „collision = error, никогда merge". data-model размещает детекцию duplicate output name на serialize-step ПОСЛЕ полной Phase 2 (все materializers отработали, затем invalid c единственным `MTL_OUTPUT_NAME_COLLISION`) — т.е. коллизия outputs НЕ является ни selection error (all-or-nothing), ни materialize-error (abort-on-first). Locked per data-model; T014/T058 encode it.
 
-**A5 (LOCKED default, confirmed).** Deterministic order = alphabetical pre-sort of `app_id`s, then topological consumption of `depends_on_graph.adjacency` (`deterministicOrder` in T056; matches US-4). `topologicalOrder` from 011 NOT reused directly (its tie-order follows file order). T020/T056 encode it.
+**A5 (LOCKED default, confirmed at analyze). Точность правила deterministic order.** research.md decision 2 формулирует два варианта: „stable sort keyed by app_id для равных позиций" и „sort app ids alphabetically, затем topologically order тот пре-отсортированный список". US-4 фиксирует один конкретный ожидаемый результат (`analytics → user_service → frontend`). Locked: alphabetical pre-sort app_ids + топологический порядок по `depends_on_graph.adjacency` (реализация `deterministicOrder(projectModel)`, T056) — совпадает с US-4; результат — НЕ массивы `topologicalOrder` из 011 как есть (его tie-продукт зависит от порядка файлов, а не алфавита), consumption идёт по `adjacency`. T020/T056 encode it.
 
-**A6 (LOCKED default, confirmed).** `DispatchOptions.infraDir` declared (reserved, default 'infra') but `dispatch` is fs-free and ignores it (consume = 021 CLI zone). T050/T058 encode it.
-
-**A4 (LOCKED default, flagged for analyze). Timing `MTL_OUTPUT_NAME_COLLISION`.** Spec говорит только „collision = error, никогда merge". data-model размещает детекцию duplicate output name на serialize-step ПОСЛЕ полной Phase 2 (все materializers отработали, затем invalid c единственным `MTL_OUTPUT_NAME_COLLISION`) — т.е. коллизия outputs НЕ является ни selection error (all-or-nothing), ни materialize-error (abort-on-first). Закодировано в T014/T058 как locked-per-data-model; подтвердить на analyze.
-
-**A5 (LOCKED default, flagged for analyze). Точность правила deterministic order.** research.md decision 2 формулирует два варианта: „stable sort keyed by app_id для равных позиций" и „sort app ids alphabetically, затем topologically order тот пре-отсортированный список". US-4 фиксирует один конкретный ожидаемый результат (`analytics → user_service → frontend`). Locked: alphabetical pre-sort app_ids + топологический порядок по `depends_on_graph.adjacency` (реализация `deterministicOrder`, T056) — совпадает с US-4; `topologicalOrder` из 011 НЕ переиспользуется напрямую (его tie-продукт зависит от порядка файлов, а не алфавита). Закодировано в T020/T056; подтвердить на analyze.
-
-**A6 (LOCKED default). `DispatchOptions.infraDir` не используется чистым `dispatch`.** Spec API включает `infraDir?: string` (default 'infra'), но `dispatch` не имеет fs (write отделен). Locked (план structure decision): поле объявлено в `DispatchOptions` как reserved (consume — зона 021 CLI), `dispatch` его не читает. Закодировано в T050/T058.
+**A6 (LOCKED default, confirmed at analyze). `DispatchOptions.infraDir` не используется чистым `dispatch`.** Spec API включает `infraDir?: string` (default 'infra'), но `dispatch` не имеет fs (write отделен). Поле объявлено в `DispatchOptions` как reserved (consume — зона 021 CLI), `dispatch` его не читает. T050/T058 encode it.
 
 ---
 

@@ -82,10 +82,12 @@ interface DispatchDiagnostic {
   readonly code: string;   // MTL_* (см. MTL catalog)
   readonly message: string;
   readonly artifactId?: string;      // app_id (для unhandled/materialize-failed)
-  readonly materializerIds?: string[]; // для MTL_COLLISION; [id] для MTL_MATERIALIZE_FAILED
+  readonly materializerIds?: string[]; // для MTL_COLLISION; [id] для MTL_UNHANDLED_ARTIFACT
   readonly materializerId?: string;  // единственный id для materialize-failed
-  readonly type?: string;            // MTL_INVALID_TERRAFORM_ADDRESS: data
+  readonly type?: string;            // MTL_INVALID_TERRAFORM_ADDRESS / MTL_COLLISION: data
   readonly name?: string;            // MTL_INVALID_TERRAFORM_ADDRESS: data
+  readonly outputName?: string;      // MTL_OUTPUT_NAME_COLLISION: дублируемое имя
+  readonly filename?: string;        // MTL_FILENAME_COLLISION: вычисленный filename
 }
 ```
 
@@ -122,7 +124,7 @@ App (ProjectModel, 011)
 GeneratedTfFile ──(writeGeneratedTerraform, I/O)──► infra/<filename> (только *.ycsf.tf.json)
 ```
 
-- `ProjectModel.depends_on_graph.topologicalOrder` (011) → порядок artifacts (FR-014); внутри уровня — alphabetical по `app_id` (research 2).
+- `ProjectModel.depends_on_graph` (011) → порядок artifacts через `deterministicOrder(projectModel)` (A5): alphabetical pre-sort `app_id`, затем topological consumption по `depends_on_graph.adjacency`; порядок матчит US-4 (research 2 / A5).
 - Registry records (013) iterated в insertion order → deterministic список materializer-ов (research 2).
 - `PluginEntry.module: unknown` → shape-guard сужает до `Materializer` (research 4).
 
@@ -132,7 +134,7 @@ GeneratedTfFile ──(writeGeneratedTerraform, I/O)──► infra/<filename> (
 dispatch(projectModel, registry, options?)
 
  Phase 1 — SELECT (all-or-nothing, FR-017):
-   orderedAppIds = deterministicOrder(topologicalOrder, app_id ties)      [FR-014]
+   orderedAppIds = deterministicOrder(projectModel)              [FR-014; alpha pre-sort + topo по adjacency (A5)]
    for artifact in artifacts(orderedAppIds):
      supporters = []                                                      [FR-002]
      for entry in registry.records.values() where kind==='materializer':
