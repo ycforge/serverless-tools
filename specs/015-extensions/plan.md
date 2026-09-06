@@ -77,7 +77,6 @@ specs/015-extensions/
 packages/pilot/
 ├── package.json                     # UNCHANGED (yaml already a dependency; no new deps)
 ├── tsup.config.ts                   # UNCHANGED (index + contracts entries already emitted)
-├── contracts/extensions.json        # NEW (repo-root catalog mirror — alongside specs/*/contracts per convention)
 └── src/
     ├── index.ts                     # UPDATE: export runtime API loadExtensions + applyExtensions (+ deepMerge)
     ├── contracts/
