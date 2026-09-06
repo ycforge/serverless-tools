@@ -220,3 +220,32 @@ export function resolveReferences(
   }
   return clone;
 }
+
+/**
+ * Deep walk of an arbitrary value tree (e.g. an override rule `value` from spec
+ * 014) resolving every `${resources...}` string leaf through the same
+ * deterministic semantics as the contracted bearer fields (009 FR-006/008/010;
+ * 010 T033). Missing/malformed references fail-fast; templates without an
+ * `env:` declaration keep their canonical form (FR-010); foreign interpolations
+ * (APIGW `${var.foo}`, Terraform, build ENV) are left untouched (FR-014).
+ */
+export function resolveReferencesInValue(
+  value: unknown,
+  envMapping: EnvMapping,
+  index: ResourceIndex,
+): unknown {
+  if (typeof value === 'string') {
+    return resolveScalar(value, index, envMapping);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => resolveReferencesInValue(item, envMapping, index));
+  }
+  if (isRecord(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      out[key] = resolveReferencesInValue(item, envMapping, index);
+    }
+    return out;
+  }
+  return value;
+}

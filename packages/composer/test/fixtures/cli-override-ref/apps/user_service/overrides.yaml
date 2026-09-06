@@ -1,0 +1,12 @@
+version: 1
+rules:
+  - op: add
+    target:
+      kind: operation
+      path: /ping
+      method: get
+    value:
+      summary: '${resources.functions.internal_authorizer.id}'
+      operationId: ping
+      x-yc-apigateway-authorizer:
+        function_id: '${resources.functions.internal_authorizer.id}'

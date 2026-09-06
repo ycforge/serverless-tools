@@ -67,11 +67,26 @@ export {
 } from './resource/types.js';
 export type {
   EnvMapping,
+  EnvMappingMode,
   ReferenceBearerField,
   ResourceDomain,
   ResourceIndex,
 } from './resource/types.js';
 export { emptyResourceIndex, loadResourceIndex, parseResourceIndex } from './resource/resource-index.js';
-export { loadEnvMapping, parseEnvMapping } from './resource/env-mapping.js';
-export { resolveReferences, validateResourceReference } from './resource/reference-resolver.js';
+export { loadEnvMapping, parseEnvMapping, emptyEnvMapping } from './resource/env-mapping.js';
+export { resolveReferences, resolveReferencesInValue, validateResourceReference } from './resource/reference-resolver.js';
 export type { ResourceReferenceValidation } from './resource/reference-resolver.js';
+
+// spec 010 — CLI public types for external consumers (check/compile contracts)
+export type {
+  CheckError,
+  CheckName,
+  CheckOptions,
+  CheckResult,
+  CheckSummary,
+  CheckSummaryCounts,
+  CompileOptions,
+  GatewayApp,
+  Provenance,
+  RouteRef,
+} from './cli/types.js';

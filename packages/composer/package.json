@@ -32,6 +32,9 @@
     "runner"
   ],
   "sideEffects": false,
+  "bin": {
+    "ycsf-api": "dist/cli/index.js"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -41,12 +44,15 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@ycforge/pilot": "workspace:*",
+    "commander": "^12.0.0",
+    "yaml": "^2.9.0"
+  },
   "devDependencies": {
     "@types/node": "^22.15.0",
-    "@ycforge/pilot": "workspace:*",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0",
-    "yaml": "^2.9.0"
+    "vitest": "^3.2.0"
   }
 }

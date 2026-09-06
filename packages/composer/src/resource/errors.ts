@@ -9,6 +9,7 @@ export const RESOURCE_REF_ERROR_CODES = [
   'RESOURCE_REF_ENV_NOT_SET',
   'RESOURCE_REF_ENV_DEFAULT_UNSUPPORTED',
   'RESOURCE_REF_ENV_UNDECLARED_RESOURCE',
+  'RESOURCE_REF_ENV_MODE_INVALID',
   'RESOURCE_REF_COLLISION_APPS_RESOURCES',
 ] as const;
 
@@ -25,6 +26,7 @@ export interface ResourceRefErrorContext {
   reason?: string;
   reference?: string;
   envVar?: string;
+  mode?: string;
 }
 
 const ALLOWED_DOMAINS = 'functions, queues, buckets, containers, gateways';
@@ -67,6 +69,8 @@ const RESOURCE_REF_ERROR_MESSAGE_BY_CODE: Record<
     `env.yaml references resource "${
       c.domain && c.name ? `${c.domain}.${c.name}` : c.domain ?? '<unknown>'
     }" (property ${c.property ?? '<unknown>'}) which is not declared in resources.yaml`,
+  RESOURCE_REF_ENV_MODE_INVALID: (c) =>
+    `env.yaml mode must be "compose" or "env-only" (got: ${c.mode ?? '<missing>'})`,
   RESOURCE_REF_COLLISION_APPS_RESOURCES: (c) =>
     `identity "${c.domain}.${c.name ?? '<unknown>'}" is declared both as an app and as an external resource (checked by ycsf check, spec 011 — not by the composer)`,
 };
@@ -88,6 +92,7 @@ export class ResourceRefError extends Error {
   readonly reason?: string;
   readonly reference?: string;
   readonly envVar?: string;
+  readonly mode?: string;
 
   constructor(
     code: ResourceRefErrorCode,
@@ -108,5 +113,6 @@ export class ResourceRefError extends Error {
     this.reason = ctx.reason;
     this.reference = ctx.reference;
     this.envVar = ctx.envVar;
+    this.mode = ctx.mode;
   }
 }

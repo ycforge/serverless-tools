@@ -1,0 +1,58 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "User Service",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/users": {
+      "get": {
+        "operationId": "listUsers",
+        "summary": "List users",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        },
+        "security": [{ "jwt": [] }]
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "operationId": "getUser",
+        "summary": "Get user",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        },
+        "security": [{ "authorizer": [] }]
+      }
+    },
+    "/admin": {
+      "get": {
+        "operationId": "adminOnly",
+        "summary": "Admin only",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        },
+        "x-yc-apigateway-authorizer": {
+          "type": "function",
+          "function_id": "${resources.functions.missing_fn.id}"
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" }
+        }
+      }
+    }
+  }
+}
