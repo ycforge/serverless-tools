@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/project-model.json",
+  "title": "@ycforge/pilot project-model — .ycsf schemas and PML_* error code catalog",
+  "description": "Machine-readable contract for the Project C project model: JSON Schema for the .ycsf/apps.yaml, .ycsf/resources.yaml and <app>/build_config.yaml files (all requiring version: 1), plus the catalog of PML_* validation error codes.",
+  "type": "object",
+  "definitions": {
+    "app": {
+      "$id": "#/definitions/app",
+      "title": "apps.yaml entry",
+      "type": "object",
+      "properties": {
+        "version": { "const": 1, "description": "Required. Format version." },
+        "apps": {
+          "type": "object",
+          "description": "Map of app_id → app definition.",
+          "patternProperties": {
+            "^[A-Za-z][A-Za-z0-9_]*$": {
+              "$ref": "#/definitions/appDefinition"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["version", "apps"],
+      "additionalProperties": false
+    },
+    "appDefinition": {
+      "$id": "#/definitions/appDefinition",
+      "type": "object",
+      "properties": {
+        "source_path": {
+          "type": "string",
+          "description": "Relative path to the app directory."
+        },
+        "builder": {
+          "type": "string",
+          "description": "Opaque builder identifier (validated in spec 013)."
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "App_id dependencies; defines build order."
+        }
+      },
+      "required": ["source_path", "builder"],
+      "additionalProperties": false,
+      "description": "No builder-specific config is allowed in apps.yaml (FR-012)."
+    },
+    "resources": {
+      "$id": "#/definitions/resources",
+      "title": "resources.yaml",
+      "type": "object",
+      "properties": {
+        "version": { "const": 1, "description": "Required. Format version." }
+      },
+      "required": ["version"],
+      "additionalProperties": {
+        "type": "object",
+        "description": "domain → map of resource_id → {} (external, reference only)."
+      }
+    },
+    "buildConfig": {
+      "$id": "#/definitions/buildConfig",
+      "title": "<app>/build_config.yaml",
+      "type": "object",
+      "properties": {
+        "version": { "const": 1, "description": "Required. Format version." },
+        "build_config": {
+          "type": "object",
+          "description": "Opaque builder config; internals NOT validated by C (FR-011).",
+          "additionalProperties": true
+        },
+        "build_env": {
+          "type": "object",
+          "description": "ENV_NAME → null (take from process env) or string literal / {{$ENV}}.",
+          "additionalProperties": {
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "required": ["version"],
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "$id": "#/definitions/diagnostic",
+      "title": "ProjectModelDiagnostic",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "PML_* code (see errorCodes)." },
+        "message": { "type": "string" },
+        "file": { "type": "string" },
+        "app": { "type": "string" },
+        "identity": { "type": "string" },
+        "field": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["code", "message", "file"],
+      "additionalProperties": false
+    }
+  },
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "PML_* error code catalog",
+    "type": "object",
+    "description": "All project-model validation error codes (Constitution V: machine-readable, compared via constants, never string literals).",
+    "properties": {
+      "PML_VERSION": { "type": "string", "const": "PML_VERSION", "description": "Missing or invalid version:1." },
+      "PML_PARSE": { "type": "string", "const": "PML_PARSE", "description": "YAML syntax / structure parse failure." },
+      "PML_INVALID": { "type": "string", "const": "PML_INVALID", "description": "Document shape violation (wrong types, unknown keys, etc.)." },
+      "PML_DUPLICATE_APP_ID": { "type": "string", "const": "PML_DUPLICATE_APP_ID", "description": "Duplicate app_id." },
+      "PML_DUPLICATE_RESOURCE_ID": { "type": "string", "const": "PML_DUPLICATE_RESOURCE_ID", "description": "Duplicate resource_id." },
+      "PML_DUPLICATE_KEY": { "type": "string", "const": "PML_DUPLICATE_KEY", "description": "Duplicate YAML key (uniqueKeys:true)." },
+      "PML_DEPENDS_SELF": { "type": "string", "const": "PML_DEPENDS_SELF", "description": "Self-reference in depends_on." },
+      "PML_DEPENDS_UNKNOWN": { "type": "string", "const": "PML_DEPENDS_UNKNOWN", "description": "depends_on references unknown app_id." },
+      "PML_DEPENDS_CYCLE": { "type": "string", "const": "PML_DEPENDS_CYCLE", "description": "Cycle in depends_on graph (involved chain in message)." },
+      "PML_IDENTITY_COLLISION": { "type": "string", "const": "PML_IDENTITY_COLLISION", "description": "Same logical identity in apps.yaml and resources.yaml." },
+      "PML_ENV_NOT_SET": { "type": "string", "const": "PML_ENV_NOT_SET", "description": "Required {{$ENV}} / null build_env variable missing from process env." }
+    },
+    "required": [
+      "PML_VERSION",
+      "PML_PARSE",
+      "PML_INVALID",
+      "PML_DUPLICATE_APP_ID",
+      "PML_DUPLICATE_RESOURCE_ID",
+      "PML_DUPLICATE_KEY",
+      "PML_DEPENDS_SELF",
+      "PML_DEPENDS_UNKNOWN",
+      "PML_DEPENDS_CYCLE",
+      "PML_IDENTITY_COLLISION",
+      "PML_ENV_NOT_SET"
+    ],
+    "additionalProperties": false
+  }
+}

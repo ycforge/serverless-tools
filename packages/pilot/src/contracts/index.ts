@@ -12,3 +12,4 @@ export * from './terraform.js';
 export * from './materializer.js';
 export * from './artifact-type.js';
 export * from './resource-reference.js';
+export * from './project-model.js';
