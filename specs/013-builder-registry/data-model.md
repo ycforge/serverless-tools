@@ -15,7 +15,7 @@ interface BuildersYaml {
 
 Инварианты:
 - `version === 1` (Constitution III).
-- ключи: непустая строка `\w+` (letter/digit/underscore/hyphen; `builder`/`materializer` identifier).
+- ключи: непустая строка `[\w-]+` (letter/digit/underscore/hyphen; `builder`/`materializer` identifier).
 - значения: непустая строка (import specifier — package name в проде, путь к fixture в тестах; research 4).
 - `builders` и `materializers` — **не пересекаются** по ключам (FR-003, Constitution V).
 - дубликат ключа в пределах раздела — error (FR-003, uniqueKeys).

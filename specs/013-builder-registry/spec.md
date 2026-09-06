@@ -42,7 +42,7 @@ materializers:
 
 **Свойства**:
 - `version: 1` — обязательное поле (Constitution III); отсутствие или неверное значение → error.
-- `builders` — map: ключ = builder identifier (строка, `\w+` — letter/digit/underscore/hyphen), значение = npm package specifier (строка).
+- `builders` — map: ключ = builder identifier (строка, `[\w-]+` — letter/digit/underscore/hyphen), значение = npm package specifier (строка).
 - `materializers` — map: ключ = materializer identifier (строка, аналогичные правила), значение = npm package specifier (строка).
 - Ключи `builders` и `materializers` **не могут пересекаться** — один и тот же identifier в обоих разделах → error (Constitution V: collision = fail-fast).
 - Duplicate ключ в пределах одного раздела → error.

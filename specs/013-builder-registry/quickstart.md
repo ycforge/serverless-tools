@@ -49,7 +49,7 @@ Each scenario is a `loadRegistry` (then `validateBuilders` where noted) + expect
 
 ### Scenario 1: valid builders.yaml loads (US-1 / FR-001, P1)
 
-**Setup**: reference `builders.yaml` above with 2 builders + 1 materializer installed/resolvable (or mapped to valid fixtures).
+**Setup**: reference `builders.yaml` above with 3 builders + 1 materializer installed/resolvable (or mapped to valid fixtures).
 
 **Run**: `const r = await loadRegistry(repoRoot)`
 
