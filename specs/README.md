@@ -50,7 +50,7 @@ Specs создаются **перед реализацией соответст�
 |---|------|-------|--------|-------------|
 | 011 | project-model — `.ycsf/*.yaml` форматы, `version: 1`, apps/resources ownership, `depends_on` граф | §4–6, §17 | ✅ | 002 |
 | 012 | build-env — `{{$ENV}}` интерполяция, `build_env`, ENV validation | §6, §19 | ✅ | 011 |
-| 013 | builder-registry — explicit mapping `.ycsf/builders.yaml`, загрузка плагинов | §21 | ⬜ | 002, 011 |
+| 013 | builder-registry — explicit mapping `.ycsf/builders.yaml`, загрузка плагинов | §21 | ✅ | 002, 011 |
 | 014 | materializer-dispatch — collision policy, TerraformResource → `.tf.json` | §22–24 | ⬜ | 002, 013 |
 | 015 | extensions — `.ycsf/extensions.yaml` IDL-адресация, deep merge | §25 | ⬜ | 014 |
 | 016 | outputs — `.ycsf/outputs.yaml`, auto-generated outputs | §26 | ⬜ | 014 |

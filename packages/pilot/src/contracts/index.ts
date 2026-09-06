@@ -14,3 +14,4 @@ export * from './artifact-type.js';
 export * from './resource-reference.js';
 export * from './project-model.js';
 export * from './build-env.js';
+export * from './registry.js';
