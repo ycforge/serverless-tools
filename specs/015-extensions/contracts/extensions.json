@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/extensions.json",
+  "title": "@ycforge/pilot extensions — .ycsf/extensions.yaml schema and EXT_* error code catalog",
+  "description": "Machine-readable contract for Project C user extensions (spec 015): JSON Schema for the .ycsf/extensions.yaml file (requiring version: 1 and the extensions rule list), the IDL-addressed deep-merge transform layered between dispatch (014) and serialization (014), the ExtensionsDiagnostic shape, and the catalog of EXT_* load/validation error codes. Target identity is the stable IDL domain.name (IDEA §16/§25), resolved via the C-owned side-table IDL_DOMAIN_BY_TF_TYPE.",
+  "type": "object",
+  "definitions": {
+    "extensionsYaml": {
+      "$id": "#/definitions/extensionsYaml",
+      "title": ".ycsf/extensions.yaml entry",
+      "type": "object",
+      "description": "Formatted contract (Constitution III): version: 1 and the extensions rule list. Exactly two top-level keys are allowed; any other key is rejected (EXT_INVALID, Constitution V — fail-fast over silent ignore). The file is optional in a project; its presence decides the orchestrator (spec 021), not the loader.",
+      "properties": {
+        "version": { "const": 1, "description": "Required. Format version (Constitution III); anything else or absent → EXT_VERSION." },
+        "extensions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/extensionRule" },
+          "description": "List of extension rules. Empty list is valid (identity no-op). One target declared more than once → EXT_DUPLICATE_TARGET at applyExtensions validation (fail-fast, Constitution V; never sequential merge)."
+        }
+      },
+      "required": ["version", "extensions"],
+      "additionalProperties": false
+    },
+    "extensionRule": {
+      "$id": "#/definitions/extensionRule",
+      "title": "One extension rule",
+      "type": "object",
+      "description": "target — stable logical IDL `domain.name` (two segments [a-z][a-z0-9_]* each, per spec-002 ResourceReference segment grammar); patch — plain-object mapping whose values are a JSON tree (object/array/scalar/null). Content of patch values is NOT validated against provider schema (Constitution IV — terraform validate owns that); only the type-structure needed for deep merge is checked.",
+      "properties": {
+        "target": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+          "description": "IDL address: domain.name, e.g. functions.user_service. Domain resolved via IDL_DOMAIN_BY_TF_TYPE; a grammatically valid but non-existent domain is NOT a structural error — it yields EXT_UNRESOLVED_TARGET at resolution (conservative toward additive table growth, spec 019)."
+        },
+        "patch": {
+          "type": "object",
+          "description": "Deep-merge patch applied to resource.configuration (§25.2): recurse iff both sides are plain objects; array/scalar/null from patch replace; new keys added; inputs never mutated. ${...} and {{$ENV}} strings pass byte-for-byte (FR-010/FR-011). Empty object {} is a valid no-op."
+        }
+      },
+      "required": ["target", "patch"],
+      "additionalProperties": false
+    },
+    "extensionsDiagnostic": {
+      "$id": "#/definitions/extensionsDiagnostic",
+      "title": "applyExtensions validation diagnostic",
+      "type": "object",
+      "description": "Emitted by the applyExtensions validation phase (EXT_DUPLICATE_TARGET / EXT_UNRESOLVED_TARGET / defensive EXT_INVALID for duplicate IDL in index or non-object configuration of a targeted resource). Structural loader diagnostics (EXT_VERSION/EXT_INVALID) reuse the ProjectModelDiagnostic shape (spec 011) with file/line/column populated; at apply time the transform has no file knowledge, so location fields stay undefined.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["EXT_INVALID", "EXT_UNRESOLVED_TARGET", "EXT_DUPLICATE_TARGET"],
+          "description": "EXT_* error code."
+        },
+        "message": { "type": "string", "description": "Human-readable diagnostic with context (for EXT_UNRESOLVED_TARGET: the target and the alphabetically ordered available IDL list)." },
+        "target": { "type": "string", "description": "Offending target (EXT_UNRESOLVED_TARGET, EXT_DUPLICATE_TARGET)." },
+        "file": { "type": "string", "description": "Optional: only populated by the loader for structural ExtensionsDiagnostic-compatible diagnostics." },
+        "field": { "type": "string", "description": "Optional: unset unless a specific field is at fault." },
+        "line": { "type": "integer", "description": "Optional: 1-based line from the YAML parse gate." },
+        "column": { "type": "integer", "description": "Optional: column from the YAML parse gate." },
+        "availableIdls": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Alphabetically ordered list of IDLs addressable in the generated model (EXT_UNRESOLVED_TARGET only; FR-007)."
+        }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    }
+  },
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "EXT_* error code catalog",
+    "type": "object",
+    "description": "All extensions load/validation error codes (spec 015). Distinct EXT_* family, separate from PML_* (project-model), BRG_* (plugin-registry) and MTL_* (materializer-dispatch) codes. Compared via constants in src/contracts/extensions.ts, never string literals (Constitution V). No EXT_MERGE_ERROR code exists (deliberately): deep merge is total on JSON trees and cannot fail.",
+    "properties": {
+      "EXT_MISSING_FILE": {
+        "const": "EXT_MISSING_FILE",
+        "description": ".ycsf/extensions.yaml is absent when loadExtensions is called (FR-002). Throws, never a validation result — symmetric with BRG_MISSING_FILE (013) and spec 011 loadProjectModel. The file is optional; its presence is decided by orchestrator 021."
+      },
+      "EXT_VERSION": {
+        "const": "EXT_VERSION",
+        "description": "version key absent or not equal to 1 (FR-003, Constitution III)."
+      },
+      "EXT_INVALID": {
+        "const": "EXT_INVALID",
+        "description": "Structural invalidity (FR-004): YAML syntax errors / duplicate YAML keys (parse gate uniqueKeys) / unknown top-level or rule keys / extensions missing or not a list / rule not a mapping / rule keys other than exactly target+patch / target not a string or violating IDL grammar (two segments [a-z][a-z0-9_]*) / patch not a plain-object mapping. Also defensive at applyExtensions validation: duplicate IDL in the generated model index (violation of the one-app-one-resource invariant) and non-object configuration of a targeted resource. Collected for ALL errors (collect-all)."
+      },
+      "EXT_UNRESOLVED_TARGET": {
+        "const": "EXT_UNRESOLVED_TARGET",
+        "description": "target (including a grammatically valid but non-existent domain) matches no generated resource's IDL (FR-007). Message carries the target and the alphabetically ordered list of available IDLs. Resolution errors collected for ALL rules before any patch is applied (all-or-nothing)."
+      },
+      "EXT_DUPLICATE_TARGET": {
+        "const": "EXT_DUPLICATE_TARGET",
+        "description": "The same target is declared more than once in the file (FR-005). Fail-fast (Constitution V); sequential merge is forbidden because it would make the result order-dependent. Precedents: MTL_COLLISION / MTL_OUTPUT_NAME_COLLISION / PML_DUPLICATE_APP_ID / BRG_KEY_COLLISION."
+      }
+    },
+    "required": [
+      "EXT_MISSING_FILE",
+      "EXT_VERSION",
+      "EXT_INVALID",
+      "EXT_UNRESOLVED_TARGET",
+      "EXT_DUPLICATE_TARGET"
+    ],
+    "additionalProperties": false
+  }
+}
