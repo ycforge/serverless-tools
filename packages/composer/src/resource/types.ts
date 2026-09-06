@@ -41,8 +41,13 @@ export interface ResourceIndex {
 /**
  * Build-time mapping of `domain.name.property → env var name` (from validated
  * `env.yaml`). Empty when `env.yaml` is absent.
+ * `mode` (spec 010 extension of the 009 contract, additive/optional): `env-only`
+ * tells the CLI to auto-enable ENV-only processing when `--env-only` is not set.
  */
+export type EnvMappingMode = 'compose' | 'env-only';
+
 export interface EnvMapping {
+  readonly mode: EnvMappingMode;
   readonly entries: ReadonlyMap<string, ReadonlyMap<string, ReadonlyMap<string, string>>>;
 
   getEnvVar(domain: string, name: string, property: string): string | undefined;

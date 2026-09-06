@@ -1,0 +1,11 @@
+version: 1
+defaultScheme: jwt
+schemes:
+  jwt:
+    type: jwt
+    jwksUri: https://auth.example.com/jwks
+    issuer: https://auth.example.com
+    audience: my-gateway
+  authorizer:
+    type: function
+    function: functions.internal_authorizer

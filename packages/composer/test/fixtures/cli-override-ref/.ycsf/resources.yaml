@@ -1,0 +1,6 @@
+version: 1
+functions:
+  internal_authorizer:
+    id: d4e0000000000000000000000001
+  list_users:
+    id: d4e0000000000000000000000002

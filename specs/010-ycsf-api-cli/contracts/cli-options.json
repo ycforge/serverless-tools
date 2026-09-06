@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/ycsf-api-cli-options.json",
+  "title": "ycsf-api CLI Options",
+  "type": "object",
+  "properties": {
+    "command": {
+      "type": "string",
+      "enum": ["compile", "check"],
+      "description": "Subcommand to execute"
+    },
+    "projectDir": {
+      "type": "string",
+      "description": "Project root directory (default: current working directory)",
+      "default": "."
+    },
+    "app": {
+      "type": "string",
+      "description": "Specific gateway app ID to process (required if multiple gateway apps exist)"
+    },
+    "envOnly": {
+      "type": "boolean",
+      "description": "Treat as ENV-only mode (skip OpenAPI file existence check)",
+      "default": false
+    },
+    "json": {
+      "type": "boolean",
+      "description": "Output machine-readable JSON (for check command)",
+      "default": false
+    },
+    "output": {
+      "type": "string",
+      "description": "Output file path (for compile command; default: stdout)"
+    }
+  },
+  "required": ["command"],
+  "additionalProperties": false
+}

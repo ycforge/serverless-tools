@@ -17,5 +17,5 @@ export type {
 } from './types.js';
 export { emptyResourceIndex, loadResourceIndex, parseResourceIndex } from './resource-index.js';
 export { parseEnvMapping, loadEnvMapping, emptyEnvMapping } from './env-mapping.js';
-export { resolveReferences, validateResourceReference } from './reference-resolver.js';
+export { resolveReferences, resolveReferencesInValue, validateResourceReference } from './reference-resolver.js';
 export type { ResourceReferenceValidation } from './reference-resolver.js';

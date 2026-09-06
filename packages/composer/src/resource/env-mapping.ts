@@ -7,6 +7,7 @@ import { DOMAIN_PROPERTIES, RESOURCE_DOMAINS } from './types.js';
 import type { EnvMapping, ResourceDomain, ResourceIndex } from './types.js';
 
 const EMPTY_ENV_MAPPING: EnvMapping = Object.freeze({
+  mode: 'compose',
   entries: Object.freeze(new Map<string, ReadonlyMap<string, ReadonlyMap<string, string>>>()),
   getEnvVar: () => undefined,
   hasEntry: () => false,
@@ -40,10 +41,21 @@ export function parseEnvMapping(text: string, filePath: string, index: ResourceI
     });
   }
 
+  let mode: EnvMapping['mode'] = 'compose';
+  if (raw['mode'] !== undefined) {
+    if (raw['mode'] !== 'compose' && raw['mode'] !== 'env-only') {
+      throw new ResourceRefError('RESOURCE_REF_ENV_MODE_INVALID', {
+        filePath,
+        mode: String(raw['mode']),
+      });
+    }
+    mode = raw['mode'];
+  }
+
   const entries = new Map<string, Map<string, Map<string, string>>>();
 
   for (const [domainKey, domainValueRaw] of Object.entries(raw)) {
-    if (domainKey === 'version') {
+    if (domainKey === 'version' || domainKey === 'mode') {
       continue;
     }
     if (!RESOURCE_DOMAINS.includes(domainKey as ResourceDomain)) {
@@ -101,6 +113,7 @@ export function parseEnvMapping(text: string, filePath: string, index: ResourceI
   }
 
   const frozen: EnvMapping = {
+    mode,
     entries: Object.freeze(
       new Map<string, ReadonlyMap<string, ReadonlyMap<string, string>>>(
         Array.from(entries, ([domain, names]) => [
