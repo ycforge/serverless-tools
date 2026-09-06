@@ -6,7 +6,7 @@ import {
 } from '../contracts/index.js';
 
 import { diag } from './errors.js';
-import { isRecord } from './types.js';
+import { forEachStringLeaf } from './string-leaves.js';
 
 /**
  * `{{$ENV}}` extraction + presence validation (US-4, FR-009/FR-010, research
@@ -29,7 +29,9 @@ export function extractEnvRequirements(
   const requirements = new Map<string, EnvRequirement>();
 
   const stringLeaves: string[] = [];
-  collectStringLeaves(buildConfig.build_config, stringLeaves);
+  forEachStringLeaf(buildConfig.build_config, (leaf) => {
+    stringLeaves.push(leaf);
+  });
   for (const leaf of stringLeaves) {
     for (const match of leaf.matchAll(ENV_REF_RE)) {
       const name = match[1];
@@ -91,18 +93,4 @@ function addRequirement(
   const value = env[name];
   const isSet = value !== undefined && value !== '';
   requirements.set(name, { name, source, app_id: appId, isSet });
-}
-
-function collectStringLeaves(value: unknown, out: string[]): void {
-  if (typeof value === 'string') {
-    out.push(value);
-    return;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) collectStringLeaves(item, out);
-    return;
-  }
-  if (isRecord(value)) {
-    for (const item of Object.values(value)) collectStringLeaves(item, out);
-  }
 }
