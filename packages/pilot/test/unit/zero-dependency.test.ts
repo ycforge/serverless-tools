@@ -38,11 +38,29 @@ describe('contracts module: zero runtime dependencies (SC-001)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('package.json declares no runtime dependencies', () => {
+  it('the @ycforge/pilot/contracts subpath never references a declared runtime dependency', () => {
     const pkg = JSON.parse(
       readFileSync(join(packageRoot, 'package.json'), 'utf8'),
     ) as Record<string, unknown>;
-    expect(pkg).not.toHaveProperty('dependencies');
+    // The pilot ROOT package now carries runtime deps (yaml@^2) for the
+    // src/model parser (spec 011). That must never leak into the contracts
+    // subpath: this assertion is scoped to the contracts import graph, so the
+    // root dep list staying non-empty is fine — using any of it in
+    // src/contracts is not.
+    const runtimeDeps = Object.keys(
+      (pkg.dependencies as Record<string, string> | undefined) ?? {},
+    );
+    const offenders: string[] = [];
+    for (const file of walk(contractsDir)) {
+      const source = readFileSync(file, 'utf8');
+      for (const match of source.matchAll(IMPORT_RE)) {
+        const specifier = match[1] ?? '';
+        if (runtimeDeps.some((dep) => specifier === dep || specifier.startsWith(`${dep}/`))) {
+          offenders.push(`${relative(packageRoot, file)}: ${specifier}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
     expect(pkg).not.toHaveProperty('peerDependencies');
   });
 });
