@@ -6,3 +6,5 @@ export { loadProjectModel } from './model/loader.js';
 export type { ProjectModelLoadResult } from './contracts/index.js';
 export { prepareBuildEnv } from './build-env/index.js';
 export type { BuildEnvResolutionResult } from './contracts/index.js';
+export { loadRegistry, validateBuilders } from './registry/index.js';
+export type { PluginRegistryLoadResult, BuilderRegistryValidationResult } from './contracts/index.js';
