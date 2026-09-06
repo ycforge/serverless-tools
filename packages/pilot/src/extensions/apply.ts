@@ -21,20 +21,17 @@ function applyRules(
 ): ApplyExtensionsResult {
   const errors: ExtensionsDiagnostic[] = [];
 
-  // 1. IDL index + defensive check: duplicate IDs in the generated model.
+  // 1. IDL index + defensive check (A5: emitted FIRST, then duplicates,
+  // then unresolved in file order — collect-all, never an early return).
   const index = createIdlIndex(resources);
-  if (index.duplicateIdls.length > 0) {
-    const idl = index.duplicateIdls[0]!;
-    return {
-      kind: 'invalid',
-      errors: [
-        ext({
-          code: EXT_INVALID,
-          message: `duplicate IDL ${idl} in generated model (EXT_INVALID)`,
-          target: idl,
-        }),
-      ],
-    };
+  for (const idl of index.duplicateIdls) {
+    errors.push(
+      ext({
+        code: EXT_INVALID,
+        message: `duplicate IDL ${idl} in generated model (EXT_INVALID)`,
+        target: idl,
+      }),
+    );
   }
 
   // 2. Duplicate targets — by appearance, fail the whole transform.

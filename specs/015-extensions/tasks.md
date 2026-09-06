@@ -267,4 +267,70 @@ Before starting implementation, confirm:
 
 ## Converge Notes
 
-_(Заполняется после /speckit.converge: gate outputs, FR → code → task matrix, deviations, readiness verdict.)_
+Фаза: **verification + convergence-report** (вн. цикл spec-to-spec). Базлайн: `015-extensions` @ `99d6fc8`. Найдено 0 блокирующих гэпов; внесён 1 небольшой consistency-fix (см. Deviations). **Verdict: CONVERGED.**
+
+### GATE-запуски (репозиторий root)
+
+| Gate | Output |
+|------|--------|
+| `pnpm --filter @ycforge/pilot test` | **297 passed / 50 files**, type errors none (базовый 259/43 + 38/7; Test Files 50 passed, Tests 297 passed) |
+| `pnpm --filter @ycforge/pilot typecheck` | `tsc --noEmit` чисто (0 errors) |
+| `pnpm --filter @ycforge/pilot build` | ESM + CJS + DTS: `dist/index.js`, `dist/contracts/index.js`, `dist/index.d.ts` — success |
+
+RED→GREEN по implement-report: пред-impl 30 failed / 7 files → GREEN 297/50; после converge-фикса повторно подтверждено 297/50.
+
+### FR → code → test matrix (compact)
+
+| FR | Code | Tests |
+|----|------|-------|
+| FR-001 формат `version:1` + `extensions` | `extensions-yaml.ts:71` (parseExtensionsYaml) | T010 / Sc1→T080 |
+| FR-002 missing file → throw `EXT_MISSING_FILE` | `loader.ts:11` | T026 / Sc8.4→T087 |
+| FR-003 `EXT_VERSION` | `extensions-yaml.ts:94` (short-circuit) | T011 / Sc7→T086 |
+| FR-004 `EXT_INVALID` structural collect-all | `extensions-yaml.ts` (extractRule/structuralErr) | T012–T014 / Sc7→T086, Sc10.4 |
+| FR-005 `EXT_DUPLICATE_TARGET` | `apply.ts:37-51` | T023 / Sc4→T083 |
+| FR-006 IDL-индекс (side-table) | `idl.ts` (`IDL_DOMAIN_BY_TF_TYPE`, `createIdlIndex`) | T015 / Sc3, Sc10.3 |
+| FR-007 `EXT_UNRESOLVED_TARGET` + availableIdls, all-or-nothing | `apply.ts:53-68` | T017, T024 / Sc3→T082 |
+| FR-008 deep merge §25.2 | `deep-merge.ts` (`isPlainObject`+`deepMerge`) | T018–T020 / Sc1, Sc2, Sc8, Sc9→T080/T081/T087/T088 |
+| FR-009 файл-порядок + детерминизм | `apply.ts:93-107` (apply-фаза) | T022, T025 / Sc4, Sc6→T083/T085 (T104 perf) |
+| FR-010 `${...}` passthrough | deep-merge (без обработки строк) | T021, T084, T089.5 / Sc1, Sc5, Sc10.5 |
+| FR-011 `{{$ENV}}` literal | apply (нет интерполяции) | T022, T084 / Sc5 |
+| FR-012 kind/type/name сохранены | `apply.ts:100-103` | T021, T080 / Sc1 |
+| FR-013 no-op пустых patch/list | apply + `deepMerge` (identity) | T025, T087 / Sc8.1/8.2 |
+| FR-014 только generated, user `.tf` untouched | CPU-only `apply`/`deep-merge`/`idl`; fs только в `loader.ts` | T084 / Sc5 (byte-сравнение) + T103 (static guard) |
+| FR-015 provider schema НЕ моделируется | structure-only (`isPlainObject`) | T013, T089 / Sc7 |
+
+US-1..US-8 (17 AC) → T021–T025 + T080–T089; Sc1–Sc10 → T080–T089; SC-001..SC-008 → покрыты (SC-004 replace, SC-005 §25.2, SC-007 passthrough, SC-008 100% AC traceability). Types → T027 (`extensions.test-d.ts`, 7 asserts).
+
+### Decisions honored (verify-лист)
+
+- `applyExtensions` — ровно 2 аргумента, `options` нет (A4) ✓ (`contracts/extensions.ts:15`, `apply.ts:120`).
+- Порядок ошибок defensive→duplicates→unresolved в порядке файла (A5) ✓ — см. Deviations (fix).
+- `IDL_DOMAIN_BY_TF_TYPE` frozen `Readonly` + `Object.freeze` (A6) ✓ (`idl.ts:10`, test `Object.isFrozen`).
+- Loader НЕ проверяет дубликаты target (A7) ✓ (`loader.spec.ts`).
+- Deep merge §25.2 точно: object+object → recursive; array/scalar/null → replace; base не plain-object → replace; non-mutating, subtree reuse по ссылке (T020) ✓.
+- `${...}` passthrough; `{{$ENV}}` НЕ обрабатывается (нет кода) ✓; без `.tf` чтения (T103 static guard: apply/deep-merge/idl без `node:fs`/`node:path`) ✓; без `*_override.tf` ✓; contract 002 `TerraformResource` не тронут (`idl?` отсутствует) ✓.
+- EXT_MISSING_FILE channel: loader **throws** (не result) ✓ (`loader.ts:16`, message совпадает с tasks.md).
+
+### Constitution gates
+
+I (чистый transform между dispatch и serialize; нет build/Terraform/Builder работы) → PASS; II (RED→GREEN 30 failed/7 files pre-impl → 297) → PASS; III (`version:1`; `EXT_*` аддитивны; contracts zero-dep — `extensions.ts` только type-imports, `zero-dependency.test.ts` walks `src/contracts`) → PASS; IV (нет вызова Terraform; user `.tf` не читается) → PASS; V (array replace не append; duplicate target = error; unknown keys fail-fast; all-or-nothing; явная side-table) → PASS; VI (граница не нарушена — user `.tf` никогда) → PASS. Secrets: credentials не моделируются, значения — opaque-дерево ✓.
+
+### Deviations
+
+- **Из implement-report (задокументированы)**: (1) closure-narrowing-фикс в тестах (`quickstart.spec.ts` T086 `check`-замыкание: `const p = project; if (p === undefined) throw` для сужения `let project` в колбэке) — тестовый файл, не поведение; (2) `as const` на 5 `EXT_*` константах (`contracts/extensions.ts:11-15`) — literal-типы вместо `string`, совместимо с T027; (3) deep-merge subtree reuse — нетронутые поддеревья base переиспользуются по ссылке (`deep-merge.ts:28`, проверено T020 `result2.a.b === base2.a.b`).
+- **Раскрыто кодом (~converge-fix)**: `applyRules` РАНЕЕ делал early-return при defensive duplicate-IDL (возврат единственного `EXT_INVALID`), что нарушало lock A5 / data-model flow («индексированный defensive эмитится ПЕРВЫМ, затем duplicates, затем unresolved» + collect-all). Фикс: `apply.ts:26-35` теперь собирает все duplicate-IDL diagnostics и продолжает сбор (порядок defensive→duplicates→unresolved). Непроизводимый на текущем dispatch (014: один app → один resource) defensive-путь; повторный прогон suite 297/50 green.
+- **Документационные нюансы (не фиксились, не блокируют)**: (1) `loader.ts` использует `try/catch` вокруг `readFileSync`, а не `existsSync`→`readFileSync` (план.md) — наблюдаемый channel идентичен (throw `EXT_MISSING_FILE` при отсутствии файла); (2) `data-model.md` apply-flow inline-комментарий порядка `[duplicates…, unresolved…, defensive…]` противоречит lock A5 (defensive-first); код следует A5. При PR — поправить комментарий в data-model.md.
+
+### Cross-spec
+
+- `EXT_*` — отдельное семейство от `PML_*/BRG_*/MTL_*`: в `src/contracts/extensions.ts` только 5 `EXT_*` констант; каталог — свой `specs/015-extensions/contracts/extensions.json`.
+- 5 кодов **byte-identical** `src/contracts/extensions.ts` ↔ `extensions.json #/errorCodes` (проверено: JSON валиден, ключи/порядок совпадают; строковое упоминание `EXT_MERGE_ERROR` в JSON — только description «кода нет»).
+- `contracts/extensions.json` — аутентичный (JSON Schema `additionalProperties:false` на 3 уровнях: extensionsYaml/extensionRule/extensionsDiagnostic).
+- IDL-таблица растёт аддитивно (019); сегодня заморожена (A6), не-IDL-адресуемые типы не ошибка.
+- IDEA.md §25: IDL-адресация и merge-семантика совпадают (object recurse / array replace / scalar override; `{{$ENV}}` не используется; `${...}` как есть; C не читает `*.tf`). Нюанс: §25 format-пример опускает `version: 1` (требуется Constitution III / spec 015) — не расхождение семантики.
+
+### Follow-ups
+
+- **Блокирующих нет.** Неблокирующих maintenance-пометок: (1) поправить `data-model.md` комментарий порядка ошибок на defensive-first (при PR); (2) при желании добавить `version: 1` в пример IDEA.md §25.
+- Readyness: спецификация, план, 46 задач `[x]`, все FR/US/AC/Sc покрыты кодом и тестами, gates зелёные (297/50, typecheck, build). **Readiness: CONVERGED** — можно переходить к review/PR в `dev`; статус 015 в `specs/README.md` (🚧→✅) и `.specify/feature.json` обновляет main agent на PR time.
+- Примечание: converge-fix в `apply.ts` остаётся незакоммиченным (по регламенту сессии no-commit); включить в PR.
