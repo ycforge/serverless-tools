@@ -273,3 +273,76 @@ Before starting implementation, confirm:
 - `MaterializationContext` — spec 002 `{ output }`, НЕ расширяется; env wiring → spec 021 (research 8).
 - Outputs: обёртка `${...}` — обязанность C при сериализации (spec 002 comment); materializer объявляет raw expression.
 - Do NOT commit; all checkboxes `- [x]` до закрытия задач в implement.
+
+---
+
+## Converge Notes
+
+**Phase**: Convergence (post-implement verification)
+**Date**: 2026-09-07
+**Verdict**: ✅ CONVERGED — implementation satisfies spec, plan, and tasks.
+
+### Verification Summary (gate outputs observed)
+
+| Gate | Command | Result |
+|------|---------|--------|
+| test | `pnpm --filter @ycforge/pilot test` | 259 passed (259), 43 test files, 0 failures, 0 type errors |
+| typecheck | `pnpm --filter @ycforge/pilot typecheck` | Clean (no errors, `tsc --noEmit`) |
+| build | `pnpm --filter @ycforge/pilot build` | Success — tsup emitted `index` + `contracts/index` (ESM + CJS + DTS; DTS includes `materialize` chunk) |
+| baseline (verified) | vitest at analyze commit `366874d` (git worktree) | 217 passed / 35 files → +42 tests / +8 files |
+
+011/012/013 baseline: zero regression confirmed against the actual pre-implementation tree (analyze commit `366874d`): 217 tests / 35 files before, 259 / 43 after — all 35 pre-existing files pass unchanged. (The verification brief quoted a "211 baseline"; the measured baseline is 217. Both are consistent with zero-regression: no pre-existing test changed outcome.)
+
+### FR → Code → Test Matrix (compact)
+
+| FR | Code | Unit Tests | Integration (quickstart) |
+|----|------|------------|--------------------------|
+| FR-001 | `select.ts:65-70` `buildArtifactDescriptors` | select.spec (orders), dispatch.spec T019 | Sc1 |
+| FR-002 | `select.ts:80-95` (supports loop), `shape.ts:16-24` | T015–T018, select.spec (insertion order) | Sc2, Sc3 |
+| FR-003 | `select.ts:107-116`, `dispatch.ts:30-33` | T015, T017 | Sc2 |
+| FR-004 | `select.ts:97-106` | T016, T018 (empty registry) | Sc3, Sc7 |
+| FR-005 | `materialize.ts:56-58` | T022 (ok path), dispatch.spec T019 | Sc1 |
+| FR-006 | `materialize.ts:59-69` | T022 | Sc6 |
+| FR-007 | `serialize.ts:31-33` `serializeResource` | T010 | Sc1 (golden bytes) |
+| FR-008 | `serialize.ts:56-58` `computeFilename` | T012 | Sc1, Sc4 |
+| FR-009 | `serialize.ts:17-28` (sorted-key replacer) | T013 | Sc9 |
+| FR-010 | `serialize.ts:72-95`, `dispatch.ts:43-51` | T012 | Sc10 (serialize-guard layer) |
+| FR-011 | `serialize.ts:44-53` `validateAddress`, `:102-121` | T011, T011b | Sc11 |
+| FR-012 | `serialize.ts:128-136`, `dispatch.ts:70-75` | T014 | Sc12 |
+| FR-013 | `context.ts:35-44`, `serialize.ts:139-146`, `dispatch.ts:66-69` | T014 | Sc13 |
+| FR-014 | `select.ts:25-62` `deterministicOrder` | dispatch.spec T019/T020, select.spec | Sc4 |
+| FR-015 | `write.ts:28-42` | T023, T025, T025b | Sc5 (write), Sc14, Sc15 |
+| FR-016 | `write.ts:44-49` (stale sweep) | T024 | Sc5 |
+| FR-017 | `select.ts:122-124` (collect-all) + `dispatch.ts:30-33` (no materialize) | T017 | Sc2, Sc3, Sc7 |
+
+All 8 user stories (US-1..US-8) and quickstart Sc1–Sc15 map to ≥1 test; SC-001..SC-008 covered (SC-004 via schema-golden content; `terraform validate`/CLI explicitly out of scope per spec). Type-level contract covered by `test/types/materialize.test-d.ts` (T026) + pre-existing `fr-014-dispatch.test-d.ts`.
+
+### Deviations (from implement report + code reality)
+
+1. **A1 widening landed in T050**: `Materializer<A = Artifact>` (bound dropped) in `src/contracts/materializer.ts:43`; default stays `Artifact`; `fr-014-dispatch.test-d.ts` and all existing plugin tests stay green. Additive contract-002 refinement (Constitution III).
+2. **MTL_* constants `as const`** — literal single-codes (`src/contracts/materialize.ts:85-90`), asserted in `materialize.test-d.ts` (T026); compared via constants, never string literals (Constitution V).
+3. **A2 `selectArtifacts` sync-throwing**: a throwing `supports` propagates (no try/catch in `select.ts`). Unit test asserts the synchronous throw at the select layer (`select.spec.ts:82-95`) rather than an `await expect(dispatch(...)).rejects` at the dispatch facade. `dispatch` is async and calls `selectArtifacts` first, so the sync throw surfaces as a promise rejection — same REJECTS envelope as specified. No `MTL_SUPPORTS_FAILED` added; catalog stays at 6 codes.
+4. **Sc10 tested at serialize-guard layer**: `detectFilenameCollision` exercised directly with synthetic duplicates (`quickstart.spec.ts` T089) rather than via a full dispatch over duplicate app ids (impossible by spec-011 construction).
+5. **T060 completeness fix (this session)**: `src/index.ts` re-exported `DispatchResult`, `DispatchOptions`, `GeneratedTfFile` but omitted `ArtifactDescriptor` (explicitly listed in T060). Additive type-only export added — `export type { ArtifactDescriptor, DispatchResult, DispatchOptions }` (line 12). Gates re-run green (259/43, typecheck, build).
+6. **T105b fixture smoke** (not in task list): `quickstart.spec.ts` proves the committed `.mjs` fixtures resolve through the real `loadRegistry` shape-guard path. Within T080/T093 scope; overwrites no other scenario.
+7. **Determinism order**: implemented as alphabetical pre-sort + topological consumption over `depends_on_graph.adjacency` (A5), NOT the raw 011 `topologicalOrder` array; matches US-4 and data-model.
+8. **Output collision timing (A4)**: `dispatch.ts` serializes all resources in-memory, then returns `invalid` with the `MTL_OUTPUT_NAME_COLLISION` diagnostic(s) on `duplicateNames` — after full Phase 2, never a selection/materialize error; outputs file appended last only when `declared.size > 0`.
+9. **`DispatchOptions.infraDir` reserved (A6)**: `dispatch` ignores options (`_options`); I/O is solely `writeGeneratedTerraform`. `write.ts` validates ALL filenames before mkdir/write; path-traversal → generic `Error` (A3), `MTL_INVALID_TERRAFORM_ADDRESS` only at serialize-time compute guard.
+10. **Adversarial cross-spec (verified)**: `src/materialize/` contains no `child_process`/spawn/Terraform-CLI invocation; no Builder execution or `Artifact` construction (only flat `ArtifactDescriptor`); outputs sourced exclusively via `context.output.declare` — no `.ycsf/outputs.yaml`/016 coupling.
+
+### Cross-Spec Note
+
+- `Materializer<A = Artifact>` is an **additive refinement of contract 002** (spec Assumption, Constitution III): default preserved, non-breaking, existing test-d green. IDEA.md §22 still renders `Materializer<A extends Artifact = Artifact>` — spec wins; IDEA.md should be updated at PR time.
+- **MTL_\* is a separate diagnostic family** from PML_* (project-model) and BRG_* (registry): 6 codes in `src/contracts/materialize.ts`, byte-identical to `contracts/materialize.json` `#/errorCodes` (same 6 literals, same order). `contracts/materialize.json` is authentic: `DispatchDiagnostic` fields mirror `#/definitions/dispatchDiagnostic` (`additionalProperties: false`), and the two generated-file shapes match `terraformResourceFileSchema` / `outputsFileSchema`.
+- `TerraformResource` shape matches `src/contracts/terraform.ts` (`kind: 'resource' | type | name | configuration`, opaque `configuration`; no provider-schema modeling — Constitution IV). `src/contracts/materialize.ts` is type-only + pure (zero-dep; verified by `zero-dependency.test.ts` walking the import graph); fs lives only in `src/materialize/write.ts`.
+- IDEA.md §24 illustrative scheme (`00-ycsf-generated.tf.json`, `99-ycsf-outputs.tf.json`) differs from the spec's chosen naming (`<app_id>.ycsf.tf.json`, `00-ycsf-outputs.tf.json`) — note only; ownership separation (`*.tf` user vs `*.ycsf.tf.json` C-owned) and regeneration safety are honored verbatim.
+
+### Follow-Ups (none blocking)
+
+- At PR time (main agent): `specs/README.md` 014 🚧 → ✅ and `.specify/feature.json`.
+- IDEA.md §22/§24: update to match spec 014 wording (`Materializer<A = Artifact>` widening; `.ycsf.tf.json` naming convention) — documentation-only, spec wins.
+- `src/index.ts` now exports `ArtifactDescriptor` (T060 completeness fix, this session) — included in the PR diff.
+
+### Readiness Verdict
+
+**✅ CONVERGED** — FR-001..FR-017 + US-1..US-8 + Sc1–Sc15 all implemented and tested; gates green (259/43, typecheck, build); decisions A1–A6 honored; constitution gates I–VI hold; zero blocking follow-ups. No further implement pass needed for spec 014 scope.

@@ -9,6 +9,6 @@ export type { BuildEnvResolutionResult } from './contracts/index.js';
 export { loadRegistry, validateBuilders } from './registry/index.js';
 export type { PluginRegistryLoadResult, BuilderRegistryValidationResult } from './contracts/index.js';
 export { dispatch } from './materialize/dispatch.js';
-export type { DispatchResult, DispatchOptions } from './contracts/index.js';
+export type { ArtifactDescriptor, DispatchResult, DispatchOptions } from './contracts/index.js';
 export { writeGeneratedTerraform } from './materialize/write.js';
 export type { GeneratedTfFile } from './contracts/index.js';
