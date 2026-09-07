@@ -14,7 +14,6 @@ import {
 import { dispatch, loadProjectModel, writeGeneratedTerraform } from '../../src/index.js';
 import { loadRegistry } from '../../src/registry/index.js';
 import {
-  GOLDEN_OUTPUTS_TF_JSON,
   GOLDEN_USER_SERVICE_TF_JSON,
   appsModel,
   makeMaterializer,
@@ -233,7 +232,7 @@ apps:
     expect(result.errors[0]?.type).toBe('yandex-function');
   });
 
-  it('T090 Sc12: declared outputs → 00-ycsf-outputs.tf.json, appended last (FR-012)', async () => {
+  it('T090 Sc12: declared outputs не эмитятся в generatedFiles dispatch-а (merged 99- через buildOutputs, orchestration 021)', async () => {
     const model = appsModel(`version: 1
 apps:
   user_service: { source_path: user_service, builder: nestjs-function }
@@ -242,11 +241,7 @@ apps:
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
 
-    expect(result.generatedFiles.map((f) => f.filename)).toEqual([
-      'user_service.ycsf.tf.json',
-      '00-ycsf-outputs.tf.json',
-    ]);
-    expect(result.generatedFiles[1]?.content).toBe(GOLDEN_OUTPUTS_TF_JSON);
+    expect(result.generatedFiles.map((f) => f.filename)).toEqual(['user_service.ycsf.tf.json']);
   });
 
   it('T091 Sc13: duplicate output name → MTL_OUTPUT_NAME_COLLISION (FR-013)', async () => {

@@ -55,7 +55,8 @@ export interface DispatchDiagnostic {
 
 /**
  * One serialized `.tf.json` file — part of `DispatchResultOk.generatedFiles`.
- * `filename` is `<app_id>.ycsf.tf.json` or `00-ycsf-outputs.tf.json`;
+ * `filename` is `<app_id>.ycsf.tf.json` (dispatch) or
+ * `99-ycsf-outputs.tf.json` (spec 016 `buildOutputs`);
  * `content` is deterministic Terraform JSON (sorted keys).
  */
 export interface GeneratedTfFile {

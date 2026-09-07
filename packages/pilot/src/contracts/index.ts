@@ -17,3 +17,5 @@ export * from './build-env.js';
 export * from './registry.js';
 export * from './materialize.js';
 export * from './extensions.js';
+export * from './moves.js';
+export * from './outputs.js';
