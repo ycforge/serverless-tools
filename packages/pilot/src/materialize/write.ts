@@ -6,21 +6,30 @@ import type { GeneratedTfFile } from '../contracts/index.js';
 /**
  * writeGeneratedTerraform — the ONLY fs-touching module of the dispatch
  * surface (FR-015/016, research 6). Pure I/O:
- *  - validates ALL filenames (`^[A-Za-z0-9_-]+\.ycsf\.tf\.json$`, basename-safe)
- *    BEFORE creating dirs or writing anything (A3: traversal rejects);
+ *  - validates ALL C-owned filenames (`<name>.ycsf.tf.json` for per-app files
+ *    plus `<name>-ycsf-outputs.tf.json` for the spec-016 outputs file,
+ *    basename-safe) BEFORE creating dirs or writing anything (A3: traversal
+ *    rejects);
  *  - recursive mkdir of `infraDir`;
  *  - writes every generated file;
- *  - removes stale C-owned `*.ycsf.tf.json` not in the current set;
+ *  - removes stale C-owned generated files not in the current set (including
+ *    legacy `00-ycsf-outputs.tf.json`, spec 016 SC-007);
  *    user `*.tf` files are never read, written or deleted (FR-015).
  */
 
-/** Ownership + validity glob for generated files. */
+/** Per-app generated file glob (`<app_id>.ycsf.tf.json`, spec 014). */
 const FILENAME_RE = /^[A-Za-z0-9_-]+\.ycsf\.tf\.json$/;
+/** Outputs merged file glob (`99-ycsf-outputs.tf.json`, spec 016 FR-020). */
+const OUTPUTS_FILENAME_RE = /^[A-Za-z0-9_-]+-ycsf-outputs\.tf\.json$/;
+
+function isCGeneratedFilename(name: string): boolean {
+  return FILENAME_RE.test(name) || OUTPUTS_FILENAME_RE.test(name);
+}
 
 function assertSafeFilename(filename: string): void {
-  if (!FILENAME_RE.test(filename) || basename(filename) !== filename) {
+  if (!isCGeneratedFilename(filename) || basename(filename) !== filename) {
     throw new Error(
-      `invalid filename '${filename}' — expected a safe basename matching '<name>.ycsf.tf.json'`,
+      `invalid filename '${filename}' — expected a safe basename matching '<name>.ycsf.tf.json' or '<name>-ycsf-outputs.tf.json'`,
     );
   }
 }
@@ -43,7 +52,7 @@ export async function writeGeneratedTerraform(
 
   const existing = await readdir(infraDir);
   for (const name of existing) {
-    if (!name.endsWith('.ycsf.tf.json')) continue;
+    if (!isCGeneratedFilename(name)) continue;
     if (current.has(name)) continue;
     await unlink(join(infraDir, name));
   }
