@@ -20,3 +20,12 @@ export type {
   ApplyExtensionsResult,
   ExtensionsDiagnostic,
 } from './contracts/index.js';
+export { loadOutputs, buildOutputs } from './outputs/index.js';
+export type {
+  OutputsYaml,
+  OutputsLoadResult,
+  BuildOutputsInput,
+  BuildOutputsResult,
+  OutputsDiagnostic,
+  OutputValue,
+} from './contracts/index.js';
