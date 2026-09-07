@@ -54,7 +54,7 @@ Specs создаются **перед реализацией соответст�
 | 014 | materializer-dispatch — collision policy, TerraformResource → `.tf.json` | §22–24 | ✅ | 002, 013 |
 | 015 | extensions — `.ycsf/extensions.yaml` IDL-адресация, deep merge | §25 | ✅ | 014 |
 | 016 | outputs — `.ycsf/outputs.yaml`, auto-generated outputs | §26 | ⬜ | 014 |
-| 017 | moved — `.ycsf/moved.yaml`, Terraform `moved` blocks | §34–35 | ⬜ | 014 |
+| 017 | moved — `.ycsf/moved.yaml`, Terraform `moved` blocks | §34–35 | 🚧 | 014 |
 | 018 | builders-core — nestjs-function (bundling), docker, vite builders | §5, §21, §36–37 | ⬜ | 002, 013 |
 | 019 | materializers-yandex — function/container/api-gateway/queue/bucket TF materializers | §22, §27, §32–33, §37 | ⬜ | 002, 014 |
 | 020 | ycsf-check — `ycsf check` validation layer | §28 | ⬜ | 011, 014–017 |
