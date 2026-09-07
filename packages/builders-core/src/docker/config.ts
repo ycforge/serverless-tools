@@ -37,7 +37,7 @@ export function parseDockerConfig(raw: unknown): ParsedDockerConfig {
   if (!requireString(repository)) invalid('repository');
 
   const tag = imageRecord.tag === undefined ? 'latest' : imageRecord.tag;
-  if (!requireString(tag) || /\s/.test(tag)) invalid('tag');
+  if (!requireString(tag) || /\s/.test(tag) || tag.startsWith('-')) invalid('tag');
 
   const dockerfile = record.dockerfile === undefined ? 'Dockerfile' : record.dockerfile;
   if (!requireString(dockerfile)) invalid('dockerfile');

@@ -34,13 +34,16 @@ describe('env residual scan (D-3, US5)', () => {
     expectHits(scanBuildInput({ external: ['sharp', '{{$PKG}}'] }, {}), ['buildConfig.external[1]']);
   });
 
-  it('buildEnv provides the var → resolved, clean', () => {
-    expectClean(scanBuildInput({ image: { tag: '{{$TAG}}' } }, { TAG: 'v2' }));
-    expectClean(scanBuildInput({}, { X: '{{$Y}}', Y: 'z' }));
+  it('STRICT FR-019: residual whose name IS a buildEnv key is still a hit (no leniency)', () => {
+    expectHits(scanBuildInput({ image: { tag: '{{$TAG}}' } }, { TAG: 'v2' }), ['buildConfig.image.tag']);
   });
 
-  it('a buildEnv value referencing a key whose own value still has residual → that key is a hit (transitive is upstream job)', () => {
-    expectHits(scanBuildInput({}, { X: '{{$Y}}', Y: '{{$Z}}' }), ['buildEnv.Y']);
+  it('US5-AC3: buildEnv value referencing its own key → hit buildEnv.GREETING', () => {
+    expectHits(scanBuildInput({}, { GREETING: '{{$GREETING}}' }), ['buildEnv.GREETING']);
+  });
+
+  it('a buildEnv value referencing a key whose own value still has residual → both keys are hits (transitive is upstream job)', () => {
+    expectHits(scanBuildInput({}, { X: '{{$Y}}', Y: '{{$Z}}' }), ['buildEnv.X', 'buildEnv.Y']);
   });
 
   it('non-object buildConfig → clean (nothing to scan)', () => {

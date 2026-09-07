@@ -155,6 +155,17 @@ describe('nestjs-function builder (US1, US5, SC-001/003/006)', () => {
     expect(err.message).toContain('runtime');
   });
 
+  it('out_filename with path separators → BLC_INVALID_CONFIG', async () => {
+    const fixture = nestjsFixture();
+    dirs.push(fixture);
+    await expectBLC(
+      nestjsFunctionBuilder.build(
+        ctx(fixture.root, { buildConfig: { entry: 'src/main.ts', out_filename: 'sub/function.zip' } }),
+      ),
+      BLC_INVALID_CONFIG,
+    );
+  });
+
   it('missing sourcePath → BLC_MISSING_SOURCE (DQ-2)', async () => {
     const fixture = nestjsFixture();
     dirs.push(fixture);

@@ -311,3 +311,12 @@ node -e "import('@ycforge/builders-core/nestjs-function').then(m => console.log(
 node -e "import('@ycforge/builders-core/docker').then(m => console.log(typeof m.default.build))"
 node -e "import('@ycforge/builders-core/vite').then(m => console.log(typeof m.default.build))"
 ```
+## Converge-Fix (после /speckit-converge)
+
+Вердикт converge: **Converged** (0 BLOCKER, 0 HIGH; 5 MINOR/INFO). Рекомендованные правки выполнены до мержа:
+
+- **CF-1 (F1, behavioral, FR-019/US5-AC3)**: сторож `src/env.ts` ставлен СТРОГО — любой остаточный `{{$...}}` в `buildConfig`/`buildEnv` → `BLC_ENV_NOT_RESOLVED`, включая самоссылочный `buildEnv: { GREETING: "{{$GREETING}}" }` (ранее считался resolved, если имя — ключ buildEnv). Приведено в соответствие с текстом FR-019/US5-AC3; добавлен тест US5-AC3 (`env-residual.test.ts`).
+- **CF-2 (F3, arg-safety, data-model §4.2/§4.1)**: docker `image.tag` теперь также отклоняет ведущий `-` (инъекция аргументов CLI); nestjs `out_filename` отклоняет пути с разделителями. Добавлены тесты в `docker.spec.ts` / `nestjs-function.spec.ts`.
+- **F2/F4/F5** — MINOR/INFO, зафиксированы как acceptably documented (traceability по `file — task-id`, имена констант каталога, отсутствие `./package.json` в exports — идентично data-model §1).
+
+Тулчейн после правок: builders-core **69 passed / 10 files**, pilot **304 passed / 52 files**, typecheck чистый, build ESM+CJS+DTS — зелёный.

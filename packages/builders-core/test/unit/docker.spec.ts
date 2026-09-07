@@ -185,6 +185,17 @@ describe('docker builder (US3, US5, SC-004, DQ-6)', () => {
     );
   });
 
+  it('BLC_INVALID_CONFIG: tag starting with "-" (arg injection) → BLC_INVALID_CONFIG', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    await expectBLC(
+      dockerBuilder.build(
+        ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app', tag: '-rm' } } }),
+      ),
+      BLC_INVALID_CONFIG,
+    );
+  });
+
   it('BLC_ENV_NOT_RESOLVED: residual {{$TAG}} in image.tag (US5-AC2/Sc7)', async () => {
     const fixture = dockerFixture();
     dirs.push(fixture);

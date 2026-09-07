@@ -38,7 +38,7 @@ export function parseNestjsConfig(raw: unknown): ParsedNestjsConfig {
   if (!requireStringArray(external)) invalid('external');
 
   const out_filename = record.out_filename === undefined ? 'function.zip' : record.out_filename;
-  if (!requireString(out_filename)) invalid('out_filename');
+  if (!requireString(out_filename) || /[\\/]/.test(out_filename)) invalid('out_filename');
 
   return { entry, runtime: runtime as 'nodejs20' | 'nodejs22', external, out_filename };
 }
