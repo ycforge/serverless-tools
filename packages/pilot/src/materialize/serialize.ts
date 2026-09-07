@@ -120,21 +120,6 @@ export function serializeResourceFile(appId: string, resource: TerraformResource
   return { kind: 'ok', file: { filename, content: serializeResource(resource) } };
 }
 
-/**
- * Serialize all declared outputs into the single `00-ycsf-outputs.tf.json`
- * (FR-012). Values are wrapped in `${...}` (spec 002); keys sorted
- * lexicographically; description omitted when absent.
- */
-export function serializeOutputs(declared: ReadonlyMap<string, OutputValue>): string {
-  const output: Record<string, { value: string; description?: string }> = {};
-  for (const [name, entry] of declared) {
-    output[name] = entry.description !== undefined
-      ? { value: `\${${entry.value}}`, description: entry.description }
-      : { value: `\${${entry.value}}` };
-  }
-  return serializeJson({ output });
-}
-
 /** Duplicate declared output names → MTL_OUTPUT_NAME_COLLISION (FR-013). */
 export function outputCollisionDiagnostics(duplicateNames: readonly string[]): DispatchDiagnostic[] {
   return duplicateNames.map((name) =>

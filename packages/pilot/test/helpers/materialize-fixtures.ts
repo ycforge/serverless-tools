@@ -42,15 +42,6 @@ export const GOLDEN_USER_SERVICE_TF_JSON = `{
   }
 }`;
 
-export const GOLDEN_OUTPUTS_TF_JSON = `{
-  "output": {
-    "url": {
-      "description": "URL",
-      "value": "\${function_url(user_service)}"
-    }
-  }
-}`;
-
 export const MAIN_TF_CONTENT = '# user\nresource "yandex_vpc_network" "net" {}\n';
 
 export interface MaterializerSpy {

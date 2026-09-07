@@ -23,3 +23,12 @@ export type {
 export { loadMoves } from './moves/loader.js';
 export { buildMoves, buildMovedFile } from './moves/build.js';
 export type { MovesLoadResult, BuildMovesResult, MovesYaml, MoveEntry, MoveEndpoint } from './contracts/index.js';
+export { loadOutputs, buildOutputs } from './outputs/index.js';
+export type {
+  OutputsYaml,
+  OutputsLoadResult,
+  BuildOutputsInput,
+  BuildOutputsResult,
+  OutputsDiagnostic,
+  OutputValue,
+} from './contracts/index.js';
