@@ -232,3 +232,67 @@ Task: "dispatch.ts (T058) + materialize.ts doc (T060), затем serialize.ts (
 2. Developer A: contracts (T050–T051) + outputs-yaml (T054) + loader (T055).
 3. Developer B: resolver (T053) + build (T056) + сервис экспорт (T057).
 4. Developer C: migration-014 (T058–T060) + тесты 014 (T061–T062).
+
+---
+
+## Converge-Notes
+
+### Validation toolchain — PASS
+
+- `pnpm --filter @ycforge/pilot test` → **337 passed / 56 files**, `Type Errors: no errors` (011/012/013/014/015 zero-regression green; new `outputs/*` + type tests included).
+- `pnpm --filter @ycforge/pilot typecheck` → **tsc --noEmit clean** (no TS errors).
+- `pnpm --filter @ycforge/pilot build` → **tsup ESM+CJS+DTS success** (dist `index` + `contracts/index` emit; `outputs-*.d.ts` included). `package.json`/`tsup.config.ts` unchanged (T102).
+
+### Source-scope structural audit — PASS
+
+- `OUT_*` 8 constants (`OUT_MISSING_FILE`/`OUT_VERSION`/`OUT_INVALID`/`OUT_RESERVED_PREFIX`/`OUT_INVALID_VALUE`/`OUT_UNRESOLVED_IDL`/`OUT_DUPLICATE_NAME`/`OUT_INVALID_AUTO_PREFIX`) defined `as const` in `src/contracts/outputs.ts`; used via constants (never string literals) in `errors.ts`/`build.ts`/`resolver.ts`/`outputs-yaml.ts` — Constitution V (T050/T103).
+- `loader.ts` is the **only** `node:fs`/`node:path` consumer in `src/outputs/`; `outputs-yaml.ts` the **only** `yaml` consumer; `build.ts`/`resolver.ts`/`errors.ts` pure (no fs — FR-018/SC-003, T103).
+- `buildOutputs` pure, two-phase validate-first collect-all all-or-nothing; `OUTPUTS_FILENAME = '99-ycsf-outputs.tf.json'`; empty → `'{"output":{}}'` with `filename = '99-ycsf-outputs.tf.json'` (FR-010/FR-014).
+- `write.ts` ownership glob extended: `OUTPUTS_FILENAME_RE = /^[A-Za-z0-9_-]+-ycsf-outputs\.tf\.json$/` covers `99-` as C-owned and removes stale `00-` (SC-007/FR-020).
+
+### Per-FR / AC traceability — PASS (test file: test name)
+
+- FR-001 `outputs-yaml.spec.ts: T010 valid canonical file → ok, version 1`; `quickstart.spec.ts: Sc1`
+- FR-002 `outputs-loader.spec.ts: T029 (a) missing file throws OUT_MISSING_FILE`; `quickstart.spec.ts: Sc11`
+- FR-003 `outputs-yaml.spec.ts: T011 version gate → OUT_VERSION`; `quickstart.spec.ts: Sc10`
+- FR-004 `outputs-yaml.spec.ts: T012 structural invalid (collect-all)`, `T013 value/description types + dup keys`; `quickstart.spec.ts: Sc10`
+- FR-005 `outputs-build.spec.ts: T023 reserved prefix → OUT_RESERVED_PREFIX`; `quickstart.spec.ts: Sc7`
+- FR-006 `outputs-resolver.spec.ts: T014 happy path → RAW tf address`, `T015 unresolved IDL`; `outputs-build.spec.ts: T017`, `T024`; `quickstart.spec.ts: Sc8`
+- FR-007 `outputs-resolver.spec.ts: T016 grammar violations → OUT_INVALID_VALUE`; `outputs-build.spec.ts: T025`; `quickstart.spec.ts: Sc9`
+- FR-008 `outputs-build.spec.ts: T020 auto without ycsf_ → OUT_INVALID_AUTO_PREFIX`, `T028`; `quickstart.spec.ts: Sc4`
+- FR-009 `outputs-build.spec.ts: T022 duplicate names rejected at parse gate`, `T027`, `T028`; `quickstart.spec.ts: Sc6`, `Sc14`
+- FR-010 `outputs-build.spec.ts: T017 happy path (99- filename)`, `T021 empty (99-)`; `quickstart.spec.ts: Sc1`, `Sc5`, `Sc15`
+- FR-011 `outputs-build.spec.ts: T017`, `T019 both wrapped ${...}`; `quickstart.spec.ts: Sc1`, `Sc3`
+- FR-012 `outputs-build.spec.ts: T017 sorted keys`, `T026 determinism`; `quickstart.spec.ts: Sc1`
+- FR-013 `outputs-build.spec.ts: T018 description omit + empty-string`; `quickstart.spec.ts: Sc2`
+- FR-014 `outputs-build.spec.ts: T021 empty → stable {"output":{}}`; `quickstart.spec.ts: Sc5`
+- FR-015 `outputs-build.spec.ts: T027 mixed errors collect-all all-or-nothing`; `quickstart.spec.ts: Sc14`
+- FR-016 `outputs-resolver.spec.ts: T016`; `quickstart.spec.ts: Sc9 ($... not passed through)`
+- FR-017 `outputs-resolver.spec.ts: T015 external/unresolved`; `quickstart.spec.ts: Sc12`
+- FR-018 `quickstart.spec.ts: Sc1 (inputs untouched)`, `Sc15 (custom.tf untouched)`
+- FR-019 `outputs-build.spec.ts: T026 determinism`; `quickstart.spec.ts: Sc13`
+- FR-020 `quickstart.spec.ts: Sc15 (dispatch no output; buildOutputs 99-; orphan removes stale 00-)`
+
+All 16 AC (US-1 AC1–3, US-2 AC1–3, US-3 AC1–4, US-4 AC1, US-5 AC1–4) map to ≥1 test (SC-002/SC-009). Quickstart Sc1–Sc15 all present as `it` blocks in `test/outputs/quickstart.spec.ts` plus in-file perf smoke (T104). Type contracts via `test/types/outputs.test-d.ts` (10 `expectTypeOf`).
+
+### Constitution conformance — PASS
+
+- **II (test-first)**: every FR/AC has a RED→GREEN test task (T010–T030, T080–T094); full suite green confirms both phases.
+- **III (contracts versioned)**: `.ycsf/outputs.yaml` carries `version: 1`; `OUT_VERSION` gates it; `OUT_*` exported from `@ycforge/pilot/contracts`.
+- **IV (user `.tf` not read)**: `buildOutputs` pure, no `node:fs`; `99-` owns the merged outputs file alongside `*.ycsf.tf.json`, never user `.tf`.
+- **V (fail-fast explicit)**: reserved prefix / invalid auto prefix / collisions are explicit diagnostics, never silent merge; unknown keys → `OUT_INVALID`; defensive dup check kept in `build.ts`.
+- **VI (owned vs external)**: external resources not in IDL index → `OUT_UNRESOLVED_IDL`.
+
+### Known implementation-time deviations (verified sound)
+
+1. **Raw address from resolver** (`analyze-fixed FR-011`): `resolveIdlReference` returns RAW `tfType.name.property` (no `${...}`, `resolver.ts:62`); single wrap point at build assembly (`build.ts:110` `\`\${...}\``). Consistent with data-model.md; all user+auto values reach `.tf.json` wrapped exactly once.
+2. **`OUT_DUPLICATE_NAME` unreachable through typed API**: YAML `uniqueKeys` (parse gate), JS objects and `ReadonlyMap` all forbid duplicate keys, so user-user/auto-auto/user-auto collisions cannot reach the typed API (user `ycsf_` is rejected earlier as `OUT_RESERVED_PREFIX`). Defensive dup check retained in `build.ts:56–61,87–91` + `T022`/`T028` tests for corrupt in-memory inputs — Constitution V satisfied.
+3. **Migration-014 C-owned lifecycle real** (SC-007/FR-020): `write.ts` glob extended with `<name>-ycsf-outputs.tf.json` (`OUTPUTS_FILENAME_RE`) so `99-` is C-owned and stale `00-` is removed (verified `quickstart.spec.ts: Sc15`); `serializeOutputs` and `GOLDEN_OUTPUTS_TF_JSON` removed from 014 test surface (`dispatch.ts`/`serialize.ts` no longer emit/use it; `rg serializeOutputs` returns nothing in `src/`).
+
+No new deviations found during convergence.
+
+### Leftover tasks / open questions
+
+None. All tasks T001–T105 in scope are verifiably implemented and traced; no blocking items remain.
+
+**Status: Converged**
