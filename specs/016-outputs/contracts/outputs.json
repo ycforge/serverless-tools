@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/outputs.json",
+  "title": "@ycforge/pilot outputs — .ycsf/outputs.yaml schema and OUT_* error code catalog",
+  "description": "Machine-readable contract for Project C user outputs (spec 016): JSON Schema for the .ycsf/outputs.yaml file (requiring version: 1 and the outputs mapping), the shape of OutputsDiagnostic and BuildOutputs result, and the catalog of OUT_* load/validation error codes. User output values are 3-segment IDL references domain.name.property (ResourceReference grammar, contract 002), resolved to ${terraform_type.name.property} via the C-owned reverse side-table DOMAIN_TO_TF_TYPE derived from IDL_DOMAIN_BY_TF_TYPE (spec 015); the merged deterministic file is 99-ycsf-outputs.tf.json (IDEA §26, supersedes 00- from spec 014).",
+  "type": "object",
+  "definitions": {
+    "outputsYaml": {
+      "$id": "#/definitions/outputsYaml",
+      "title": ".ycsf/outputs.yaml entry",
+      "type": "object",
+      "description": "Formatted contract (Constitution III): version: 1 and the outputs mapping. Exactly two top-level keys are allowed; any other key is rejected (OUT_INVALID, Constitution V — fail-fast over silent ignore). Output names must match [a-z][a-z0-9_]* and must NOT start with the reserved ycsf_ prefix (OUT_RESERVED_PREFIX).",
+      "properties": {
+        "version": { "const": 1, "description": "Required. Format version (Constitution III); anything else or absent → OUT_VERSION." },
+        "outputs": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/userOutput" },
+          "description": "Mapping of output name → rule. Each rule references a generated resource via a 3-segment IDL. Duplicate YAML keys are rejected at the parse gate (uniqueKeys); duplicate output names across layers (user+auto) → OUT_DUPLICATE_NAME at buildOutputs."
+        }
+      },
+      "required": ["version", "outputs"],
+      "additionalProperties": false
+    },
+    "userOutput": {
+      "$id": "#/definitions/userOutput",
+      "title": "One user-declared output",
+      "type": "object",
+      "description": "value — 3-segment IDL reference domain.name.property (each segment [a-z][a-z0-9_]* per contract-002 ResourceReference grammar). A grammatically valid but non-existent domain/name yields OUT_UNRESOLVED_IDL at resolution (conservative toward additive side-table growth, spec 019). Property is NOT validated against provider schema (Constitution IV). ${...} in value is an error (user passes the bare IDL; buildOutputs wraps it).",
+      "properties": {
+        "value": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+          "description": "IDL reference: domain.name.property, e.g. gateways.openapi.domain → ${yandex_api_gateway.openapi.domain}."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional output description; when absent → omitted from the generated file (undefined omits, empty string '' is preserved)."
+        }
+      },
+      "required": ["value"],
+      "additionalProperties": false
+    },
+    "outputsDiagnostic": {
+      "$id": "#/definitions/outputsDiagnostic",
+      "title": "Outputs load/build diagnostic",
+      "type": "object",
+      "description": "Emitted by loadOutputs (structural OUT_VERSION/OUT_INVALID with file/line/column populated) or by the pure buildOutputs validation phase (OUT_RESERVED_PREFIX / OUT_INVALID_VALUE / OUT_UNRESOLVED_IDL / OUT_DUPLICATE_NAME / OUT_INVALID_AUTO_PREFIX; location fields stay undefined since the transform has no file knowledge).",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["OUT_MISSING_FILE", "OUT_VERSION", "OUT_INVALID", "OUT_RESERVED_PREFIX", "OUT_INVALID_VALUE", "OUT_UNRESOLVED_IDL", "OUT_DUPLICATE_NAME", "OUT_INVALID_AUTO_PREFIX"],
+          "description": "OUT_* error code."
+        },
+        "message": { "type": "string", "description": "Human-readable diagnostic with context (for OUT_UNRESOLVED_IDL: the reference and the alphabetically ordered available IDL list)." },
+        "name": { "type": "string", "description": "Optional: offending output name (OUT_RESERVED_PREFIX, OUT_DUPLICATE_NAME, OUT_INVALID_VALUE, OUT_UNRESOLVED_IDL, OUT_INVALID_AUTO_PREFIX)." },
+        "file": { "type": "string", "description": "Optional: only populated by the loader for structural OutputsDiagnostic-compatible diagnostics." },
+        "field": { "type": "string", "description": "Optional: unset unless a specific field is at fault." },
+        "line": { "type": "integer", "description": "Optional: 1-based line from the YAML parse gate." },
+        "column": { "type": "integer", "description": "Optional: column from the YAML parse gate." },
+        "availableIdls": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Alphabetically ordered list of IDLs addressable in the generated model (OUT_UNRESOLVED_IDL only)."
+        }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    }
+  },
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "OUT_* error code catalog",
+    "type": "object",
+    "description": "All outputs load/validation error codes (spec 016). Distinct OUT_* family, separate from PML_* (project-model), BRG_* (plugin-registry), MTL_* (materializer-dispatch) and EXT_* (extensions) codes. Compared via constants in src/contracts/outputs.ts, never string literals (Constitution V). MTL_OUTPUT_NAME_COLLISION (spec 014) stays for dispatch-level duplicates; OUT_DUPLICATE_NAME is the merge-level (user+auto) point.",
+    "properties": {
+      "OUT_MISSING_FILE": {
+        "const": "OUT_MISSING_FILE",
+        "description": ".ycsf/outputs.yaml is absent when loadOutputs is called (FR-002). Throws, never a validation result — symmetric with EXT_MISSING_FILE (015), BRG_MISSING_FILE (013) and spec 011 loadProjectModel. File presence is decided by orchestrator 021."
+      },
+      "OUT_VERSION": {
+        "const": "OUT_VERSION",
+        "description": "version key absent or not equal to 1 (FR-003, Constitution III)."
+      },
+      "OUT_INVALID": {
+        "const": "OUT_INVALID",
+        "description": "Structural invalidity (FR-004): YAML syntax errors / duplicate YAML keys (parse gate uniqueKeys) / unknown top-level keys / outputs missing or not a mapping / rule not a mapping / value not a string / description not a string or absent / output name violating [a-z][a-z0-9_]*. Collected for ALL errors (collect-all)."
+      },
+      "OUT_RESERVED_PREFIX": {
+        "const": "OUT_RESERVED_PREFIX",
+        "description": "User output name starts with the reserved ycsf_ prefix (IDEA §26: prefix is reserved for auto-generated outputs). Fail-fast (Constitution V): error, never silent rename."
+      },
+      "OUT_INVALID_VALUE": {
+        "const": "OUT_INVALID_VALUE",
+        "description": "value is not a valid 3-segment IDL reference per ResourceReference grammar (contract 002), or already contains ${...} (the user passes a bare IDL; buildOutputs wraps it)."
+      },
+      "OUT_UNRESOLVED_IDL": {
+        "const": "OUT_UNRESOLVED_IDL",
+        "description": "IDL reference (domain.name.property) cannot be resolved: domain not in DOMAIN_TO_TF_TYPE or domain.name not in the IDL index built from the generated resources (FR-007). Message carries the reference and the alphabetically ordered list of available IDLs. Resolution errors collected for ALL outputs before any file is generated (all-or-nothing)."
+      },
+      "OUT_DUPLICATE_NAME": {
+        "const": "OUT_DUPLICATE_NAME",
+        "description": "Output name appears more than once in the merged file (user-user, user-auto, auto-auto; FR-005/FR-016). Collect-all; all-or-nothing. Precedent for the merge-level point: MTL_OUTPUT_NAME_COLLISION covers only dispatch-level duplicates within a single materializer graph."
+      },
+      "OUT_INVALID_AUTO_PREFIX": {
+        "const": "OUT_INVALID_AUTO_PREFIX",
+        "description": "Auto-generated output name does NOT start with ycsf_ (materializer contract violation; FR-017). Fail-fast (Constitution V): error, never silent prefix insertion."
+      }
+    },
+    "required": [
+      "OUT_MISSING_FILE",
+      "OUT_VERSION",
+      "OUT_INVALID",
+      "OUT_RESERVED_PREFIX",
+      "OUT_INVALID_VALUE",
+      "OUT_UNRESOLVED_IDL",
+      "OUT_DUPLICATE_NAME",
+      "OUT_INVALID_AUTO_PREFIX"
+    ],
+    "additionalProperties": false
+  }
+}
