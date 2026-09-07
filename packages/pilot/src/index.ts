@@ -20,3 +20,6 @@ export type {
   ApplyExtensionsResult,
   ExtensionsDiagnostic,
 } from './contracts/index.js';
+export { loadMoves } from './moves/loader.js';
+export { buildMoves, buildMovedFile } from './moves/build.js';
+export type { MovesLoadResult, BuildMovesResult, MovesYaml, MoveEntry, MoveEndpoint } from './contracts/index.js';
