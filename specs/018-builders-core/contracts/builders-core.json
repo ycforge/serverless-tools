@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/builders-core.json",
+  "title": "@ycforge/builders-core — artifact catalog, builder build_config schemas, BLC_* error code catalog",
+  "description": "Machine-readable contract for the core builder package (spec 018): the builder-id → artifact-type catalog (forward contract for 019/021), JSON Schema drafts for the three app-level build_config shapes (versionless, per spec 011), the three Artifact.value shapes (IDEA §8), and the catalog of BLC_* builder diagnostics. Type references here mirror src/types.ts/src/catalog.ts/src/diagnostics.ts of @ycforge/builders-core (standalone structural types, no pilot imports).",
+  "type": "object",
+  "definitions": {
+    "builderContext": {
+      "$id": "#/definitions/builderContext",
+      "title": "BuildContext (spec 002, standalone structural replica)",
+      "type": "object",
+      "properties": {
+        "projectRoot": { "type": "string" },
+        "sourcePath": { "type": "string" },
+        "buildConfig": {},
+        "buildEnv": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Resolved Record<string,string> (spec 012); residual {{$...}} here is a D-3 violation (BLC_ENV_NOT_RESOLVED)."
+        },
+        "outputDir": { "type": "string" }
+      },
+      "required": ["projectRoot", "buildConfig", "buildEnv", "outputDir"],
+      "additionalProperties": false
+    },
+    "functionArtifactValue": {
+      "$id": "#/definitions/functionArtifactValue",
+      "title": "Artifact.value of ycforge:function",
+      "type": "object",
+      "properties": {
+        "archivePath": { "type": "string", "description": "Absolute path to the .zip inside outputDir." },
+        "entryPoint": { "type": "string", "description": "Non-empty handler identifier, \"<basename>.handler\"." }
+      },
+      "required": ["archivePath", "entryPoint"],
+      "additionalProperties": false
+    },
+    "dockerArtifactValue": {
+      "$id": "#/definitions/dockerArtifactValue",
+      "title": "Artifact.value of ycforge:docker-image",
+      "type": "object",
+      "properties": {
+        "image": { "type": "string", "pattern": "^.+/[^@]+@sha256:[0-9a-f]{64}$", "description": "Immutable digest form; mutable tags never appear here (FR-011)." }
+      },
+      "required": ["image"],
+      "additionalProperties": false
+    },
+    "frontendArtifactValue": {
+      "$id": "#/definitions/frontendArtifactValue",
+      "title": "Artifact.value of ycforge:frontend",
+      "type": "object",
+      "properties": {
+        "directory": { "type": "string", "description": "Absolute path to the static build output inside outputDir." }
+      },
+      "required": ["directory"],
+      "additionalProperties": false
+    },
+    "nestjsFunctionBuildConfig": {
+      "$id": "#/definitions/nestjsFunctionBuildConfig",
+      "title": "app-level build_config for builder nestjs-function (versionless, spec 011)",
+      "type": "object",
+      "description": "Unknown top-level keys are ignored (coexistence with B-shared fields such as openapi_entry).",
+      "properties": {
+        "entry": { "type": "string", "default": "src/main.ts" },
+        "runtime": { "type": "string", "default": "nodejs20", "enum": ["nodejs20", "nodejs22"] },
+        "external": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "out_filename": { "type": "string", "default": "function.zip" }
+      },
+      "additionalProperties": true
+    },
+    "dockerBuildConfig": {
+      "$id": "#/definitions/dockerBuildConfig",
+      "title": "app-level build_config for builder docker (versionless, spec 011)",
+      "type": "object",
+      "description": "Credentials are never part of the config (FR-012). image.repository is required (no reasonable default for a registry).",
+      "properties": {
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "tag": { "type": "string", "default": "latest", "pattern": "^[^\\s][^\\s]*$", "description": "Push tag; never used as the artifact image (only the digest form is)." }
+          },
+          "required": ["repository"],
+          "additionalProperties": false
+        },
+        "dockerfile": { "type": "string", "default": "Dockerfile" }
+      },
+      "additionalProperties": true,
+      "required": ["image"]
+    },
+    "viteBuildConfig": {
+      "$id": "#/definitions/viteBuildConfig",
+      "title": "app-level build_config for builder vite (versionless, spec 011)",
+      "type": "object",
+      "properties": {
+        "out_dir": { "type": "string", "default": "dist" },
+        "root": { "type": "string", "default": "." },
+        "command": { "type": "string", "default": "vite build" }
+      },
+      "additionalProperties": true
+    },
+    "artifactCatalog": {
+      "$id": "#/definitions/artifactCatalog",
+      "title": "builder-id → artifact-type catalog (FR-003)",
+      "type": "object",
+      "properties": {
+        "nestjs-function": {
+          "type": "object",
+          "properties": { "artifactType": { "const": "ycforge:function" } },
+          "required": ["artifactType"],
+          "additionalProperties": false
+        },
+        "docker": {
+          "type": "object",
+          "properties": { "artifactType": { "const": "ycforge:docker-image" } },
+          "required": ["artifactType"],
+          "additionalProperties": false
+        },
+        "vite": {
+          "type": "object",
+          "properties": { "artifactType": { "const": "ycforge:frontend" } },
+          "required": ["artifactType"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["nestjs-function", "docker", "vite"],
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "$id": "#/definitions/diagnostic",
+      "title": "Builder diagnostic",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "BLC_* code (see errorCodes)." },
+        "message": { "type": "string" },
+        "builder": { "type": "string", "description": "Builder id that emitted the diagnostic." },
+        "field": { "type": "string", "description": "build_config field / build_env var when applicable." }
+      },
+      "required": ["code", "message"]
+    }
+  },
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "BLC_* error code catalog",
+    "type": "object",
+    "description": "Builder diagnostics of @ycforge/builders-core (spec 018 Key Entities). Compared via constants in src/diagnostics.ts, never string literals (Constitution V). Codes are additive and non-breaking; D-3 guard (BLC_ENV_NOT_RESOLVED) is the contract-violation detector for pilot spec 012.",
+    "properties": {
+      "BLC_INVALID_CONFIG": { "const": "BLC_INVALID_CONFIG", "description": "Known build_config field has an invalid type/value; missing image.repository; invalid tag; unsupported runtime (FR-004/009/014)." },
+      "BLC_MISSING_SOURCE": { "const": "BLC_MISSING_SOURCE", "description": "sourcePath absent and build is ambiguous (all three builders)." },
+      "BLC_ENTRY_NOT_FOUND": { "const": "BLC_ENTRY_NOT_FOUND", "description": "entry file referenced by build_config does not exist (FR-007)." },
+      "BLC_BUILD_FAILED": { "const": "BLC_BUILD_FAILED", "description": "Underlying build failed: esbuild error, docker CLI nonzero/unavailable, vite command failed, missing build output (FR-007/013/017)." },
+      "BLC_ENV_NOT_RESOLVED": { "const": "BLC_ENV_NOT_RESOLVED", "description": "Residual {{$...}} in buildConfig/buildEnv — upstream interpolation contract violated (FR-019, D-3)." },
+      "BLC_IMAGE_DIGEST_UNAVAILABLE": { "const": "BLC_IMAGE_DIGEST_UNAVAILABLE", "description": "Push succeeded but digest not resolved from push output or docker inspect (FR-011)." },
+      "BLC_ARCHIVE_FAILED": { "const": "BLC_ARCHIVE_FAILED", "description": "Zip creation/write failed (US1/US6)." }
+    },
+    "required": [
+      "BLC_INVALID_CONFIG",
+      "BLC_MISSING_SOURCE",
+      "BLC_ENTRY_NOT_FOUND",
+      "BLC_BUILD_FAILED",
+      "BLC_ENV_NOT_RESOLVED",
+      "BLC_IMAGE_DIGEST_UNAVAILABLE",
+      "BLC_ARCHIVE_FAILED"
+    ],
+    "additionalProperties": false
+  }
+}
