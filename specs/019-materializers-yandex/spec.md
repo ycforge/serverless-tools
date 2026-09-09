@@ -253,7 +253,7 @@ DevOps с app `openapi` (артефакт `ycforge:api-gateway: { specPath, reso
 
 ### Edge Cases
 
-- **`archivePath` не существует** (yandex-function): materializer должен trust builder output (spec 018 guarantees; если файл отсутствует — ошибка на Terraform apply stage, не materialize).
+- **`archivePath` не существует** (yandex-function): materializer trust'ит builder output (spec 018), но `user_hash` требует прочитать архив, поэтому отсутствующий файл на момент `materialize()` даёт **raw fs-ошибку (ENOENT)**, НЕ `MaterializerError`/YMT-диагностику; dispatch (014) обернёт её в `MTL_MATERIALIZE_FAILED`.
 - **Пустой `directory`** (yandex-storage-bucket): создаётся только `yandex_storage_bucket` без `storage_object` resources.
 - **Имя файла содержит unsafe chars** (yandex-storage-bucket): sanitized для TF address (`[a-z0-9_]`), оригинальное имя сохраняется в `key` TF config.
 - **Resource reference не найден в TF state** (yandex-api-gateway): materializer заменяет логический ref на TF expression; actual resolution — на этапе `terraform apply`. Материализатор не проверяет существование.
@@ -361,7 +361,7 @@ DevOps с app `openapi` (артефакт `ycforge:api-gateway: { specPath, reso
 - **Queue артефакт**: `ycforge:queue` не имеет builder в spec 018; артефакт создаётся из explicit configuration (`.ycsf/apps.yaml` с builder: `"queue"`) или фабричного метода C (spec 021). Spec 019 фиксирует shape; mechanism генерации — spec 021.
 - **`user_hash` детерминирован**: SHA-256 содержимого архива (или эквивалент). Конкретный хеш-алгоритм — implementation detail; stability — requirement.
 - **`acl: "public-read"` для bucket**: default для frontend. Расширяемый через extensions (spec 015). Plan-фаза может предложить configurable default.
-- **Materializer не валидирует existence files/archive**: trust builder output (spec 018 guarantees). Terraform apply выявит отсутствующие файлы.
+- **Materializer не валидирует existence files/archive**: trust builder output (spec 018 guarantees). Исключение — `user_hash` обязан прочитать архив: отсутствующий файл пробрасывается как raw fs-ошибка на `materialize()` (не `MaterializerError`/YMT-код, Т119); dispatch 014 оборачивает её в `MTL_MATERIALIZE_FAILED` (abort-on-first).
 - **Dispatch multi-resource**: spec 014 ограничивает one-resource-per-app на fixture-level; real dispatch (021) будет materialize all resources из materializer result. Spec 019 не меняет dispatch semantics.
 
 ---

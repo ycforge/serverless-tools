@@ -1,6 +1,7 @@
 import { isAbsolute } from 'node:path';
-import type { Artifact, FunctionArtifactValue, MaterializationContext, Materializer, TerraformResource } from '../types.js';
+import type { FunctionArtifactValue, MaterializationContext, Materializer, TerraformResource } from '../types.js';
 import { YMT_INVALID_ARTIFACT_VALUE, materializerError } from '../diagnostics.js';
+import { isTfAddress } from '../helpers/filename.js';
 import { sha256Hex } from './hash.js';
 
 const materializer: Materializer = {
@@ -19,9 +20,12 @@ const materializer: Materializer = {
       throw materializerError(YMT_INVALID_ARTIFACT_VALUE, 'archivePath must be relative, not absolute');
     }
 
-    const userHash = await sha256Hex(archivePath);
+    if (typeof artifact.name !== 'string' || !isTfAddress(artifact.name)) {
+      throw materializerError(YMT_INVALID_ARTIFACT_VALUE, 'artifact value missing required field: name (stable app identity)');
+    }
+    const name = artifact.name;
 
-    const name = (artifact as { name?: string }).name ?? 'unknown';
+    const userHash = await sha256Hex(archivePath);
 
     const resource: TerraformResource = {
       kind: 'resource',

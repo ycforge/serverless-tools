@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import { ARTIFACT_CATALOG, ARTIFACT_TYPES, MATERIALIZER_IDS } from '@ycforge/materializers-core';
-import type { ArtifactType, MaterializerId } from '@ycforge/materializers-core';
+import type { ArtifactType, MaterializerCatalogEntry, MaterializerId } from '@ycforge/materializers-core';
 
 const IS_ARTIFACT_TYPE = /^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/;
 
@@ -46,5 +46,19 @@ describe('materializer artifact catalog (FR-003, D-3)', () => {
     for (const artifactType of ARTIFACT_TYPES) {
       expect(IS_ARTIFACT_TYPE.test(artifactType)).toBe(true);
     }
+  });
+
+  it('MaterializerCatalogEntry is exported and mirrors the catalog rows (T118)', () => {
+    const entries: MaterializerCatalogEntry[] = [...MATERIALIZER_IDS].map((id) => ({
+      id,
+      artifactType: ARTIFACT_CATALOG[id].artifactType,
+    }));
+    expect(entries).toHaveLength(5);
+    for (const entry of entries) {
+      expect(MATERIALIZER_IDS).toContain(entry.id);
+      expect(ARTIFACT_TYPES).toContain(entry.artifactType);
+    }
+    expectTypeOf<MaterializerCatalogEntry>().toHaveProperty('id');
+    expectTypeOf<MaterializerCatalogEntry>().toHaveProperty('artifactType');
   });
 });

@@ -1,5 +1,6 @@
-import type { Artifact, DockerArtifactValue, MaterializationContext, Materializer, TerraformResource } from '../types.js';
+import type { DockerArtifactValue, MaterializationContext, Materializer, TerraformResource } from '../types.js';
 import { YMT_INVALID_ARTIFACT_VALUE, materializerError } from '../diagnostics.js';
+import { isTfAddress } from '../helpers/filename.js';
 
 const materializer: Materializer = {
   supports(artifact, _context: MaterializationContext): boolean {
@@ -13,7 +14,10 @@ const materializer: Materializer = {
       throw materializerError(YMT_INVALID_ARTIFACT_VALUE, 'artifact value missing required field: image');
     }
 
-    const name = (artifact as { name?: string }).name ?? 'unknown';
+    if (typeof artifact.name !== 'string' || !isTfAddress(artifact.name)) {
+      throw materializerError(YMT_INVALID_ARTIFACT_VALUE, 'artifact value missing required field: name (stable app identity)');
+    }
+    const name = artifact.name;
 
     const resource: TerraformResource = {
       kind: 'resource',

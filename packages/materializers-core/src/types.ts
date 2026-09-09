@@ -28,9 +28,17 @@ export interface TerraformResource<T = unknown> {
   readonly configuration: T;
 }
 
-/** Typed artifact; `type` follows `<package-scope>:<kind>` (spec 002). */
+/**
+ * Typed artifact; `type` follows `<package-scope>:<kind>` (spec 002).
+ *
+ * `name` is the stable app identity per spec 014 (dispatch passes the app id)
+ * and must satisfy the TF address grammar — the materializer fails fast with
+ * `YMT_INVALID_ARTIFACT_VALUE` when `name` is missing, non-string, or not
+ * TF-address-safe.
+ */
 export interface Artifact<T = unknown> {
   readonly type: string;
+  readonly name: string;
   readonly value: T;
 }
 

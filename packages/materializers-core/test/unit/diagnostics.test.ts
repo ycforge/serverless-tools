@@ -52,3 +52,45 @@ describe('YMT_* diagnostics vs contracts/materializers-core.json (FR-026/027, Co
     expect(err.materializer).toBe('yandex-function');
   });
 });
+
+interface ValueSchema {
+  definitions: {
+    artifact: { required: string[]; properties: Record<string, { type?: string; pattern?: string; description?: string }> };
+    functionArtifactValue: { properties: { archivePath: { description: string } } };
+    frontendArtifactValue: { properties: { directory: { description: string } } };
+    dockerArtifactValue: { properties: { image: { pattern: string; description: string } } };
+  };
+}
+
+const CONTRACT = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8')) as ValueSchema;
+
+describe('contract value schemas vs implemented semantics (T115/T120)', () => {
+  it('artifact definition requires `name` as a TF address (T114 mirror, T115)', () => {
+    const artifact = CONTRACT.definitions.artifact;
+    expect(artifact.required).toContain('name');
+    expect(artifact.properties.name?.pattern).toBe('^[a-zA-Z_][a-zA-Z0-9_]*$');
+    expect(artifact.properties.type?.type).toBe('string');
+    expect(artifact.required).toEqual(['type', 'name', 'value']);
+  });
+
+  it('archivePath description pins the infra-relative (never absolute) semantics (T115, DQ-2)', () => {
+    expect(CONTRACT.definitions.functionArtifactValue.properties.archivePath.description).toBe(
+      'Infra-relative path to the .zip (never absolute); copied verbatim into content.zip_filename (DQ-2).',
+    );
+  });
+
+  it('directory description pins the infra-relative (never absolute) semantics (T115)', () => {
+    expect(CONTRACT.definitions.frontendArtifactValue.properties.directory.description).toBe(
+      'Infra-relative path to static build output (never absolute).',
+    );
+  });
+
+  it('docker image pattern accepts digests, short-hex fixtures and plain images, rejects mutable tags (T120)', () => {
+    const { pattern } = CONTRACT.definitions.dockerArtifactValue.properties.image;
+    const re = new RegExp(pattern);
+    expect(re.test('cr.yandex/app@sha256:abc123def456')).toBe(true);
+    expect(re.test(`cr.yandex/app@sha256:${'a'.repeat(64)}`)).toBe(true);
+    expect(re.test('cr.yandex/app')).toBe(true);
+    expect(re.test('cr.yandex/app:latest')).toBe(false);
+  });
+});

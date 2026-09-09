@@ -112,16 +112,16 @@ export interface Materializer<A = Artifact> {
 ```ts
 // Из spec 018 (builders-core) — переопределены для полноты
 export interface FunctionArtifactValue {
-  readonly archivePath: string;  // abs path to .zip
+  readonly archivePath: string;  // infra-relative path to .zip (DQ-2; never absolute)
   readonly entryPoint: string;   // "<basename>.handler"
 }
 
 export interface DockerArtifactValue {
-  readonly image: string;        // immutable digest: "cr.yandex/...@sha256:..."
+  readonly image: string;        // immutable digest: "cr.yandex/...@sha256:..." (или plain image; без mutable tags)
 }
 
 export interface FrontendArtifactValue {
-  readonly directory: string;    // abs path to static output dir
+  readonly directory: string;    // infra-relative path to static build output (never absolute)
 }
 
 // NEW — forward contract (spec 019)
@@ -333,7 +333,15 @@ Steps:
 
 - If 0 files → return only the bucket resource (FR-024, empty bucket).
 - Sanitization: replace `[^\w]` → `_`, dedup `__`, trim leading/trailing `_` (research D-RE-8).
+- Nested files (T116): `key` = POSIX relative path as listed (with `/`, e.g. `assets/logo.png`); TF `name` = `<app_id>_<sanitizeFilename(relativePath)>` (e.g. `frontend_assets_logo_png`) — санитизация по ВСЕМУ относительному пути исключает коллизии TF-имён между same-named файлами в разных директориях; `source` = `resolve(dir, relativePath)`.
 - `acl: "public-read"`: default for frontend (IDEA §36); extensions override.
+
+> **DQ-5 warning channel (T121)**: при 0 файлов materializer НЕ бросает — warning `YMT_EMPTY_DIRECTORY`
+> (константа `src/diagnostics.ts`) ретранслируется через
+> `context.output.declare('<name>_bucket_id', { value: '...', description: YMT_EMPTY_DIRECTORY })` —
+> `description` выходного output'а = код warning'а. Контракт на 021: outputs c
+> `description`, равным YMT-коду, считать warning-каналом — strip/route их ПЕРЕД
+> записью `outputs.yaml` (diagnostic-код не попадает в итоговое описание output'а).
 
 **Output**: `context.output.declare('<name>_bucket_id', { value: 'yandex_storage_bucket.<name>.id' })`
 

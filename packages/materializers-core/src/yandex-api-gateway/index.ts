@@ -1,7 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { ApiGatewayArtifactValue, Artifact, MaterializationContext, Materializer, ResourceReference, TerraformResource } from '../types.js';
+import type { ApiGatewayArtifactValue, MaterializationContext, Materializer, ResourceReference, TerraformResource } from '../types.js';
 import { YMT_INVALID_ARTIFACT_VALUE, materializerError } from '../diagnostics.js';
+import { isTfAddress } from '../helpers/filename.js';
 import { replaceResourceRefs } from './ref-resolver.js';
 
 const materializer: Materializer = {
@@ -19,7 +20,11 @@ const materializer: Materializer = {
     const specContent = readFileSync(specPath, 'utf8');
     const resolved = replaceResourceRefs(specContent, resourceReferences as readonly ResourceReference[]);
 
-    const name = (artifact as { name?: string }).name ?? 'unknown';
+    if (typeof artifact.name !== 'string' || !isTfAddress(artifact.name)) {
+      throw materializerError(YMT_INVALID_ARTIFACT_VALUE, 'artifact value missing required field: name (stable app identity)');
+    }
+    const name = artifact.name;
+
     const companionDir = resolve(process.cwd(), 'generated');
     mkdirSync(companionDir, { recursive: true });
     const companionPath = resolve(companionDir, `${name}-openapi.yaml`);

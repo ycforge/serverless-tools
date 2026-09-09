@@ -15,6 +15,12 @@ export const MATERIALIZER_IDS = [
 
 export type MaterializerId = (typeof MATERIALIZER_IDS)[number];
 
+/** A single catalog row: one materializer id paired with the artifact type it supports. */
+export type MaterializerCatalogEntry = {
+  readonly id: MaterializerId;
+  readonly artifactType: ArtifactType;
+};
+
 export const ARTIFACT_CATALOG = {
   'yandex-function': { artifactType: 'ycforge:function' },
   'yandex-serverless-container': { artifactType: 'ycforge:docker-image' },

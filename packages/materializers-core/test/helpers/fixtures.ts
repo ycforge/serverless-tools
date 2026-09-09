@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
@@ -141,6 +141,22 @@ export function makeStaticDir(files: readonly string[] = ['index.html', 'style.c
 /** tmp (empty) dir — the empty-frontend fixture (FR-024). */
 export function makeEmptyDir(): string {
   return makeTempDir('empty-');
+}
+
+/**
+ * tmp dir with a nested structure (T116): the same `logo.png` basename appears
+ * in two dirs and there is a deeper level — proves keys use the POSIX relative
+ * path and TF names stay collision-free after sanitization.
+ */
+export function makeNestedStaticDir(): string {
+  const dir = makeTempDir('nested-static-');
+  writeFileSync(join(dir, 'index.html'), '/* index.html */\n', 'utf8');
+  mkdirSync(join(dir, 'assets', 'img'), { recursive: true });
+  mkdirSync(join(dir, 'img'), { recursive: true });
+  writeFileSync(join(dir, 'assets', 'logo.png'), '/* assets logo */\n', 'utf8');
+  writeFileSync(join(dir, 'assets', 'img', 'banner.svg'), '/* banner */\n', 'utf8');
+  writeFileSync(join(dir, 'img', 'logo.png'), '/* img logo */\n', 'utf8');
+  return dir;
 }
 
 /** Read a file back as utf8 (companion content assertions). */

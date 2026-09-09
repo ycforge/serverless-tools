@@ -49,6 +49,7 @@
   "scripts": {
     "build": "tsup",
     "test": "tsup && vitest run",
+    "lint": "eslint src test",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

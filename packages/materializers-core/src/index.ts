@@ -11,7 +11,7 @@
 export const MATERIALIZERS_CORE_VERSION = '0.1.0';
 
 export { ARTIFACT_CATALOG, ARTIFACT_TYPES, MATERIALIZER_IDS } from './catalog.js';
-export type { ArtifactType, MaterializerId } from './catalog.js';
+export type { ArtifactType, MaterializerCatalogEntry, MaterializerId } from './catalog.js';
 
 export {
   YMT_EMPTY_DIRECTORY,

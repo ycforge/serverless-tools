@@ -5,7 +5,7 @@ import { YMT_EMPTY_DIRECTORY, YMT_INVALID_ARTIFACT_VALUE } from '../../src/diagn
 import { createOutputBuilder } from '../../src/helpers/output-builder.js';
 import type { OutputBuilderWithCollection } from '../../src/helpers/output-builder.js';
 import type { MaterializationContext, TerraformResource } from '../../src/types.js';
-import { makeEmptyDir, makeStaticDir } from '../helpers/fixtures.js';
+import { makeEmptyDir, makeNestedStaticDir, makeStaticDir } from '../helpers/fixtures.js';
 
 function createContext(): MaterializationContext & { output: OutputBuilderWithCollection } {
   return { output: createOutputBuilder() };
@@ -129,5 +129,33 @@ describe('yandex-storage-bucket materializer (US2, T061)', () => {
         ctx,
       ),
     ).rejects.toMatchObject({ code: YMT_INVALID_ARTIFACT_VALUE });
+  });
+
+  it('nested dirs: key = POSIX relative path, TF names collision-free (T116)', async () => {
+    const nestedDir = makeNestedStaticDir();
+    const ctx = createContext();
+    const result = (await materializer.materialize(
+      { type: 'ycforge:frontend', name: 'frontend', value: { directory: nestedDir } } as never,
+      ctx,
+    )) as readonly TerraformResource[];
+
+    const objects = result.filter((r) => r.type === 'yandex_storage_object');
+    const keys = objects.map((o) => (o.configuration as { key: string }).key).sort();
+    expect(keys).toEqual(['assets/img/banner.svg', 'assets/logo.png', 'img/logo.png', 'index.html']);
+
+    const names = objects.map((o) => o.name).sort();
+    expect(names).toEqual([
+      'frontend_assets_img_banner_svg',
+      'frontend_assets_logo_png',
+      'frontend_img_logo_png',
+      'frontend_index_html',
+    ]);
+    expect(new Set(names).size).toBe(names.length);
+
+    for (const obj of objects) {
+      expect((obj.configuration as { source: string }).source).toBe(
+        `${nestedDir}/${(obj.configuration as { key: string }).key}`,
+      );
+    }
   });
 });

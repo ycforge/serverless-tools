@@ -47,9 +47,10 @@
       "type": "object",
       "properties": {
         "type": { "type": "string", "description": "Follows <package-scope>:<kind> convention, e.g. ycforge:function." },
+        "name": { "type": "string", "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$", "description": "Stable app identity per spec 014; must be a TF address (missing/non-string/non-TF-address → YMT_INVALID_ARTIFACT_VALUE at materialize)." },
         "value": { "description": "Opaque to C — only the matching materializer interprets it." }
       },
-      "required": ["type", "value"],
+      "required": ["type", "name", "value"],
       "additionalProperties": false
     },
     "materializer": {
@@ -69,7 +70,7 @@
       "title": "Artifact.value of ycforge:function (spec 018)",
       "type": "object",
       "properties": {
-        "archivePath": { "type": "string", "description": "Absolute path to the .zip inside outputDir." },
+        "archivePath": { "type": "string", "description": "Infra-relative path to the .zip (never absolute); copied verbatim into content.zip_filename (DQ-2)." },
         "entryPoint": { "type": "string", "description": "Non-empty handler identifier, \"<basename>.handler\"." }
       },
       "required": ["archivePath", "entryPoint"],
@@ -80,7 +81,7 @@
       "title": "Artifact.value of ycforge:docker-image (spec 018)",
       "type": "object",
       "properties": {
-        "image": { "type": "string", "pattern": "^.+/[^@]+@sha256:[0-9a-f]{64}$", "description": "Immutable digest form; mutable tags never appear here." }
+        "image": { "type": "string", "pattern": "^cr\\.yandex/[^:]+(@sha256:[0-9a-f]{8,64})?$", "description": "cr.yandex repository, optionally pinned to a sha256 digest (8–64 hex); plain images allowed. Mutable `:latest`-style tags never appear here." }
       },
       "required": ["image"],
       "additionalProperties": false
@@ -90,7 +91,7 @@
       "title": "Artifact.value of ycforge:frontend (spec 018)",
       "type": "object",
       "properties": {
-        "directory": { "type": "string", "description": "Absolute path to the static build output inside outputDir." }
+        "directory": { "type": "string", "description": "Infra-relative path to static build output (never absolute)." }
       },
       "required": ["directory"],
       "additionalProperties": false

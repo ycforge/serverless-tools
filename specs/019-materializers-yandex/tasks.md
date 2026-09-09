@@ -102,7 +102,7 @@ description: "Task list for materializers-core — yandex-function/container/api
 
 ### Implementation (GREEN)
 
-- [x] T050 [US1] Implement `packages/materializers-core/src/yandex-function/hash.ts` — `sha256Hex(filePath: string): Promise<string>` — `readFile` байтов архива (path как в artifact value; resolution `isAbsolute ? path : resolve(process.cwd(), path)`), `createHash('sha256')` → hex-строка (research D-RE-6); fs-ошибка чтения файла пробрасывается (trust builder output, spec Edge Cases: отсутствие файла → ошибка на apply, НЕ искажённая в YMT). **Depends**: T040, T030. — green hash-часть US1.
+- [x] T050 [US1] Implement `packages/materializers-core/src/yandex-function/hash.ts` — `sha256Hex(filePath: string): Promise<string>` — `readFile` байтов архива (path как в artifact value; resolution `isAbsolute ? path : resolve(process.cwd(), path)`), `createHash('sha256')` → hex-строка (research D-RE-6); fs-ошибка чтения файла пробрасывается as-is (отсутствие файла → raw fs ENOENT на materialize, НЕ искажённая в YMT/`MaterializerError`; dispatch 014 → `MTL_MATERIALIZE_FAILED`, Т119). **Depends**: T040, T030. — green hash-часть US1.
 - [x] T051 [US1] Implement `packages/materializers-core/src/yandex-function/index.ts` — default-export `Materializer`: `supports(artifact) === artifact.type === 'ycforge:function'` (FR-006); `materialize` = validate value (отсутствие `archivePath`/`entryPoint`/absolute-path → `YMT_INVALID_ARTIFACT_VALUE`, константы, DQ-2) → `user_hash = await sha256Hex(value.archivePath)` → `TerraformResource { kind:'resource', type:'yandex_function', name:<app_id>, configuration:{ runtime:'nodejs22', entrypoint: value.entryPoint, user_hash, content:{ zip_filename: value.archivePath } } }` (FR-007..010, minimal per IDEA §27) → `context.output.declare('<name>_function_id', { value:'yandex_function.<name>.id' })` (FR-005). **Depends**: T050, T033. — green T040 (US1). **MVP REACHED**: `user_service` генерирует `yandex_function`.
 
 ---
@@ -161,6 +161,21 @@ description: "Task list for materializers-core — yandex-function/container/api
 
 ---
 
+## Phase 7: Convergence (кросс-проверка материалов фиксов/шаблонов; T114–T121)
+
+**Purpose**: Закрытие 8 convergence findings с тестами. Проверка видна в plane-архитектуре PR 019; derail репо baseline-console 019.
+
+- [x] T114 Materializer input contract: добавить обязательный `name` в `Artifact<T> = { type, name, value }` (`src/types.ts`, JSDoc: stable app identity per spec 014); убрать silent `?? 'unknown'`-fallback во всех 5 materializer index-файлах → fail-fast `materializerError(YMT_INVALID_ARTIFACT_VALUE)` при missing/non-string/non-TF-address `name` (`src/helpers/filename.ts` `isTfAddress`); core type-test ассертит required `name` + NOT-assignable без `name`; pilot `materializers-core-contract.test-d.ts` — Artifact-равенство заменено на one-directional `CoreArtifact → PilotArtifact` (pilot contracts НЕ трогаются, DQ-3/021).
+- [x] T115 Contracts JSON value-schema descriptions синхронизированы с DQ-2: `functionArtifactValue.archivePath` → "infra-relative path to the .zip (never absolute)"; `frontendArtifactValue.directory` → "infra-relative path to static build output (never absolute)"; `artifact`-definition mirror `name` (required + TF-address pattern). Consistency-check расширен в `test/unit/diagnostics.test.ts`.
+- [x] T116 Bucket nested-dir keys + name collation: `key` = POSIX relative path из листинга (с `/`), TF `name` = `sanitizeFilename(полный relative path)` (напр. `assets/logo.png` → `assets_logo_png`), `source` = `resolve(dir, relativePath)` — коллизий между same-named файлами в разных dirs нет. Хелпер `makeNestedStaticDir` в `test/helpers/fixtures.ts` + тест в `test/unit/yandex-storage-bucket.spec.ts`.
+- [x] T117 Linter cleanup: unused `Artifact`-imports удалены из 5 index-файлов; `"lint": "eslint src test"` добавлен в `packages/materializers-core/package.json`; `pnpm exec eslint packages/materializers-core` — 0 ошибок (root `pnpm lint` pre-existing pilot/builders-core errors вне scope).
+- [x] T118 Экспорт `MaterializerCatalogEntry` (`{ id: MaterializerId; artifactType: ArtifactType }`) из `src/catalog.ts` + `src/index.ts`; ассерт в `test/types/materializers-core.test-d.ts` и `test/unit/catalog.test.ts`.
+- [x] T119 Пин реального поведения missing archive: `materialize()` с несуществующим archivePath → reject с raw fs ENOENT (НЕ `MaterializerError`/YMT); тест в `test/unit/yandex-function.spec.ts`; edge-case wording в `spec.md`/`plan.md`/traceability-строке `tasks.md` — "missing archive → raw fs error распространяется на materialize (dispatch 014 → `MTL_MATERIALIZE_FAILED`); не YMT-диагностика".
+- [x] T120 Docker image pattern: `contracts/materializers-core.json` `dockerArtifactValue.image.pattern` = `^cr\.yandex/[^:]+(@sha256:[0-9a-f]{8,64})?$` (short-hex fixture + real digest ref + plain image; `:latest` rejected); description обновлён; consistency-assert в `test/unit/diagnostics.test.ts`.
+- [x] T121 Документация warning-канала `YMT_EMPTY_DIRECTORY` (DQ-5): bucket materializer эмитит warning через `output.declare(..., { description: YMT_EMPTY_DIRECTORY })`; 021 должен strip/route warnings перед записью `outputs.yaml` — note в `data-model.md` §5.5 и `plan.md`.
+
+---
+
 ## AC → Test Traceability (SC-007; заполняется в T112)
 
 | AC | Тест (файл — задачи RED/GREEN) |
@@ -173,7 +188,7 @@ description: "Task list for materializers-core — yandex-function/container/api
 | US2-AC3 (empty dir → bucket only) | `test/unit/yandex-storage-bucket.spec.ts` — T061/T071 |
 | US3-AC1 (companion ref replacement + file() spec) | `test/unit/yandex-api-gateway.spec.ts` — T081/T092 |
 | US3-AC2 (0 refs → companion as-is) | `test/unit/yandex-api-gateway.spec.ts` — T081/T092 |
-| Edge: archivePath не существует | T051 (trust builder; ошибка не создаётся на materialize) |
+| Edge: archivePath не существует | T051/T119 (raw fs ENOENT распространяется на materialize; НЕ MaterializerError/YMT-код; dispatch 014 → MTL_MATERIALIZE_FAILED) |
 | Edge: пустой directory | `test/unit/yandex-storage-bucket.spec.ts` — T061/T071 (YMT_EMPTY_DIRECTORY) |
 | Edge: unsafe-символы имени файла | `test/unit/yandex-storage-bucket.spec.ts` — T061/T071 (+T013/34) |
 | Edge: resource reference не найден | `test/unit/yandex-api-gateway.spec.ts` — T081/T091 (без ошибки) |

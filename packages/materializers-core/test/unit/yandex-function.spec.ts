@@ -113,4 +113,21 @@ describe('yandex-function materializer (US1, T040)', () => {
       ),
     ).rejects.toMatchObject({ code: YMT_INVALID_ARTIFACT_VALUE });
   });
+
+  it('missing archive propagates a raw fs ENOENT error, not a YMT diagnostic (T119)', async () => {
+    const ctx = createContext();
+    const err = await materializer
+      .materialize(
+        { type: 'ycforge:function', name: 'user_service', value: { archivePath: 'missing-archive.zip', entryPoint: 'index.handler' } } as never,
+        ctx,
+      )
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(err).not.toBeNull();
+    const e = err as Error & { code?: string };
+    expect(e.name).not.toBe('MaterializerError');
+    expect(e.code).toBe('ENOENT');
+  });
 });

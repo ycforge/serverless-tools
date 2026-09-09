@@ -41,9 +41,16 @@ describe('materializers-core conformance to pilot contracts (spec 019, D-RE-5)',
     expectTypeOf<CoreTerraformResource>().toEqualTypeOf<PilotTerraformResource>();
   });
 
-  it('Artifact is structurally identical in both directions (FR-003)', () => {
-    expectTypeOf<PilotArtifact>().toEqualTypeOf<CoreArtifact>();
-    expectTypeOf<CoreArtifact>().toEqualTypeOf<PilotArtifact>();
+  it('Core Artifact is assignable to Pilot Artifact (additive `name`, FR-003)', () => {
+    // Core adds a required `name` (stable app identity, spec 014) to the spec-002
+    // `{ type, value }` shape. Extra properties on the SOURCE are fine for
+    // structural assignability, so the direction `CoreArtifact → PilotArtifact`
+    // holds; the reverse does not — pilot artifacts carry no `name`, so they are
+    // NOT usable where a core Artifact is expected (DQ-3: 014 dispatch passes the
+    // descriptor, pilot production contracts stay untouched — spec 021 per DQ-3).
+    expectTypeOf<CoreArtifact>().toMatchTypeOf<PilotArtifact>();
+    // @ts-expect-error core requires `name` — pilot artifact shape lacks it
+    expectTypeOf<PilotArtifact>().toMatchTypeOf<CoreArtifact>();
   });
 
   it('pilot single-resource Materializer is assignable to core multi-resource Materializer (additive, D-RE-5)', () => {

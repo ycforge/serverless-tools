@@ -8,6 +8,7 @@ import {
   YMT_INVALID_ARTIFACT_VALUE,
   YMT_INVALID_QUEUE_URL,
   type ArtifactType,
+  type MaterializerCatalogEntry,
   type MaterializerId,
 } from '@ycforge/materializers-core';
 import type {
@@ -53,6 +54,20 @@ describe('materializers-core type-level contract (FR-001/003, D-3, D-RE-5)', () 
     expectTypeOf<ArtifactTypesEntry>().toEqualTypeOf<ArtifactType>();
   });
 
+  it('MaterializerCatalogEntry is exported as { id, artifactType } (T118)', () => {
+    const entry: MaterializerCatalogEntry = { id: 'yandex-function', artifactType: 'ycforge:function' };
+    expectTypeOf<MaterializerCatalogEntry>().toHaveProperty('id').toEqualTypeOf<MaterializerId>();
+    expectTypeOf<MaterializerCatalogEntry>().toHaveProperty('artifactType').toEqualTypeOf<ArtifactType>();
+    expectTypeOf(entry.id).toMatchTypeOf<MaterializerId>();
+  });
+
+  it('Artifact requires `name` (stable app identity, T114)', () => {
+    expectTypeOf<Artifact>().toHaveProperty('name').toBeString();
+    // @ts-expect-error name is required — a name-less artifact is NOT assignable
+    const missingName: Artifact = { type: 'ycforge:function', value: { archivePath: 'x', entryPoint: 'y' } };
+    void missingName;
+  });
+
   it('YMT_* constants are exported from the root', () => {
     expectTypeOf(YMT_INVALID_QUEUE_URL).toBeString();
     expectTypeOf(YMT_INVALID_ARTIFACT_VALUE).toBeString();
@@ -91,7 +106,7 @@ describe('materializers-core type-level contract (FR-001/003, D-3, D-RE-5)', () 
   });
 
   it('standalone core shapes are structurally compatible with the caller expectations', () => {
-    const artifact: Artifact = { type: 'ycforge:function', value: { archivePath: 'x', entryPoint: 'y' } };
+    const artifact: Artifact = { type: 'ycforge:function', name: 'user_service', value: { archivePath: 'x', entryPoint: 'y' } };
     const output: OutputBuilder = { declare: (_name, _output) => {} };
     const context: MaterializationContext = { output };
     expectTypeOf(yandexFunction.supports(artifact, context)).toBeBoolean();
