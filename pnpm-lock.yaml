@@ -74,6 +74,21 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@22.20.1)(supports-color@7.2.0)(yaml@2.9.0)
 
+  packages/materializers-core:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.20.1
+      tsup:
+        specifier: ^8.5.0
+        version: 8.5.1(@swc/core@1.16.1)(postcss@8.5.26)(supports-color@7.2.0)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@22.20.1)(supports-color@7.2.0)(yaml@2.9.0)
+
   packages/nest-bridge:
     devDependencies:
       '@nestjs/common':
@@ -119,6 +134,9 @@ importers:
       '@ycforge/builders-core':
         specifier: workspace:*
         version: link:../builders-core
+      '@ycforge/materializers-core':
+        specifier: workspace:*
+        version: link:../materializers-core
       tsup:
         specifier: ^8.5.0
         version: 8.5.1(@swc/core@1.16.1)(postcss@8.5.26)(supports-color@7.2.0)(typescript@5.9.3)(yaml@2.9.0)

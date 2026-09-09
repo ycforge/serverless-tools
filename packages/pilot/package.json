@@ -21,9 +21,9 @@
   ],
   "scripts": {
     "build": "tsup",
-    "pretest": "pnpm --filter @ycforge/builders-core build",
+    "pretest": "pnpm --filter @ycforge/builders-core build && pnpm --filter @ycforge/materializers-core build && pnpm build",
     "test": "vitest run",
-    "typecheck": "pnpm --filter @ycforge/builders-core build && tsc --noEmit"
+    "typecheck": "pnpm --filter @ycforge/builders-core build && pnpm --filter @ycforge/materializers-core build && tsc --noEmit"
   },
   "dependencies": {
     "yaml": "^2.9.0"
@@ -31,6 +31,7 @@
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@ycforge/builders-core": "workspace:*",
+    "@ycforge/materializers-core": "workspace:*",
     "tsup": "^8.5.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"

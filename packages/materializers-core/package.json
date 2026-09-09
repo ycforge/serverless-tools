@@ -1,0 +1,61 @@
+{
+  "name": "@ycforge/materializers-core",
+  "version": "0.1.0",
+  "description": "Core Terraform materializer plugins for the serverless-tools ecosystem (spec 019): yandex-function, yandex-serverless-container, yandex-api-gateway, yandex-message-queue, yandex-storage-bucket. Registered via the spec-013/014 explicit mapping under subpath specifiers @ycforge/materializers-core/*.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./yandex-function": {
+      "types": "./dist/yandex-function/index.d.ts",
+      "import": "./dist/yandex-function/index.js",
+      "require": "./dist/yandex-function/index.cjs"
+    },
+    "./yandex-serverless-container": {
+      "types": "./dist/yandex-serverless-container/index.d.ts",
+      "import": "./dist/yandex-serverless-container/index.js",
+      "require": "./dist/yandex-serverless-container/index.cjs"
+    },
+    "./yandex-api-gateway": {
+      "types": "./dist/yandex-api-gateway/index.d.ts",
+      "import": "./dist/yandex-api-gateway/index.js",
+      "require": "./dist/yandex-api-gateway/index.cjs"
+    },
+    "./yandex-message-queue": {
+      "types": "./dist/yandex-message-queue/index.d.ts",
+      "import": "./dist/yandex-message-queue/index.js",
+      "require": "./dist/yandex-message-queue/index.cjs"
+    },
+    "./yandex-storage-bucket": {
+      "types": "./dist/yandex-storage-bucket/index.d.ts",
+      "import": "./dist/yandex-storage-bucket/index.js",
+      "require": "./dist/yandex-storage-bucket/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "tsup && vitest run",
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
