@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "build": "tsup",
-    "pretest": "pnpm --filter @ycforge/builders-core build && pnpm --filter @ycforge/materializers-core build",
+    "pretest": "pnpm --filter @ycforge/builders-core build && pnpm --filter @ycforge/materializers-core build && pnpm build",
     "test": "vitest run",
     "typecheck": "pnpm --filter @ycforge/builders-core build && pnpm --filter @ycforge/materializers-core build && tsc --noEmit"
   },
