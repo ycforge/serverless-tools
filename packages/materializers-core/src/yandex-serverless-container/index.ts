@@ -1,15 +1,35 @@
-import type { Artifact, MaterializationContext, Materializer } from '../types.js';
-
-function notImplemented(): never {
-  throw new Error('not implemented');
-}
+import type { Artifact, DockerArtifactValue, MaterializationContext, Materializer, TerraformResource } from '../types.js';
+import { YMT_INVALID_ARTIFACT_VALUE, materializerError } from '../diagnostics.js';
 
 const materializer: Materializer = {
-  supports(_artifact: Artifact, _context: MaterializationContext): boolean {
-    return notImplemented();
+  supports(artifact, _context: MaterializationContext): boolean {
+    return artifact.type === 'ycforge:docker-image';
   },
-  async materialize(): Promise<never> {
-    return notImplemented();
+  async materialize(artifact, context) {
+    const value = artifact.value as DockerArtifactValue;
+    const { image } = value;
+
+    if (!image) {
+      throw materializerError(YMT_INVALID_ARTIFACT_VALUE, 'artifact value missing required field: image');
+    }
+
+    const name = (artifact as { name?: string }).name ?? 'unknown';
+
+    const resource: TerraformResource = {
+      kind: 'resource',
+      type: 'yandex_serverless_container',
+      name,
+      configuration: {
+        image,
+        name,
+      },
+    };
+
+    context.output.declare(`${name}_container_id`, {
+      value: `yandex_serverless_container.${name}.id`,
+    });
+
+    return resource;
   },
 };
 
