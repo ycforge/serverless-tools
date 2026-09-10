@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { PluginRegistry, PluginRegistryLoadResult } from '../contracts/registry.js';
-import { BRG_MISSING_FILE } from '../contracts/registry.js';
 import { parseBuildersYaml } from './builders-yaml.js';
 import { loadPlugins } from './load.js';
 import { validateBuilders } from './validate.js';

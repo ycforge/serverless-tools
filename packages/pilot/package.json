@@ -25,7 +25,11 @@
     "test": "vitest run",
     "typecheck": "pnpm --filter @ycforge/builders-core build && pnpm --filter @ycforge/materializers-core build && tsc --noEmit"
   },
+  "bin": {
+    "ycsf": "dist/cli/index.js"
+  },
   "dependencies": {
+    "commander": "^12.1.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

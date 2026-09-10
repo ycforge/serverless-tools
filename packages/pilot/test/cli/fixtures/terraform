@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Hermetic mock terraform for CLI integration tests (spec 021).
+# Replies with canned pass-through output so plan/apply/destroy pipelines can
+# be exercised offline and deterministically.
+set -e
+case "$1" in
+  init)
+    echo "Terraform initialized."
+    ;;
+  plan)
+    echo "Terraform plan: 2 to add, 0 to change, 0 to destroy."
+    ;;
+  apply)
+    echo "Terraform apply: 2 added, 0 changed, 0 destroyed."
+    ;;
+  destroy)
+    echo "Terraform destroy: 2 destroyed."
+    ;;
+  validate)
+    echo "Terraform validation successful."
+    ;;
+  version)
+    echo "Terraform v1.5.0"
+    ;;
+  *)
+    echo "mock terraform: unknown command '$1'" >&2
+    exit 0
+    ;;
+esac

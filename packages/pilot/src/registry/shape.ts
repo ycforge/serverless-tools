@@ -9,6 +9,21 @@ export function isBuilderShape(obj: unknown): boolean {
   return typeof (obj as Record<string, unknown>).build === 'function';
 }
 
+/**
+ * Extract a typed Builder from a loaded module namespace (spec 021, D-RE-15).
+ * Symmetric to getMaterializer; returns null when the module does not satisfy
+ * the builder shape.
+ */
+export function getBuilder(module: unknown): import('../contracts/builder.js').Builder | null {
+  if (module === null || typeof module !== 'object') return null;
+  const ns = module as Record<string, unknown>;
+  const target: unknown = ns.default !== null && typeof ns.default === 'object' ? ns.default : ns;
+  if (isBuilderShape(target)) {
+    return target as import('../contracts/builder.js').Builder;
+  }
+  return null;
+}
+
 export function isMaterializerShape(obj: unknown): boolean {
   if (obj === null || typeof obj !== 'object') return false;
   const rec = obj as Record<string, unknown>;

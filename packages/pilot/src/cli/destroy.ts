@@ -1,0 +1,102 @@
+// spec 021 ycsf-cli — ycsf destroy command action (US6, FR-026..029).
+import { readdir, unlink } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { Command } from 'commander';
+import { confirmDestroy } from './prompt.js';
+import { runTerraformInit, runTerraformDestroy } from './pipeline.js';
+import { CLIError, CLI_UNEXPECTED_ERROR } from './errors.js';
+import type { CLIResult, CLIDiagnostic } from './result.js';
+
+async function cleanGeneratedFiles(rootDir: string): Promise<number> {
+  const ycsfDir = join(rootDir, '.ycsf');
+  let removed = 0;
+  let entries: string[] = [];
+  try {
+    entries = await readdir(ycsfDir);
+  } catch {
+    return 0;
+  }
+  for (const name of entries) {
+    if (name.endsWith('.ycsf.tf.json')) {
+      try {
+        await unlink(join(ycsfDir, name));
+        removed += 1;
+      } catch {
+        // File already gone — treat as removed.
+        removed += 1;
+      }
+    }
+  }
+  return removed;
+}
+
+export async function destroyAction(cmd: Command): Promise<void> {
+  const opts = cmd.optsWithGlobals();
+  const rootDir = String(opts.projectDir ?? process.cwd());
+  const json = Boolean(opts.json);
+  const yes = Boolean(opts.yes);
+  const cleanup = Boolean(opts.cleanup);
+
+  const diagnostics: CLIDiagnostic[] = [];
+  let exitCode: 0 | 1 | 2 = 0;
+
+  try {
+    if (!yes) {
+      const confirmed = await confirmDestroy();
+      if (!confirmed) {
+        const result: CLIResult = {
+          command: 'destroy',
+          exitCode: 0,
+          diagnostics: [],
+          summary: { tfDestroyOutput: '', cleanedUp: false },
+        };
+        if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+        else process.stderr.write('✓ Destroy cancelled by user.\n');
+        process.exitCode = 0;
+        return;
+      }
+    }
+
+    await runTerraformInit(rootDir, json);
+    const tfDestroyOutput = await runTerraformDestroy(rootDir, yes, json);
+
+    let cleanedUp = false;
+    if (cleanup) {
+      const removed = await cleanGeneratedFiles(rootDir);
+      cleanedUp = removed >= 0;
+    }
+
+    const result: CLIResult = {
+      command: 'destroy',
+      exitCode: 0,
+      diagnostics: [],
+      summary: { tfDestroyOutput, cleanedUp },
+    };
+    if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    else {
+      if (tfDestroyOutput) process.stderr.write(tfDestroyOutput);
+      process.stderr.write(`✓ Terraform destroy complete.${cleanup ? ' Generated files cleaned.' : ''}\n`);
+    }
+    process.exitCode = 0;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const code = err instanceof CLIError ? err.code : CLI_UNEXPECTED_ERROR;
+    diagnostics.push({ code, message });
+    exitCode = err instanceof CLIError ? err.exitCode : 1;
+
+    if (json) {
+      const result: CLIResult = {
+        command: 'destroy',
+        exitCode,
+        diagnostics,
+        summary: { tfDestroyOutput: '', cleanedUp: false },
+      };
+      process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    } else {
+      process.stderr.write(`✗ ${code}: ${message}\n`);
+    }
+    process.exitCode = exitCode;
+  }
+}
+
+export const destroyCommand = 'destroy';

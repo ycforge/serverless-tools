@@ -1,0 +1,171 @@
+// spec 021 ycsf-cli — entry point: commander program + error handler (D-RE-9, D-RE-13).
+import { Command } from 'commander';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { buildAction } from './build.js';
+import { materializeAction } from './materialize.js';
+import { checkAction } from './check.js';
+import { planAction } from './plan.js';
+import { applyAction } from './apply.js';
+import { destroyAction } from './destroy.js';
+import {
+  CLIError,
+  CLI_UNKNOWN_COMMAND,
+  CLI_UNEXPECTED_ERROR,
+  ExitCode,
+} from './errors.js';
+import type { CLIResult, CLIDiagnostic } from './result.js';
+
+function packageVersion(): string {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(join(import.meta.dirname, '..', '..', 'package.json'), 'utf8'),
+    ) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+const program = new Command();
+
+program
+  .name('ycsf')
+  .description('Yandex Cloud serverless-tools build/deployment orchestrator (Project C)')
+  .version(packageVersion())
+  .option('--project-dir <path>', 'Project directory (default: current directory)', process.cwd())
+  .option('--json', 'Output machine-readable JSON')
+  .option('--no-color', 'Disable ANSI colors in human-readable output')
+  .configureHelp({ showGlobalOptions: true })
+  // commander writes "error: ..." to stderr before throwing CommanderError;
+  // we suppress that raw write and emit our own diagnostics in fail() (FR-001).
+  .configureOutput({ writeErr: () => {} });
+
+// commander 12 calls actions as fn(options, command) with `this` bound to the
+// Command. Our action helpers accept a Command (mirroring composer's
+// `function (this: Command)` pattern), so bind `this` and forward it.
+const bindAction = (fn: (cmd: Command) => Promise<void>) =>
+  function (this: Command): Promise<void> {
+    return fn(this);
+  };
+
+program
+  .command('build')
+  .description('Build all apps using their configured builders')
+  .option('--target <app>', 'Build only this app (by app ID from apps.yaml)')
+  .action(bindAction(buildAction));
+
+program
+  .command('materialize')
+  .description('Run materializers to generate Terraform .tf.json files')
+  .option('--target <app>', 'Materialize only this app (by app ID from apps.yaml)')
+  .action(bindAction(materializeAction));
+
+program
+  .command('check')
+  .description('Validate project-level contracts without Terraform')
+  .option('--validate-tf', 'Run terraform validate as a final step')
+  .action(bindAction(checkAction));
+
+program
+  .command('plan')
+  .description('Run full pipeline: build, materialize, then terraform plan')
+  .action(bindAction(planAction));
+
+program
+  .command('apply')
+  .description('Run full pipeline: build, materialize, terraform plan, then terraform apply')
+  .action(bindAction(applyAction));
+
+program
+  .command('destroy')
+  .description('Destroy infrastructure via terraform destroy, optionally clean up generated files')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .option('--cleanup', 'Delete .ycsf/*.ycsf.tf.json files after destroy')
+  .action(bindAction(destroyAction));
+
+// exitOverride() lets us catch commander's thrown CommanderError (unknown
+// command / unknown option / --help / --version) and map them to our exit
+// codes instead of commander calling process.exit directly (FR-001, FR-003).
+// In commander 12 the override does NOT propagate to subcommands, so apply
+// it to every registered command.
+program.exitOverride();
+for (const sub of program.commands) sub.exitOverride();
+
+async function fail(error: unknown, commandName: string): Promise<void> {
+  const diagnostics: CLIDiagnostic[] = [];
+  let exitCode: 0 | 1 | 2 = ExitCode.Error;
+  const json = process.argv.includes('--json');
+
+  const emit = (result: CLIResult): void => {
+    if (json) {
+      process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    }
+  };
+
+  if (error instanceof CLIError) {
+    exitCode = error.exitCode;
+    diagnostics.push({ code: error.code, message: error.message });
+    emit({ command: commandName, exitCode, diagnostics });
+    if (!json) process.stderr.write(`Error: ${error.message}\n`);
+  } else {
+    const message = error instanceof Error ? error.message : String(error);
+    exitCode = ExitCode.Error;
+    diagnostics.push({ code: CLI_UNEXPECTED_ERROR, message });
+    emit({ command: commandName, exitCode, diagnostics });
+    if (!json) process.stderr.write(`Unexpected error: ${message}\n`);
+  }
+  process.exitCode = exitCode;
+}
+
+/** Run the CLI. Commands may be parsed through a list of raw args. */
+export async function main(argv: string[] = process.argv): Promise<number> {
+  const commandName = detectCommand(argv);
+  try {
+    await program.parseAsync(argv);
+
+    return typeof process.exitCode === 'number' ? process.exitCode : ExitCode.Success;
+  } catch (error) {
+    // commander throws CommanderError for --help / --version / unknown command
+    // when exitOverride() is active. help/version are normal exits (0).
+    const code = (error as { code?: string })?.code;
+    if (code === 'commander.helpDisplayed' || code === 'commander.version') {
+      return ExitCode.Success;
+    }
+    // Any other commander input error (unknown command, unknown option, missing
+    // argument) is a user-input error → exit 2 (FR-001), reported as CLI_* code.
+    if (typeof code === 'string' && code.startsWith('commander.')) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Strip commander's own "error: " prefix (we prefix ourselves).
+      const cleanMsg = message.replace(/^error:\s*/, '');
+      const diagnostics: CLIDiagnostic[] = [{ code: CLI_UNKNOWN_COMMAND, message: cleanMsg }];
+      const result: CLIResult = {
+        command: commandName || 'ycsf',
+        exitCode: 2,
+        diagnostics,
+      };
+      const json = process.argv.includes('--json');
+      if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      else process.stderr.write(`Error: ${cleanMsg}\n`);
+      process.exitCode = ExitCode.InputError;
+      return 2;
+    }
+    await fail(error, commandName || 'ycsf');
+    return typeof process.exitCode === 'number' ? process.exitCode : ExitCode.Error;
+  }
+}
+
+/** Determine the invoked subcommand from argv (used for CLIResult.command). */
+function detectCommand(argv: readonly string[]): string {
+  const commands = ['build', 'materialize', 'check', 'plan', 'apply', 'destroy'];
+  for (const arg of argv.slice(2)) {
+    if (commands.includes(arg)) return arg;
+  }
+  return 'ycsf';
+}
+
+const mainUrl = pathToFileURL(process.argv[1] ?? '').href;
+if (import.meta.url === mainUrl) {
+  void main();
+}
