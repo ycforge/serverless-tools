@@ -32,3 +32,5 @@ export type {
   OutputsDiagnostic,
   OutputValue,
 } from './contracts/index.js';
+export { check } from './check/index.js';
+export type { CheckResult, CheckOptions } from './check/index.js';

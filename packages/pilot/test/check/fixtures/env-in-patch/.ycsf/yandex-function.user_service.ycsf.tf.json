@@ -1,0 +1,11 @@
+{
+  "resource": {
+    "yandex_function": {
+      "user_service": {
+        "name": "user-service",
+        "runtime": "nodejs18",
+        "entrypoint": "main.handler"
+      }
+    }
+  }
+}

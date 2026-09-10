@@ -1,0 +1,11 @@
+{
+  "resource": {
+    "yandex_function": {
+      "analytics": {
+        "name": "analytics-svc",
+        "runtime": "nodejs22",
+        "entrypoint": "handler.main"
+      }
+    }
+  }
+}
