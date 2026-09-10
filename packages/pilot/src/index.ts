@@ -34,3 +34,5 @@ export type {
 } from './contracts/index.js';
 export { check } from './check/index.js';
 export type { CheckResult, CheckOptions } from './check/index.js';
+export { buildApps } from './build/index.js';
+export type { BuildAppsResult, BuiltArtifact, BuildAppsOptions } from './contracts/build.js';

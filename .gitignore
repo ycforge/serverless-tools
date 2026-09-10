@@ -6,6 +6,10 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+# Source-level unit/integration tests live in test/build/ (spec 021) — not build output
+!packages/pilot/test/build/
+# packages/pilot/src/build/ is the buildApps orchestrator source (spec 021) — not build output
+!packages/pilot/src/build/
 # Fixture dist outputs must stay tracked (convention-entry integration tests)
 !packages/composer/test/fixtures/app-convention/dist/
 !packages/composer/test/fixtures/app-convention/dist/*

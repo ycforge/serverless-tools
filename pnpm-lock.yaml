@@ -124,6 +124,9 @@ importers:
 
   packages/pilot:
     dependencies:
+      commander:
+        specifier: ^12.1.0
+        version: 12.1.0
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
