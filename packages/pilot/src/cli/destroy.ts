@@ -1,10 +1,16 @@
 // spec 021 ycsf-cli — ycsf destroy command action (US6, FR-026..029).
+import { existsSync } from 'node:fs';
 import { readdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { confirmDestroy } from './prompt.js';
 import { runTerraformInit, runTerraformDestroy } from './pipeline.js';
-import { CLIError, CLI_UNEXPECTED_ERROR } from './errors.js';
+import {
+  CLIError,
+  CLI_UNEXPECTED_ERROR,
+  InputError,
+  CLI_MISSING_PROJECT_DIR,
+} from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
 
 async function cleanGeneratedFiles(rootDir: string): Promise<number> {
@@ -44,6 +50,17 @@ export async function destroyAction(cmd: Command): Promise<void> {
   let exitCode: 0 | 1 | 2 = 0;
 
   try {
+    // FR-004/data-model §7: --project-dir must resolve to an existing
+    // directory → InputError (exit 2) BEFORE any terraform dispatch. Without
+    // this guard a missing dir would surface as an ENOENT from the missing
+    // infra/ cwd and be misreported as CLI_TERRAFORM_NOT_FOUND (T162).
+    if (!existsSync(rootDir)) {
+      throw new InputError(
+        `project directory does not exist — '${rootDir}' is not a serverless-tools project root`,
+        CLI_MISSING_PROJECT_DIR,
+      );
+    }
+
     if (!yes) {
       const confirmed = await confirmDestroy();
       if (!confirmed) {

@@ -475,3 +475,17 @@ With multiple developers:
 
 ### quickstart.md ссылается на несуществующий `scripts/mock-terraform.sh` (LOW)
 - [x] T159 [T125] `specs/021-ycsf-cli/quickstart.md:89` — ссылка заменена на реальный герметичный mock `packages/pilot/test/cli/fixtures/terraform` (committed, bash-скрипт init/plan/apply/destroy). **Ref**: quickstart Sc6/Sc9, T125.
+
+---
+
+## Phase 17: Convergence
+
+**Purpose**: FINAL ACCEPTANCE CONVERGE audit (2026-09-11, read-only, git HEAD fd65c2d). Baseline: `pnpm --filter @ycforge/pilot test` → 105 files / 541 tests GREEN; vitest typecheck clean; `eslint` clean on src/cli, src/build, src/registry, src/contracts, src/index.ts, test/cli, test/build. T157–T159 re-verified (bare `ycsf` → full help stdout + exit 0; data-model §4.2 dispatch signature; quickstart mock terraform path). Sanity probes against `packages/pilot/dist/cli/index.js` all green (--help/--version, `-p` alias, `--json frobnicate` → command `""` + exit 2, missing `.ycsf/apps.yaml` → exit 2 for build/materialize/check/plan/apply, destroy non-TTY → exit 2 CLI_DESTROY_REQUIRES_YES, plan/apply/destroy with mock terraform → exit 0, build `--target` unknown → exit 2, built-in `--json` summaries match `#/summarySchemas`, 8/8 error codes byte-for-byte == contracts, `--cleanup` removes `infra/*.ycsf.tf.json`+`99-ycsf-outputs.tf.json` only). Verdict: NOT CONVERGED — three NEW divergences (T160–T162): two stale doc references to `.ycsf/*.ycsf.tf.json` surviving T152 sync claim, and one destroy edge-case exit-code/message misattribution.
+
+### `--cleanup`/materialize doc references to `.ycsf/*.ycsf.tf.json` остались после T152 (LOW, docs)
+- [x] T160 [FR-028] `specs/021-ycsf-cli/data-model.md:243` — §4.4 destroy шаг 5 → «delete infra/*.ycsf.tf.json + infra/99-ycsf-outputs.tf.json». **Ref**: FR-028, T152.
+
+- [x] T161 [US2] `specs/021-ycsf-cli/spec.md:190,194,198` — US2 текст/Independent Test/AC1 → `infra/*.ycsf.tf.json` (цель материализации — `infra/`). **Ref**: FR-028, T152, T141.
+
+### `destroy --yes` на несуществующий `--project-dir`: exit 1 + ошибочный CLI_TERRAFORM_NOT_FOUND вместо exit 2 (LOW)
+- [x] T162 [FR-004/FR-021] `packages/pilot/src/cli/destroy.ts` — guard `existsSync(rootDir)` в начале destroyAction → `InputError` `CLI_MISSING_PROJECT_DIR`/exit 2 ДО terraform dispatch (terraform.spawn ENOENT от несуществующего `cwd: infra/` больше не атрибутируется как CLI_TERRAFORM_NOT_FOUND). Unit-тест (несуществующий dir → exit 2, spawn не вызван) + integration (destroy --yes /nonexistent → exit 2, без CLI_TERRAFORM_NOT_FOUND). **Ref**: spec.md:73, spec.md:305, FR-004, data-model.md:295, D-RE-3.

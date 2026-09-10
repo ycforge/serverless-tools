@@ -240,7 +240,7 @@ ycsf destroy (--yes or confirmed):
 │
 ├─ 3. spawnTerraform('init', rootDir)
 ├─ 4. spawnTerraform('destroy', rootDir, { autoApprove: yes })
-├─ 5. If --cleanup: delete .ycsf/*.ycsf.tf.json
+├─ 5. If --cleanup: delete infra/*.ycsf.tf.json + infra/99-ycsf-outputs.tf.json
 └─ 6. Exit 0
 ```
 

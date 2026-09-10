@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 vi.mock('../../../src/cli/prompt.js', () => ({
   confirmDestroy: vi.fn(),
@@ -16,9 +19,12 @@ import { ExitCode, DestroyRequiresYesError } from '../../../src/cli/errors.js';
 const mockSpawn = vi.mocked(child_process.spawn);
 const mockSpawnSync = vi.mocked(child_process.spawnSync);
 
+let projectDir: string;
+let missingDir: string;
+
 function fakeCmd(opts: Record<string, unknown> = {}) {
   return {
-    optsWithGlobals: () => ({ projectDir: '/root', json: true, yes: false, cleanup: false, ...opts }),
+    optsWithGlobals: () => ({ projectDir: projectDir, json: true, yes: false, cleanup: false, ...opts }),
   } as never;
 }
 
@@ -46,9 +52,17 @@ function okChild(stdout = ''): never {
 
 describe('ycsf destroy action (T100)', () => {
   beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), 'pilot-destroy-ucli-'));
+    mkdirSync(join(projectDir, 'infra'), { recursive: true });
+    missingDir = join(tmpdir(), 'pilot-destroy-missing-' + process.pid + '-' + Date.now());
     vi.clearAllMocks();
     process.exitCode = undefined;
     mockSpawnSync.mockReturnValue(terraformProbe());
+  });
+
+  afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(missingDir, { recursive: true, force: true });
   });
 
   it('AC1: destroy --yes → exit 0, terraform destroy with autoApprove', async () => {
@@ -56,10 +70,11 @@ describe('ycsf destroy action (T100)', () => {
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await destroyAction(fakeCmd({ yes: true }));
     expect(process.exitCode).toBe(ExitCode.Success);
-    expect(mockSpawn).toHaveBeenCalledWith(
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      2,
       expect.any(String),
       expect.arrayContaining(['destroy', '-auto-approve', '-no-color']),
-      expect.objectContaining({ cwd: '/root/infra' }),
+      expect.objectContaining({ cwd: join(projectDir, 'infra') }),
     );
     const json = JSON.parse(String(spy.mock.calls[0]?.[0]));
     expect(json.summary?.tfDestroyOutput).toContain('Destroy complete!');
@@ -110,6 +125,16 @@ describe('ycsf destroy action (T100)', () => {
     expect(json.summary?.cleanedUp).toBe(false);
     spy.mockRestore();
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('T162: destroy on nonexistent --project-dir → exit 2, CLI_MISSING_PROJECT_DIR, terraform NOT called', async () => {
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await destroyAction(fakeCmd({ projectDir: missingDir, yes: true }));
+    expect(process.exitCode).toBe(ExitCode.InputError);
+    expect(mockSpawn).not.toHaveBeenCalled();
+    const json = JSON.parse(String(spy.mock.calls[0]?.[0]));
+    expect(json.diagnostics[0]?.code).toBe('CLI_MISSING_PROJECT_DIR');
+    spy.mockRestore();
   });
 
   it('AC5: SIGINT during runTerraform → child SIGTERM, SIGKILL backstop, exit(130)', async () => {

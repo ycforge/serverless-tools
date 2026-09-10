@@ -187,15 +187,15 @@ DevOps запускает `ycsf build` в корне проекта. CLI заг�
 
 ### User Story 2 — DevOps запускает `ycsf materialize` (Priority: P1)
 
-DevOps запускает `ycsf materialize` после build. CLI запускает dispatch (materializers), применяет extensions, записывает generated `.ycsf.tf.json`.
+DevOps запускает `ycsf materialize` после build. CLI запускает dispatch (materializers), применяет extensions, записывает generated `infra/*.ycsf.tf.json`.
 
 **Why this priority**: Essential for generation pipeline; bridge between build and terraform.
 
-**Independent Test**: Fixture: project с artifacts из build step. Запустить `ycsf materialize --project-dir ./fixture`. Ожидать: exit code 0, `.ycsf/*.ycsf.tf.json` файлы созданы.
+**Independent Test**: Fixture: project с artifacts из build step. Запустить `ycsf materialize --project-dir ./fixture`. Ожидать: exit code 0, `infra/*.ycsf.tf.json` файлы созданы.
 
 **Acceptance Scenarios**:
 
-1. **Given** project с generated artifacts, **When** `ycsf materialize` выполняется, **Then** exit code = 0, `.ycsf/*.ycsf.tf.json` файлы содержат generated resources.
+1. **Given** project с generated artifacts, **When** `ycsf materialize` выполняется, **Then** exit code = 0, `infra/*.ycsf.tf.json` файлы содержат generated resources.
 2. **Given** project с extensions на несуществующий resource, **When** `ycsf materialize` выполняется, **Then** exit code = 1, diagnostics содержит `YCK_MISSING_TARGET`.
 3. **Given** project с 2 apps и `--target user_service`, **When** `ycsf materialize` выполняется, **Then** materialize выполняется только для `user_service`.
 

@@ -52,4 +52,15 @@ describe('destroy integration (T101)', () => {
     expect(result.stderr).toContain('Running terraform destroy...');
     expect(result.stderr).toContain('Terraform destroy complete');
   });
+
+  it('T162: destroy --yes on nonexistent --project-dir → exit 2, CLI_MISSING_PROJECT_DIR', async () => {
+    const result = await runCli(
+      CANONICAL,
+      ['destroy', '--project-dir', '/nonexistent-ycsf-dir', '--yes'],
+      envWithMockTerraform(),
+    );
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('CLI_MISSING_PROJECT_DIR');
+    expect(result.stderr).not.toContain('CLI_TERRAFORM_NOT_FOUND');
+  });
 });
