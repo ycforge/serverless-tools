@@ -505,3 +505,167 @@ With multiple developers:
 
 ### plan.md:17 осталась stale-ссылка `.ycsf/*.ycsf.tf.json` после T160/T161 (LOW, docs)
 - [x] T165 [FR-028] `specs/021-ycsf-cli/plan.md:17` — «write during materialize (`.ycsf/*.ycsf.tf.json`)» → `infra/*.ycsf.tf.json` (+ `99-ycsf-outputs.tf.json`), согласовано с `pipeline.ts:125-126` и T160/T161. **Ref**: FR-028, T152, T160, T161.
+
+---
+
+## Phase 19: Convergence
+
+**Purpose**: FINAL ACCEPTANCE CONVERGE audit (2026-09-11, read-only, git HEAD 0d47090). Baseline: `pnpm --filter @ycforge/pilot test` → 105 files / 544 tests GREEN; vitest typecheck clean; `eslint` clean on `src/cli/**`, `src/build/**`, `src/registry/**`, `src/contracts/**`, `src/index.ts`, `test/cli/**`, `test/build/**`. T138–T165 all RESOLVED and re-verified. Dist rebuilt via `pretest`. Adversarial sanity probes run against `packages/pilot/dist/cli/index.js`. Verdict: **CONVERGED**.
+
+### T166–T175: Adversarial re-verification of all exit-code paths, --json schema, flags, SIGINT, destroy cleanup
+
+#### T166: Exit-code mapping — all 6 commands on missing/nonexistent `--project-dir` → exit 2
+
+**Expected** (spec.md:73, data-model.md:295): invalid path → exit 2 + `CLI_MISSING_PROJECT_DIR` for ALL commands except `destroy` (which guards via `statSync().isDirectory()` → `InputError` exit 2 per T162/T163).
+
+**Probes** (all against `dist/cli/index.js`):
+
+| Command | Probe | Expected | Actual | Match |
+|---------|-------|----------|--------|-------|
+| `build` | `build --project-dir /nonexistent_xyz` | exit 2, `CLI_MISSING_PROJECT_DIR` | exit 2 | ✅ |
+| `materialize` | `materialize --project-dir /nonexistent_xyz` | exit 2, `CLI_MISSING_PROJECT_DIR` | exit 2 | ✅ |
+| `check` | `check --project-dir /nonexistent_xyz` | exit 2, `CLI_MISSING_PROJECT_DIR` | exit 2 | ✅ |
+| `plan` | `plan --project-dir /nonexistent_xyz` | exit 2, `CLI_MISSING_PROJECT_DIR` | exit 2 | ✅ |
+| `apply` | `apply --project-dir /nonexistent_xyz` | exit 2, `CLI_MISSING_PROJECT_DIR` | exit 2 | ✅ |
+| `destroy --yes` | `destroy --yes --project-dir /nonexistent_xyz` | exit 2, `CLI_MISSING_PROJECT_DIR` no `CLI_TERRAFORM_NOT_FOUND` | exit 2 | ✅ |
+| `destroy --yes` | `destroy --yes --project-dir /tmp/afile.txt` (plain file) | exit 2, not `CLI_UNEXPECTED_ERROR` exit 1 | exit 2 | ✅ (T163) |
+
+**Code**: `destroy.ts:58-68` (`statSync(rootDir).isDirectory()` guards before terraform dispatch); `build.ts:81-83` catch → `CLI_BUILD_FAILED` exit 1, but `buildApps` catch returns `CLI_MISSING_PROJECT_DIR`; `check.ts:33-50` (`existsSync` guard); `pipeline.ts:148-149` (`InputError` remapped for plan/apply T149). All verified. ✅
+
+#### T167: Unknown command & unknown target → exit 2
+
+| Probe | Expected | Actual | Match |
+|-------|----------|--------|-------|
+| `frobnicate` (bare unknown command) | exit 2, `CLI_UNKNOWN_COMMAND` | exit 2 | ✅ |
+| `build --target unknown_app` | exit 2, `CLI_APP_NOT_FOUND` | exit 2 | ✅ |
+| `materialize --target unknown_app` | exit 2, `CLI_APP_NOT_FOUND` | exit 2 | ✅ |
+
+**Code**: `index.ts:159-172` (commander `commander.*` error → exit 2, `CLI_UNKNOWN_COMMAND`); `buildApps/index.ts:56-67` (unknown target → `CLI_APP_NOT_FOUND` in `BuildAppsResult.errors`); `build.ts:54-55` (maps `CLI_APP_NOT_FOUND` → exit 2); `materialize.ts:59-78` (unknown target → exit 2 before registry load). ✅
+
+#### T168: `destroy` non-TTY without `--yes` → exit 2 + `CLI_DESTROY_REQUIRES_YES`
+
+| Probe | Expected | Actual | Match |
+|-------|----------|--------|-------|
+| `echo "" \| destroy --project-dir <canonical>` | exit 2, `CLI_DESTROY_REQUIRES_YES` | exit 2 | ✅ |
+| `destroy --json` (non-TTY, no --yes) | exit 2, `"command": "destroy"`, `CLI_DESTROY_REQUIRES_YES` | exit 2 | ✅ |
+
+**Code**: `prompt.ts:6-8` (`isTTY` check → throws `DestroyRequiresYesError`); `destroy.ts:71-85`. ✅
+
+#### T169: Missing terraform → exit 1 + `CLI_TERRAFORM_NOT_FOUND` (plan/apply/destroy)
+
+| Probe | Expected | Actual | Match |
+|-------|----------|--------|-------|
+| `PATH=/usr/bin:/bin plan --project-dir <canonical>` | exit 1, `CLI_TERRAFORM_NOT_FOUND` | exit 1, `CLI_TERRAFORM_NOT_FOUND` | ✅ |
+
+**Code**: `terraform.ts:6-19` (`findTerraform` throws `RuntimeError` `CLI_TERRAFORM_NOT_FOUND` when `which`/`where` returns non-zero); `pipeline.ts:165` (`spawnTerraform('init')` propagates). ✅
+
+#### T170: `--json` schema — command enum with `""`, pure JSON stdout, summaries match `#/summarySchemas`
+
+| Probe | Expected | Actual | Match |
+|-------|----------|--------|-------|
+| `--json -p check frobnicate` | `command: ""`, exitCode 2, `CLI_UNKNOWN_COMMAND` | `command: ""`, exitCode 2 | ✅ (T164) |
+| `check --json canonical` | pure JSON stdout, `command: "check"`, `exitCode: 0`, `diagnostics: []`, `summary: {total: 0}` | exact match | ✅ |
+| `build --json canonical` | pure JSON stdout, `summary: {apps: 2, artifacts: 2}` | exact match | ✅ |
+| `build --json --target user_service` | `summary: {apps: 1, artifacts: 1}` (T150 — processed apps, not project apps) | `{apps: 1, artifacts: 1}` | ✅ |
+| `materialize --json canonical` | `summary: {files: 3, extensions: 1}` | exact match | ✅ |
+| `materialize --json --target analytics` | `summary: {files: 1, extensions: 1}` (only analytics file) | `{files: 1, extensions: 1}` | ✅ |
+| `plan --json` (mock terraform) | pure JSON stdout, no progress in stdout, `summary.tfPlanOutput` contains plan output | exact match | ✅ |
+| `destroy --json` (non-TTY) | `summary: {tfDestroyOutput: "", cleanedUp: false}` | exact match | ✅ |
+
+**Code**: All commands emit `JSON.stringify(CLIResult, null, 2)` to stdout only when `json===true`; progress/messages go to stderr only when `!json` (FR-005). Contract `#/definitions/cliResult.command.enum` = `["build","materialize","check","plan","apply","destroy",""]` — `detectCommand` returns `''` for unrecognized (T151/T164), `fail()` at `index.ts:163-172` uses `commandName`. ✅
+
+#### T171: `--no-color` → `NO_COLOR=1` env var; no ANSI escapes emitted
+
+| Probe | Expected | Actual | Match |
+|-------|----------|--------|-------|
+| `--no-color check` | `process.env.NO_COLOR === '1'` | `NO_COLOR='1'` set | ✅ |
+| `build` (human-readable) | no ANSI escape sequences (`\033`) | 0 escapes found (`cat -v | grep -c`) | ✅ |
+
+**Code**: `index.ts:96-105` (`preAction` hook sets `NO_COLOR=1` when `opts.color === false`); no `chalk` or ANSI codes used anywhere in `src/cli/**` — output uses plain `✓`/`✗` Unicode characters only. ✅
+
+#### T172: `-p` alias for `--project-dir`; `globalFlags.projectDir.alias = "p"`
+
+| Probe | Expected | Actual | Match |
+|-------|----------|--------|-------|
+| `check -p /abs/project/root` | `projectDir` forwarded to action | `/abs/project/root` passed | ✅ (unit test index.test.ts T156) |
+| Contract `#/cliSurface/globalFlags.projectDir.alias` | `"p"` | `"p"` | ✅ |
+
+**Code**: `index.ts:37` (`.option('-p, --project-dir <path>', ...)`). ✅
+
+#### T173: Commands catalog descriptions match contract `#/commands/*/description` (const)
+
+| Command | Code `index.ts` description | Contract `const` | Match |
+|---------|-------------------------------|-------------------|-------|
+| build | `'Build all apps using their configured builders'` | `"Build all apps using their configured builders"` | ✅ |
+| materialize | `'Run materializers to generate Terraform .tf.json files'` | `"Run materializers to generate Terraform .tf.json files"` | ✅ |
+| check | `'Validate project-level contracts without Terraform'` | `"Validate project-level contracts without Terraform"` | ✅ |
+| plan | `'Run full pipeline: build, materialize, then terraform plan'` | `"Run full pipeline: build, materialize, then terraform plan"` | ✅ |
+| apply | `'Run full pipeline: build, materialize, terraform plan, then terraform apply'` | `"Run full pipeline: build, materialize, terraform plan, then terraform apply"` | ✅ |
+| destroy | `'Destroy infrastructure via terraform destroy, optionally clean up generated files'` | `"Destroy infrastructure via terraform destroy, optionally clean up generated files"` | ✅ |
+
+All 6 subcommand descriptions match contract `const` values exactly. ✅
+
+#### T174: SIGINT → exit 130 (never exit 1 / `CLI_TERRAFORM_FAILED`)
+
+**Verified** by unit tests:
+- `terraform.test.ts`: backstop path (SIGTERM → 2s → SIGKILL → `process.exit(130)`) ✅
+- `terraform.test.ts`: graceful-close path (`closeCb(143)` after SIGINT → `process.exit(130)`, NOT `CLI_TERRAFORM_FAILED` exit 1) ✅
+- `destroy.test.ts` AC5: SIGINT during `runTerraform` → child SIGTERM + SIGKILL backstop, exit 130 ✅
+
+**Code**: `terraform.ts:75-86` (SIGINT handler sets `interrupted=true`, SIGTERM child, 2s backstop → SIGKILL → `process.exit(130)`); `terraform.ts:109-115` (`close` handler: `if (interrupted) { clearTimeout(backstop); process.exit(130); return; }` before checking exit code). ✅
+
+#### T175: `destroy --yes --cleanup` removes only `infra/*.ycsf.tf.json` + `infra/99-ycsf-outputs.tf.json`, preserves `keep.tf.json` + `.ycsf/`; `cleanedUp = removed > 0` (T155)
+
+| Probe | Expected | Actual | Match |
+|-------|----------|--------|-------|
+| `destroy --yes --cleanup` with `infra/{user_service.ycsf.tf.json, 99-ycsf-outputs.tf.json, keep.tf.json}` + `.ycsf/user_service.ycsf.tf.json` | removes first 2, keeps `keep.tf.json` + `.ycsf/` | only `keep.tf.json` remains in `infra/`, `.ycsf/` untouched | ✅ |
+| `destroy --yes --cleanup` on empty `infra/` | `cleanedUp: false` | `cleanedUp: false` | ✅ |
+
+**Code**: `destroy.ts:16-40` (`cleanGeneratedFiles` scans `join(rootDir, 'infra')`, removes files ending `.ycsf.tf.json` or named `99-ycsf-outputs.tf.json` only); `destroy.ts:93` (`cleanedUp = removed > 0`). ✅
+
+#### T176: Standalone `ycsf materialize` includes moves + outputs (T147 consistency)
+
+**Code**: `materialize.ts:111` calls `runMaterializeGeneration(rootDir, model, registry, genOpts)` which at `pipeline.ts:35-129` runs dispatch → extensions → moves → outputs → `writeGeneratedTerraform`. Pipeline order matches spec.md line 50. `--target` filters generated files by `${target}.ycsf.tf.json` post-dispatch (pipeline.ts:121-124, T141 AC3). ✅
+
+#### T177: T163–T165 re-verified
+
+- **T163**: `destroy.ts:58-68` — `statSync(rootDir).isDirectory()` rejects missing path AND plain file (ENOTDIR) → `InputError` `CLI_MISSING_PROJECT_DIR` exit 2, BEFORE terraform dispatch. Verified: `destroy --yes --project-dir /tmp/afile_test` (file) → exit 2, not `CLI_UNEXPECTED_ERROR` exit 1. ✅
+- **T164**: `index.ts:185-210` — `detectCommand` skips value-taking flags (`-p`/`--project-dir`/`--target`) and their value token, nullary flags (`--json`/`--no-color`/etc.), and `--flag=value` form; first positional non-command token → `''`. Verified: `--json -p check frobnicate` → `command: ""` + exit 2. ✅
+- **T165**: `plan.md:17` — stale `.ycsf/*.ycsf.tf.json` reference → `infra/*.ycsf.tf.json` (+ `99-ycsf-outputs.tf.json`), synced with `pipeline.ts:125-126` and T160/T161. ✅
+
+#### T178: Constitution V audit — no string-literal CLI_*/YCK_* comparisons in `src/cli/**` or `src/build/**`
+
+Grep for `=== 'CLI_*` / `=== "CLI_*"` in `src/cli/**` + `src/build/**` → **0 matches**. All CLI_* code comparisons use imported constants from `errors.ts`. (String literals like `'ENOENT'`, `'commander.help'`, `'DUPLICATE_KEY'` are Node.js/CLI-framework codes, not CLI_* or YCK_* business codes — Constitution V compliant.) ✅
+
+#### T179: Contracts audit — 8/8 error codes, exit codes, CLIResult shape, command enum
+
+| Contract section | Expected | Actual | Match |
+|----------------|----------|--------|-------|
+| `#/errorCodes` properties | 8 codes | 8 codes match (`CLI_UNKNOWN_COMMAND`, `CLI_MISSING_PROJECT_DIR`, `CLI_APP_NOT_FOUND`, `CLI_BUILD_FAILED`, `CLI_TERRAFORM_FAILED`, `CLI_TERRAFORM_NOT_FOUND`, `CLI_DESTROY_REQUIRES_YES`, `CLI_UNEXPECTED_ERROR`) | ✅ |
+| `#/errorCodes/required` | same 8 | same 8 | ✅ |
+| `#/definitions/cliResult.command.enum` | `["build","materialize","check","plan","apply","destroy",""]` | enum includes `""` for program-level errors | ✅ |
+| `#/exitCodes` | 0, 1, 2, 130 | `ExitCode` enum: Success=0, Error=1, InputError=2; SIGINT → `process.exit(130)` | ✅ |
+| `#/cliSurface.globalFlags.projectDir.alias` | `"p"` | `-p, --project-dir` in `index.ts:37` | ✅ |
+| `#/summarySchemas/*` | build:{apps,artifacts}, materialize:{files,extensions}, check:{total}, plan:{tfPlanOutput}, apply:{tfApplyOutput}, destroy:{tfDestroyOutput,cleanedUp} | All 6 match runtime JSON output | ✅ |
+
+#### T180: Help & version
+
+| Probe | Expected | Actual | Match |
+|-------|----------|--------|-------|
+| bare `ycsf` (no args) | full help to stdout, exit 0 (T157) | full help stdout, exit 0 | ✅ |
+| `ycsf --help` | exit 0, lists all 6 commands + `--project-dir`/`--json` | exit 0, all listed | ✅ |
+| `ycsf build --help` | exit 0, shows `--target` + `--project-dir` | exit 0, both shown | ✅ |
+| `ycsf --version` | exit 0, version string `1.0.0` | `1.0.0`, exit 0 | ✅ |
+| `ycsf help` (built-in help command) | help output | works (commander auto-generated) | ✅ |
+
+**Code**: `index.ts:33-36` (`.name('ycsf').version(packageVersion())`); `index.ts:153-156` (bare invocation → `program.helpInformation()` to stdout, return `ExitCode.Success`). ✅
+
+### DeliberateDivergence
+
+N/A — no DeliberateDivergence section present in `specs/021-ycsf-cli/spec.md`, `contracts/ycsf-cli.json`, `data-model.md`, `plan.md`, `research.md`, or `quickstart.md`.
+
+### Summary
+
+All T138–T165 findings resolved and re-verified. Adversarial audit T166–T180 finds **zero new divergences**. Exit-code mapping (0/1/2/130) is correct across all commands and edge cases. `--json` schema (including `command: ""`) matches contract. Summary schemas match `#/summarySchemas` for all 6 commands. `--no-color` → `NO_COLOR=1` set; no ANSI escapes. `-p` alias + `globalFlags.alias` match. `--target` semantics correct for build/materialize only. SIGINT → 130 on all paths. `destroy --cleanup` removes only `infra/*.ycsf.tf.json` + `99-ycsf-outputs.tf.json`, preserves `keep.tf.json` + `.ycsf/`; `cleanedUp = removed > 0`. 8/8 error codes byte-for-byte match `#/errorCodes`. All 6 command descriptions match contract `const`. Standalone materialize includes moves/outputs (pipeline.ts shared). Constitution V: zero string-literal CLI_* comparisons.
+
+**VERDICT: CONVERGED.**
