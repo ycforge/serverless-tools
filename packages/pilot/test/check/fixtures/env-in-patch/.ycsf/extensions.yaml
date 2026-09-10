@@ -1,0 +1,6 @@
+version: 1
+extensions:
+  - target: functions.user_service
+    patch:
+      environment:
+        API_KEY: "{{$API_KEY}}"

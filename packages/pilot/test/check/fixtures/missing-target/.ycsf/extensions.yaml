@@ -1,0 +1,5 @@
+version: 1
+extensions:
+  - target: functions.user_service
+    patch:
+      runtime: python312
