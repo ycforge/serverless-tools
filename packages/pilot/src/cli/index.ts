@@ -54,6 +54,9 @@ program
   .command('build')
   .description('Build all apps using their configured builders')
   .option('--target <app>', 'Build only this app (by app ID from apps.yaml)')
+  .option('--no-cache', 'Ignore cache (rebuild all)')
+  .option('--force', 'Alias for --no-cache')
+  .option('--cache-dir <path>', 'Override cache directory')
   .action(bindAction(buildAction));
 
 program
@@ -71,11 +74,17 @@ program
 program
   .command('plan')
   .description('Run full pipeline: build, materialize, then terraform plan')
+  .option('--no-cache', 'Ignore cache (rebuild all)')
+  .option('--force', 'Alias for --no-cache')
+  .option('--cache-dir <path>', 'Override cache directory')
   .action(bindAction(planAction));
 
 program
   .command('apply')
   .description('Run full pipeline: build, materialize, terraform plan, then terraform apply')
+  .option('--no-cache', 'Ignore cache (rebuild all)')
+  .option('--force', 'Alias for --no-cache')
+  .option('--cache-dir <path>', 'Override cache directory')
   .action(bindAction(applyAction));
 
 program

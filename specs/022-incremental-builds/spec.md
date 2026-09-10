@@ -6,7 +6,7 @@
 - **Title**: incremental-builds — content-addressed кэш артефактов (skip rebuild при неизменном fingerprint)
 - **Feature Branch**: `022-incremental-builds`
 - **Created**: 2026-09-11
-- **Status**: 🚧 Draft
+- **Status**: ✅ Done
 - **Input**: roadmap row `022 | incremental-builds — content-addressed кэш артефактов | §39 | ⬜ | 021`; IDEA.md §39, §20, §30
 - **Dependencies**: 021 (ycsf-cli ✅), 011 (project-model ✅ — `depends_on` граф), 013 (builder-registry ✅), 002 (pilot-contracts ✅ — `Builder`/`Artifact`)
 - **IDEA.md sections**: §39 (Incremental builds), §20 (Project C CLI), §30 (B+C+Terraform pipeline), §5–§6 (.ycsf/apps.yaml, build_config.yaml)

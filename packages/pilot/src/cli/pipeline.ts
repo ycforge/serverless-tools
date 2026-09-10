@@ -134,12 +134,18 @@ export async function runMaterializeGeneration(
  */
 export async function runBuildAndMaterialize(
   rootDir: string,
-  opts?: { target?: string; json?: boolean },
-): Promise<void> {
+  opts?: { target?: string; json?: boolean; noCache?: boolean; cacheDir?: string; onCacheProgress?: (r: import('../contracts/cache.js').CacheCheckResult) => void },
+): Promise<{ cache?: import('../contracts/cache.js').CacheSummary } | void> {
   const json = opts?.json;
 
   stderr('Building apps...', json);
-  const buildResult = await buildApps(rootDir, opts?.target !== undefined ? { target: opts.target } : undefined);
+  const buildOpts: import('../contracts/build.js').BuildAppsOptions = {
+    ...(opts?.target !== undefined ? { target: opts.target } : {}),
+    ...(opts?.noCache !== undefined ? { noCache: opts.noCache } : {}),
+    ...(opts?.cacheDir !== undefined ? { cacheDir: opts.cacheDir } : {}),
+    ...(opts?.onCacheProgress !== undefined ? { onCacheProgress: opts.onCacheProgress } : {}),
+  };
+  const buildResult = await buildApps(rootDir, buildOpts);
   if (buildResult.kind === 'invalid') {
     const first = buildResult.errors[0];
     const code = String(first?.code ?? CLI_BUILD_FAILED);
@@ -158,6 +164,8 @@ export async function runBuildAndMaterialize(
   const { files } = await runMaterializeGeneration(rootDir, projectModel, registry, genOpts);
 
   stderr(`Build + materialize complete. ${buildResult.artifacts.length} app(s) built, ${files.length} file(s) written.`, json);
+  const c = (buildResult as unknown as { cache?: import('../contracts/cache.js').CacheSummary }).cache;
+  return c !== undefined ? { cache: c } : {};
 }
 
 export async function runTerraformInit(rootDir: string, json?: boolean): Promise<void> {

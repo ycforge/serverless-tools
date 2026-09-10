@@ -1,4 +1,4 @@
-// spec 021 ycsf-cli — ycsf apply command action (US5, FR-023..025).
+// spec 021 ycsf-cli — ycsf apply command action (US5, FR-023..025) + spec 022 cache.
 import type { Command } from 'commander';
 import {
   runBuildAndMaterialize,
@@ -8,31 +8,44 @@ import {
 } from './pipeline.js';
 import { CLIError, CLI_UNEXPECTED_ERROR } from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
+import { formatCacheLine } from './cache-helpers.js';
+import type { CacheCheckResult } from '../contracts/cache.js';
 
 export async function applyAction(cmd: Command): Promise<void> {
   const opts = cmd.optsWithGlobals();
   const rootDir = String(opts.projectDir ?? process.cwd());
   const json = Boolean(opts.json);
+  const noCache = Boolean(opts.noCache || opts.force || opts.cache === false);
+  const cacheDir = opts.cacheDir as string | undefined;
 
   const diagnostics: CLIDiagnostic[] = [];
   let exitCode: 0 | 1 | 2 = 0;
 
   try {
-    await runBuildAndMaterialize(rootDir, { json });
+    const cacheEntries: CacheCheckResult[] = [];
+    const onCacheProgress = (r: CacheCheckResult) => {
+      cacheEntries.push(r);
+      if (!json) process.stderr.write(formatCacheLine(r) + '\n');
+    };
+    const bmOpts: { json?: boolean; noCache?: boolean; cacheDir?: string; onCacheProgress?: (r: CacheCheckResult) => void } = { json };
+    if (noCache) bmOpts.noCache = true;
+    if (cacheDir !== undefined && !noCache) bmOpts.cacheDir = cacheDir;
+    bmOpts.onCacheProgress = onCacheProgress;
+    const bm = (await runBuildAndMaterialize(rootDir, bmOpts)) as { cache?: import('../contracts/cache.js').CacheSummary } | undefined;
     await runTerraformInit(rootDir, json);
     await runTerraformPlan(rootDir, json);
     const tfApplyOutput = await runTerraformApply(rootDir, json);
+
+    const cache = (bm?.cache) ?? { hits: cacheEntries.filter((e) => e.hit).length, misses: cacheEntries.filter((e) => !e.hit).length, entries: cacheEntries };
 
     const result: CLIResult = {
       command: 'apply',
       exitCode: 0,
       diagnostics: [],
-      summary: { tfApplyOutput },
+      summary: { tfApplyOutput, cache },
     };
     if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     else {
-      // Terraform pass-through already streams child output to stderr (D-RE-2);
-      // do not echo tfApplyOutput again (T154).
       process.stderr.write('✓ Terraform apply complete.\n');
     }
     process.exitCode = 0;
@@ -47,7 +60,7 @@ export async function applyAction(cmd: Command): Promise<void> {
         command: 'apply',
         exitCode,
         diagnostics,
-        summary: { tfApplyOutput: '' },
+        summary: { tfApplyOutput: '', cache: { hits: 0, misses: 0, entries: [] } },
       };
       process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     } else {

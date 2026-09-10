@@ -19,3 +19,5 @@ export * from './materialize.js';
 export * from './extensions.js';
 export * from './moves.js';
 export * from './outputs.js';
+export * from './cache.js';
+export * from './build.js';
