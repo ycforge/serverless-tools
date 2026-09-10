@@ -66,7 +66,7 @@ export async function destroyAction(cmd: Command): Promise<void> {
     let cleanedUp = false;
     if (cleanup) {
       const removed = await cleanGeneratedFiles(rootDir);
-      cleanedUp = removed >= 0;
+      cleanedUp = removed > 0; // T155: true only when files were actually removed
     }
 
     const result: CLIResult = {

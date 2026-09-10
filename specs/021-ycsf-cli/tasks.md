@@ -448,3 +448,15 @@ With multiple developers:
 
 ### Terraform stdout дублируется в stderr в human-readable mode (cosmetic)
 - [x] T154 [US4/US5/US6] `packages/pilot/src/cli/{plan,apply,destroy}.ts` — повторный `process.stderr.write(tfXOutput)` из human-ветки успеха удалён (pass-through стримит вывод один раз, D-RE-2); `tfXOutput` остался только в `--json` summary. **Ref**: FR-020, FR-022, FR-024, FR-025.
+
+---
+
+## Phase 15: Convergence
+
+**Purpose**: Final converge audit (2026-09-11, read-only, git HEAD 8d0c930). Baseline: `pnpm --filter @ycforge/pilot test` → 105 files / 538 tests GREEN; vitest typecheck clean; eslint clean on scoped paths. T138–T154 verified resolved in code + sanity probes against `packages/pilot/dist/cli/index.js` (--help/--version, missing dir exit 2 for build/materialize/check/plan/apply, `--json frobnicate` → command "", `--target unknown-app` exit 2, destroy non-TTY exit 2, plan/apply/destroy with mock terraform, SIGINT unit paths). Verdict: NOT CONVERGED — two NEW divergences (T155, T156).
+
+### `destroy` summary `cleanedUp` всегда `true` (LOW)
+- [x] T155 [US6/US7] `packages/pilot/src/cli/destroy.ts` — `cleanedUp = removed > 0` (true только когда удалён хотя бы один файл). Unit-тесты: пустой `infra/` → `summary.cleanedUp === false`; T152 (2 удалённых файла) и обновлённый AC4 (1 файл) остаются зелёными. **Ref**: FR-028, D-RE-7, contracts ycsf-cli.json `#/summarySchemas/destroy`.
+
+### `--project-dir` алиас `-p` из контракта не реализован (LOW)
+- [x] T156 [FR-004] `packages/pilot/src/cli/index.ts` — `.option('-p, --project-dir <path>', ...)` (алиас добавлен, mirror composer D-RE-9). Unit-тест `-p <dir> check` → projectDir передан в action (аналог `--project-dir`). **Ref**: FR-004, D-RE-9, contracts ycsf-cli.json `#/cliSurface`.

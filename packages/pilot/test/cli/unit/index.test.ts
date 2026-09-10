@@ -57,6 +57,12 @@ describe('ycsf CLI entry point (T015)', () => {
     expect(lastCheckCommand().optsWithGlobals().projectDir).toBe('/abs/project/root');
   });
 
+  it('T156: -p alias resolves --project-dir (D-RE-9 mirror of composer)', async () => {
+    const code = await main(['node', 'ycsf', 'check', '-p', '/abs/project/root']);
+    expect(code).toBe(ExitCode.Success);
+    expect(lastCheckCommand().optsWithGlobals().projectDir).toBe('/abs/project/root');
+  });
+
   it('--json flag is exposed on the subcommand options', async () => {
     const code = await main(['node', 'ycsf', 'check', '--json']);
     expect(code).toBe(ExitCode.Success);

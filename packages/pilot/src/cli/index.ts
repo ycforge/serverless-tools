@@ -34,7 +34,7 @@ program
   .name('ycsf')
   .description('Yandex Cloud serverless-tools build/deployment orchestrator (Project C)')
   .version(packageVersion())
-  .option('--project-dir <path>', 'Project directory (default: current directory)', process.cwd())
+  .option('-p, --project-dir <path>', 'Project directory (default: current directory)', process.cwd())
   .option('--json', 'Output machine-readable JSON')
   .option('--no-color', 'Disable ANSI colors in human-readable output')
   .configureHelp({ showGlobalOptions: true })

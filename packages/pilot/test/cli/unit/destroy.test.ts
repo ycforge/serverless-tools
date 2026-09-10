@@ -75,15 +75,41 @@ describe('ycsf destroy action (T100)', () => {
     spy.mockRestore();
   });
 
-  it('AC4: --cleanup → cleanup called after destroy', async () => {
+  it('AC4: --cleanup → removes infra files, cleanedUp true when files removed', async () => {
+    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const root = mkdtempSync(join(tmpdir(), 'pilot-destroy-ac4-'));
+    mkdirSync(join(root, 'infra'), { recursive: true });
+    writeFileSync(join(root, 'infra', 'user_service.ycsf.tf.json'), '{}');
+
     vi.mocked(confirmDestroy).mockResolvedValue(true);
     mockSpawn.mockReturnValueOnce(okChild('Terraform initialized.')).mockReturnValue(okChild('Destroy complete!'));
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    await destroyAction(fakeCmd({ yes: true, cleanup: true }));
+    await destroyAction(fakeCmd({ projectDir: root, yes: true, cleanup: true }));
     expect(process.exitCode).toBe(ExitCode.Success);
     const json = JSON.parse(String(spy.mock.calls[0]?.[0]));
     expect(json.summary?.cleanedUp).toBe(true);
     spy.mockRestore();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('T155: --cleanup with nothing to remove → cleanedUp false', async () => {
+    const { mkdirSync, mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const root = mkdtempSync(join(tmpdir(), 'pilot-destroy-t155-'));
+    mkdirSync(join(root, 'infra'), { recursive: true });
+
+    vi.mocked(confirmDestroy).mockResolvedValue(true);
+    mockSpawn.mockReturnValueOnce(okChild('Terraform initialized.')).mockReturnValue(okChild('Destroy complete!'));
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await destroyAction(fakeCmd({ projectDir: root, yes: true, cleanup: true }));
+    expect(process.exitCode).toBe(ExitCode.Success);
+    const json = JSON.parse(String(spy.mock.calls[0]?.[0]));
+    expect(json.summary?.cleanedUp).toBe(false);
+    spy.mockRestore();
+    rmSync(root, { recursive: true, force: true });
   });
 
   it('AC5: SIGINT during runTerraform → child SIGTERM, SIGKILL backstop, exit(130)', async () => {
