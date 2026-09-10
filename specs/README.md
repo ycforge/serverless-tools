@@ -58,7 +58,7 @@ Specs создаются **перед реализацией соответст�
 | 018 | builders-core — nestjs-function (bundling), docker, vite builders | §5, §21, §36–37 | ✅ | 002, 013 |
 | 019 | materializers-yandex — function/container/api-gateway/queue/bucket TF materializers | §22, §27, §32–33, §37 | ✅ | 002, 014 |
 | 020 | ycsf-check — `ycsf check` validation layer | §28 | ✅ | 011, 014–017 |
-| 021 | ycsf-cli — build/materialize/plan/apply/destroy | §20, §30, §40 | ⬜ | 013, 014 |
+| 021 | ycsf-cli — build/materialize/plan/apply/destroy | §20, §30, §40 | 🚧 | 013, 014, 020 |
 | 022 | incremental-builds — content-addressed кэш артефактов | §39 | ⬜ | 021 |
 
 ## Волна 4 — интеграция
