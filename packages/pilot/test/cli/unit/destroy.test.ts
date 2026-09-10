@@ -86,7 +86,7 @@ describe('ycsf destroy action (T100)', () => {
     spy.mockRestore();
   });
 
-  it('AC5: SIGINT during runTerraform → child killed, exit 130', async () => {
+  it('AC5: SIGINT during runTerraform → child SIGTERM, SIGKILL backstop, exit(130)', async () => {
     vi.useFakeTimers();
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     const killMock = vi.fn();
@@ -97,9 +97,8 @@ describe('ycsf destroy action (T100)', () => {
       kill: killMock,
     };
     mockSpawn.mockReturnValueOnce(okChild('Terraform initialized.')).mockReturnValue(hangingChild as never);
-    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    const pending = destroyAction(fakeCmd({ yes: true }));
+    destroyAction(fakeCmd({ yes: true }));
     // flush the init→destroy handshake so the SIGINT listener is registered
     for (let i = 0; i < 10; i++) await Promise.resolve();
 
@@ -110,15 +109,42 @@ describe('ycsf destroy action (T100)', () => {
     expect(killMock).toHaveBeenCalledWith('SIGKILL');
     expect(exitSpy).toHaveBeenCalledWith(130);
 
-    // destroyAction swallows the RuntimeError and reports CLI_TERRAFORM_FAILED.
-    await pending;
-    expect(process.exitCode).toBe(ExitCode.Error);
-    const json = JSON.parse(String(spy.mock.calls[0]?.[0]));
-    expect(json.diagnostics[0]?.code).toBe('CLI_TERRAFORM_FAILED');
-
     process.removeAllListeners('SIGINT');
     vi.useRealTimers();
     exitSpy.mockRestore();
+  });
+
+  it('T152: --cleanup removes generated terraform files from infra/, not .ycsf/', async () => {
+    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const root = mkdtempSync(join(tmpdir(), 'pilot-destroy-cleanup-'));
+    mkdirSync(join(root, 'infra'), { recursive: true });
+    mkdirSync(join(root, '.ycsf'), { recursive: true });
+    const infraFiles = [
+      'user_service.ycsf.tf.json',
+      '99-ycsf-outputs.tf.json',
+      'keep.tf.json',
+    ];
+    for (const f of infraFiles) writeFileSync(join(root, 'infra', f), '{}');
+    writeFileSync(join(root, '.ycsf', 'user_service.ycsf.tf.json'), '{}');
+
+    vi.mocked(confirmDestroy).mockResolvedValue(true);
+    mockSpawn.mockReturnValueOnce(okChild('Terraform initialized.')).mockReturnValue(okChild('Destroy complete!'));
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await destroyAction({ optsWithGlobals: () => ({ projectDir: root, json: true, yes: true, cleanup: true }) } as never);
+    expect(process.exitCode).toBe(ExitCode.Success);
+    const json = JSON.parse(String(spy.mock.calls[0]?.[0]));
+    expect(json.summary?.cleanedUp).toBe(true);
+
+    const { readdirSync } = await import('node:fs');
+    const remainingInfra = readdirSync(join(root, 'infra'));
+    expect(remainingInfra).toEqual(['keep.tf.json']);
+    // Build cache (.ycsf/) is NOT touched by --cleanup.
+    expect(readdirSync(join(root, '.ycsf'))).toEqual(['user_service.ycsf.tf.json']);
+
     spy.mockRestore();
+    rmSync(root, { recursive: true, force: true });
   });
 });

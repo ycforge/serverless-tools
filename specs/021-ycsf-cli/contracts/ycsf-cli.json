@@ -14,8 +14,8 @@
       "properties": {
         "command": {
           "type": "string",
-          "enum": ["build", "materialize", "check", "plan", "apply", "destroy"],
-          "description": "Command name."
+          "enum": ["build", "materialize", "check", "plan", "apply", "destroy", ""],
+          "description": "Command name. Empty string = program-level error (unknown command, FR-001); no subcommand was parsed (T151)."
         },
         "exitCode": {
           "type": "number",
@@ -261,7 +261,7 @@
             "properties": {
               "projectDir": { "type": "string", "default": ".", "description": "Project root directory." },
               "yes": { "type": "boolean", "default": false, "description": "Skip confirmation prompt." },
-              "cleanup": { "type": "boolean", "default": false, "description": "Remove generated .ycsf.tf.json files after destroy." },
+              "cleanup": { "type": "boolean", "default": false, "description": "Remove generated .tf.json files (infra/*.ycsf.tf.json + infra/99-ycsf-outputs.tf.json) after destroy." },
               "json": { "type": "boolean", "default": false, "description": "Output JSON." },
               "noColor": { "type": "boolean", "default": false, "description": "Disable ANSI colors." }
             }

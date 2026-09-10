@@ -1,5 +1,5 @@
 // spec 021 ycsf-cli — terraform spawn wrapper (D-RE-2, D-RE-3, D-RE-4).
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { RuntimeError, CLI_TERRAFORM_NOT_FOUND, CLI_TERRAFORM_FAILED } from './errors.js';
 
@@ -55,7 +55,8 @@ export async function spawnTerraform(
     });
 
     let stdout = '';
-    let killed = false;
+    let interrupted = false;
+    let backstop: NodeJS.Timeout | undefined;
 
     child.stdout?.on('data', (chunk: Buffer) => {
       const s = chunk.toString();
@@ -67,18 +68,21 @@ export async function spawnTerraform(
       process.stderr.write(chunk);
     });
 
+    // D-RE-4: on SIGINT → SIGTERM the child, force SIGKILL after 2s, then
+    // exit 130. Any interrupt path (graceful child close before the backstop
+    // OR the SIGKILL backstop) MUST end in exit 130, never a CLI_TERRAFORM_FAILED
+    // exit 1 (spec Edge case SIGINT, T153).
     const onSigint = (): void => {
-      if (killed) return;
-      killed = true;
+      if (interrupted) return;
+      interrupted = true;
       child.kill('SIGTERM');
-      const timer = setTimeout(() => {
+      backstop = setTimeout(() => {
         if (!child.killed) {
           child.kill('SIGKILL');
         }
-        reject(new RuntimeError(`terraform ${command} interrupted`, CLI_TERRAFORM_FAILED));
         process.exit(130);
       }, 2000);
-      timer.unref();
+      backstop.unref();
     };
 
     process.on('SIGINT', onSigint);
@@ -104,6 +108,11 @@ export async function spawnTerraform(
 
     child.on('close', (code: number | null) => {
       process.removeListener('SIGINT', onSigint);
+      if (interrupted) {
+        if (backstop) clearTimeout(backstop);
+        process.exit(130);
+        return;
+      }
       if (code === 0) {
         resolve({ exitCode: 0, stdout });
       } else {
@@ -116,20 +125,4 @@ export async function spawnTerraform(
       }
     });
   });
-}
-
-export { setupSigintHandler };
-
-function setupSigintHandler(child: ChildProcess): void {
-  const onSigint = (): void => {
-    child.kill('SIGTERM');
-    const timer = setTimeout(() => {
-      if (!child.killed) {
-        child.kill('SIGKILL');
-      }
-      process.exit(130);
-    }, 2000);
-    timer.unref();
-  };
-  process.on('SIGINT', onSigint);
 }

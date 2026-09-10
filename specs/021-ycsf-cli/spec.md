@@ -131,7 +131,7 @@ ycsf destroy:  terraform destroy → artifact cleanup
 - Thin wrapper: CLI вызывает library functions + spawns `terraform` CLI. No terraform state management, no provider schema modeling (Constitution IV).
 - Fail-fast on pipeline: if build fails, materialize is not attempted.
 
-**D-5 — `ycsf destroy` = terraform destroy + cleanup.** `ycsf destroy` вызывает `terraform destroy` (pass-through), затем удаляет сгенерированные артефакты (`.ycsf/*.ycsf.tf.json`). CLI не manages state — state is Terraform's responsibility.
+**D-5 — `ycsf destroy` = terraform destroy + cleanup.** `ycsf destroy` вызывает `terraform destroy` (pass-through), затем удаляет сгенерированные артефакты (`infra/*.ycsf.tf.json` + `infra/99-ycsf-outputs.tf.json`, T152). CLI не manages state — state is Terraform's responsibility.
 
 Рациональность:
 - §40 IDEA.md: "обёртка над `terraform destroy` с дополнительной очисткой артефактов".
@@ -263,7 +263,7 @@ DevOps запускает `ycsf destroy` для удаления infrastructure.
 
 1. **Given** deployed project, **When** `ycsf destroy --yes` выполняется, **Then** exit code = 0, terraform destroy output отображён, infrastructure удалена.
 2. **Given** deployed project, **When** `ycsf destroy` выполняется БЕЗ `--yes`, **Then** CLI показывает confirmation prompt "Are you sure? (y/N):" и ждёт ввод.
-3. **Given** deployed project, **When** `ycsf destroy --yes --cleanup` выполняется, **Then** после terraform destroy удаляются `.ycsf/*.ycsf.tf.json` файлы.
+3. **Given** deployed project, **When** `ycsf destroy --yes --cleanup` выполняется, **Then** после terraform destroy удаляются `infra/*.ycsf.tf.json` файлы.
 4. **Given** `terraform` не найден в PATH, **When** `ycsf destroy` выполняется, **Then** exit code = 1, diagnostics содержит `CLI_TERRAFORM_NOT_FOUND`.
 
 ---
@@ -365,7 +365,7 @@ DevOps запускает `ycsf --help` или `ycsf build --help` для пол
 
 - **FR-026**: `ycsf destroy` MUST вызывать `terraform destroy -auto-approve -no-color` (с `-auto-approve` только если `--yes` flag установлен).
 - **FR-027**: `ycsf destroy` БЕЗ `--yes` MUST показывать interactive confirmation prompt. Если stdin не TTY → exit code 2 + `CLI_DESTROY_REQUIRES_YES`.
-- **FR-028**: `ycsf destroy --cleanup` MUST удалять `.ycsf/*.ycsf.tf.json` файлы после успешного terraform destroy.
+- **FR-028**: `ycsf destroy --cleanup` MUST удалять `infra/*.ycsf.tf.json` файлы (плюс `infra/99-ycsf-outputs.tf.json`) после успешного terraform destroy (цель материализации — `infra/`, см. pipeline order; T152).
 - **FR-029**: `ycsf destroy` MUST вызывать `terraform init -no-color` перед destroy.
 
 ### Error Codes (CLI_0xx family)

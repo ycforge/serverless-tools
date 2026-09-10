@@ -43,6 +43,23 @@ describe('ycsf build CLI action (T050)', () => {
     spy.mockRestore();
   });
 
+  it('T150: build with --target → summary.apps counts PROCESSED apps, not project apps', async () => {
+    const project = new Map([['user_service', {}], ['analytics', {}]]);
+    mockBuildApps.mockResolvedValue({
+      kind: 'ok',
+      projectModel: { apps: project } as never,
+      registry: { records: new Map() } as never,
+      artifacts: [{ appId: 'user_service', artifact: { type: 't', value: {} } }],
+    });
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await buildAction(fakeCmd({ json: true, target: 'user_service' }));
+    expect(process.exitCode).toBe(ExitCode.Success);
+    const json = JSON.parse(String(spy.mock.calls[0]?.[0] ?? ''));
+    expect(json.summary?.apps).toBe(1);
+    expect(json.summary?.artifacts).toBe(1);
+    spy.mockRestore();
+  });
+
   it('AC2: build fails with ENV not set → exit 1, PML_ENV_NOT_SET', async () => {
     mockBuildApps.mockResolvedValue({
       kind: 'invalid',

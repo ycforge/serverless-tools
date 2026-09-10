@@ -12,7 +12,11 @@ export interface CLIDiagnostic {
 
 /** Unified structured output for all commands (--json flag, D-RE-7). */
 export interface CLIResult {
-  /** Command name: 'build' | 'materialize' | 'check' | 'plan' | 'apply' | 'destroy'. */
+  /**
+   * Command name: 'build' | 'materialize' | 'check' | 'plan' | 'apply' | 'destroy'.
+   * Empty string '' = program-level error (unknown command, FR-001/T151) —
+   * no subcommand could be parsed.
+   */
   readonly command: string;
   /** Exit code: 0 = success, 1 = error, 2 = input/config error. */
   readonly exitCode: 0 | 1 | 2;

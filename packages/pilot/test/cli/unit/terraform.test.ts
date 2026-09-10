@@ -56,7 +56,7 @@ describe('spawnTerraform (T031)', () => {
     );
   });
 
-  it('SIGINT → SIGTERM immediately, SIGKILL after 2s, process.exit(130)', async () => {
+  it('SIGINT → SIGTERM immediately, SIGKILL backstop after 2s, exit(130)', async () => {
     vi.useFakeTimers();
     const probe = {
       status: 0,
@@ -76,21 +76,51 @@ describe('spawnTerraform (T031)', () => {
     mockSpawn.mockReturnValue(fakeChild as never);
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
-    const pending = spawnTerraform('plan', '/root');
-    // Attach the rejection handler BEFORE the timer fires so the rejection is
-    // never observed as unhandled in-flight (reject happens inside the timer).
-    const rejection = expect(pending).rejects.toMatchObject({
-      name: 'RuntimeError',
-      code: CLI_TERRAFORM_FAILED,
-      exitCode: 1,
-    });
+    spawnTerraform('plan', '/root');
     process.emit('SIGINT');
     expect(killMock).toHaveBeenCalledWith('SIGTERM');
 
     await vi.advanceTimersByTimeAsync(2000);
     expect(killMock).toHaveBeenCalledWith('SIGKILL');
     expect(exitSpy).toHaveBeenCalledWith(130);
-    await rejection;
+
+    process.removeAllListeners('SIGINT');
+    vi.useRealTimers();
+    exitSpy.mockRestore();
+  });
+
+  it('T153: SIGINT → child closes gracefully → exit(130), NOT CLI_TERRAFORM_FAILED exit 1', async () => {
+    vi.useFakeTimers();
+    const probe = {
+      status: 0,
+      stdout: '/usr/local/bin/terraform\n',
+      stderr: '',
+      pid: 1,
+      signal: null,
+    } as unknown as SpawnSyncReturns<string>;
+    mockSpawnSync.mockReturnValue(probe);
+    let closeCb: ((code: number | null) => void) | undefined;
+    const fakeChild = {
+      stdout: { on: vi.fn() },
+      stderr: { on: vi.fn() },
+      on: vi.fn((event: string, cb: (code: number | null) => void) => {
+        if (event === 'close') closeCb = cb;
+      }),
+      kill: vi.fn(),
+    };
+    mockSpawn.mockReturnValue(fakeChild as never);
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+    spawnTerraform('plan', '/root');
+    process.emit('SIGINT');
+    expect(fakeChild.kill).toHaveBeenCalledWith('SIGTERM');
+
+    // Child exits gracefully (e.g. 143 after SIGTERM) BEFORE the 2s backstop.
+    closeCb?.(143);
+    expect(exitSpy).toHaveBeenCalledWith(130);
+
+    // Repro of the former bug: reject(CLI_TERRAFORM_FAILED) → exit 1.
+    await vi.advanceTimersByTimeAsync(3000);
 
     process.removeAllListeners('SIGINT');
     vi.useRealTimers();

@@ -8,18 +8,21 @@ import { CLIError, CLI_UNEXPECTED_ERROR } from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
 
 async function cleanGeneratedFiles(rootDir: string): Promise<number> {
-  const ycsfDir = join(rootDir, '.ycsf');
+  // Generated Terraform files live in <root>/infra/ (materialize target),
+  // NOT .ycsf/ — per-app `*.ycsf.tf.json` plus the merged `99-ycsf-outputs.tf.json`
+  // (T147/T152). Build artifacts under .ycsf/artifacts are left intact.
+  const infraDir = join(rootDir, 'infra');
   let removed = 0;
   let entries: string[] = [];
   try {
-    entries = await readdir(ycsfDir);
+    entries = await readdir(infraDir);
   } catch {
     return 0;
   }
   for (const name of entries) {
-    if (name.endsWith('.ycsf.tf.json')) {
+    if (name.endsWith('.ycsf.tf.json') || name === '99-ycsf-outputs.tf.json') {
       try {
-        await unlink(join(ycsfDir, name));
+        await unlink(join(infraDir, name));
         removed += 1;
       } catch {
         // File already gone — treat as removed.
@@ -74,7 +77,8 @@ export async function destroyAction(cmd: Command): Promise<void> {
     };
     if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     else {
-      if (tfDestroyOutput) process.stderr.write(tfDestroyOutput);
+      // Terraform pass-through already streams child output to stderr (D-RE-2);
+      // do not echo tfDestroyOutput again (T154).
       process.stderr.write(`✓ Terraform destroy complete.${cleanup ? ' Generated files cleaned.' : ''}\n`);
     }
     process.exitCode = 0;

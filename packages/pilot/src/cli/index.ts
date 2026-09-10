@@ -82,7 +82,7 @@ program
   .command('destroy')
   .description('Destroy infrastructure via terraform destroy, optionally clean up generated files')
   .option('-y, --yes', 'Skip confirmation prompt')
-  .option('--cleanup', 'Delete .ycsf/*.ycsf.tf.json files after destroy')
+  .option('--cleanup', 'Delete generated .tf.json files from infra/ after destroy')
   .action(bindAction(destroyAction));
 
 // exitOverride() lets us catch commander's thrown CommanderError (unknown
@@ -154,7 +154,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       const cleanMsg = message.replace(/^error:\s*/, '');
       const diagnostics: CLIDiagnostic[] = [{ code: CLI_UNKNOWN_COMMAND, message: cleanMsg }];
       const result: CLIResult = {
-        command: commandName || 'ycsf',
+        command: commandName,
         exitCode: 2,
         diagnostics,
       };
@@ -163,18 +163,19 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       process.exitCode = ExitCode.InputError;
       return 2;
     }
-    await fail(error, commandName || 'ycsf', json);
+    await fail(error, commandName, json);
     return typeof process.exitCode === 'number' ? process.exitCode : ExitCode.Error;
   }
 }
 
-/** Determine the invoked subcommand from argv (used for CLIResult.command). */
+/** Determine the invoked subcommand from argv (used for CLIResult.command).
+ *  Unknown command → '' (program-level error, FR-001; T151). */
 function detectCommand(argv: readonly string[]): string {
   const commands = ['build', 'materialize', 'check', 'plan', 'apply', 'destroy'];
   for (const arg of argv.slice(2)) {
     if (commands.includes(arg)) return arg;
   }
-  return 'ycsf';
+  return '';
 }
 
 const mainUrl = pathToFileURL(process.argv[1] ?? '').href;

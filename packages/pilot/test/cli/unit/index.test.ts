@@ -36,6 +36,7 @@ describe('ycsf CLI entry point (T015)', () => {
     expect(process.exitCode).toBe(ExitCode.InputError);
     const json = JSON.parse(String(spy.mock.calls[0]?.[0]));
     expect(json.exitCode).toBe(2);
+    expect(json.command).toBe('');
     expect(json.diagnostics[0]?.code).toBe(CLI_UNKNOWN_COMMAND);
     expect(typeof json.diagnostics[0]?.message).toBe('string');
     spy.mockRestore();

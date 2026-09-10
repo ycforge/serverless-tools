@@ -427,3 +427,24 @@ With multiple developers:
 - [x] T148 [US3] Fix `ycsf check` on a project WITHOUT `.ycsf/apps.yaml`: сейчас `packages/pilot/src/cli/check.ts` делегирует в `check()` library (spec 020), которая глотает throw `loadProjectModel` и возвращает пустой `diagnostics` → CLI выводит «All checks passed.» и exit 0. Это нарушает spec 021 Edge case «Нет `.ycsf/apps.yaml`: Все команды (кроме destroy) выходят с exit code 2 + `CLI_MISSING_PROJECT_DIR`». Решение: guard в CLI-слое перед вызовом `check()` (проверка `existsSync(<rootDir>/.ycsf/apps.yaml)` → `InputError` `CLI_MISSING_PROJECT_DIR`, exit 2) ИЛИ согласованное решение оставить spec 020-семантику и зафиксировать его в spec.md; в любом случае добавить тест: `ycsf check --project-dir <nonexistent>` → exit 2 + stderr/diagnostics содержит `CLI_MISSING_PROJECT_DIR` (unit + integration `packages/pilot/test/cli/unit/check.test.ts` + `test/cli/integration/check.integration.spec.ts`). **Ref**: spec Edge cases «Нет .ycsf/apps.yaml», FR-014, data-model §7 (contradicts).
 
 - [x] T149 [US4/US5] Fix exit code preservation for input errors in `ycsf plan`/`ycsf apply`: сейчас `packages/pilot/src/cli/pipeline.ts` `runBuildAndMaterialize` оборачивает любой `kind:'invalid'` результат `buildApps` в `RuntimeError` (exitCode 1), поэтому `plan`/`apply` на проекте без `.ycsf/apps.yaml` завершаются с code `CLI_MISSING_PROJECT_DIR` но exit 1 вместо требуемого 2 (в отличие от `src/cli/build.ts`, который мапит input-codes на exit 2). Решение: пробрасывать input-codes (`CLI_MISSING_PROJECT_DIR`, `CLI_APP_NOT_FOUND`) до exit 2 в plan/apply (сохранить `err.exitCode` входного диагностика или ремапить в catch). Добавить тесты: `ycsf plan --project-dir <nonexistent>` → exit 2 + `CLI_MISSING_PROJECT_DIR`; аналогично `apply` (integration `packages/pilot/test/cli/integration/plan.integration.spec.ts` + `apply.integration.spec.ts`, unit в `test/cli/unit/plan.test.ts`/`apply.test.ts`). **Ref**: spec Edge cases «Нет .ycsf/apps.yaml», D-3 (unified exit codes 0/1/2), data-model §7 (partial).
+
+---
+
+## Phase 14: Convergence
+
+**Purpose**: Final converge re-check (2026-09-11, read-only audit, git HEAD 700da04). Baseline: `pnpm --filter @ycforge/pilot test` → 105 files / 535 tests GREEN; vitest typecheck clean; `eslint` clean on src/cli, src/build, src/registry, src/contracts, src/index.ts, test/cli, test/build. Phase 12/13 findings T138–T149 all RESOLVED in code + verified by smoke probes against `packages/pilot/dist/cli/index.js` (rebuilt via pretest). Verdict: NOT CONVERGED — four NEW divergences (T150–T153) plus one cosmetic note (T154).
+
+### `--cleanup` удаляет файлы из неверной директории (MEDIUM)
+- [x] T152 [US6] `packages/pilot/src/cli/destroy.ts` `cleanGeneratedFiles` сканирует `<rootDir>/infra/` и удаляет файлы по обоим C-owned паттернам (`*.ycsf.tf.json` и `99-ycsf-outputs.tf.json`); `.ycsf/` (build cache) не трогается. Текст FR-028/D-5/сценария и contracts `#/commands/destroy.cleanup` синхронизированы с `infra/`. Unit-тест: temp-project infra/{user_service.ycsf.tf.json, 99-ycsf-outputs.tf.json, keep.tf.json} → удаляются только первые два, `.ycsf/user_service.ycsf.tf.json` остаётся. **Ref**: FR-028, US6 AC3, D-RE-2.
+
+### `summary.apps` считает все apps проекта, а не обработанные (LOW)
+- [x] T150 [US7/US1] `packages/pilot/src/cli/build.ts` — `summary.apps` = число обработанных apps (`result.artifacts.length`); `build --target user_service` теперь отдаёт `{ apps: 1, artifacts: 1 }`. Unit-тест добавлен. **Ref**: FR-008, D-RE-7, contracts summarySchemas.build.
+
+### `--json` при unknown command: `"command": "ycsf"` вне enum (LOW)
+- [x] T151 [FR-001/US7] `packages/pilot/src/cli/index.ts` `detectCommand` возвращает `''` для нераспознанной команды; `CLIResult.command = ''` для program-level parse errors. Enum в `contracts/ycsf-cli.json` расширен до `["build","materialize","check","plan","apply","destroy",""]` (описание: program-level error, FR-001). Unit-тест `unit/index.test.ts` обновлён (`command` === `''`). **Ref**: FR-001, contracts ycsf-cli.json `#/definitions/cliResult`.
+
+### SIGINT: graceful child exit даёт exit 1 вместо 130 (LOW)
+- [x] T153 [US6] `packages/pilot/src/cli/terraform.ts` — флаг `interrupted` в `onSigint`; в `'close'`-обработчике `if (interrupted) { clearTimeout(backstop); process.exit(130); }` — любой SIGINT во время terraform (graceful close ИЛИ SIGKILL backstop) → exit 130, никогда `CLI_TERRAFORM_FAILED` exit 1. Удалён дублирующий мёртвый экспорт `setupSigintHandler`. Unit-тесты: backstop (SIGKILL+130) и graceful-close (exit 130). **Ref**: spec Edge cases, D-RE-4, data-model §4.3.
+
+### Terraform stdout дублируется в stderr в human-readable mode (cosmetic)
+- [x] T154 [US4/US5/US6] `packages/pilot/src/cli/{plan,apply,destroy}.ts` — повторный `process.stderr.write(tfXOutput)` из human-ветки успеха удалён (pass-through стримит вывод один раз, D-RE-2); `tfXOutput` остался только в `--json` summary. **Ref**: FR-020, FR-022, FR-024, FR-025.

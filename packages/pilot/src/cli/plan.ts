@@ -25,7 +25,8 @@ export async function planAction(cmd: Command): Promise<void> {
     };
     if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     else {
-      if (tfPlanOutput) process.stderr.write(tfPlanOutput);
+      // Terraform pass-through already streams child output to stderr (D-RE-2);
+      // do not echo tfPlanOutput again (T154).
       process.stderr.write('✓ Terraform plan complete.\n');
     }
     process.exitCode = 0;

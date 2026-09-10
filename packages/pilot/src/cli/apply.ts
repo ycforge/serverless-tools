@@ -31,7 +31,8 @@ export async function applyAction(cmd: Command): Promise<void> {
     };
     if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     else {
-      if (tfApplyOutput) process.stderr.write(tfApplyOutput);
+      // Terraform pass-through already streams child output to stderr (D-RE-2);
+      // do not echo tfApplyOutput again (T154).
       process.stderr.write('✓ Terraform apply complete.\n');
     }
     process.exitCode = 0;

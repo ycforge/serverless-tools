@@ -25,7 +25,10 @@ export async function buildAction(cmd: Command): Promise<void> {
 
     if (result.kind === 'ok') {
       const artifactCount = result.artifacts.length;
-      const appCount = result.projectModel.apps.size;
+      // Apps actually built (== artifacts.length). Under --target only the
+      // targeted app is processed, so summary.apps must NOT be the full
+      // project app count (FR-010, T150).
+      const appCount = artifactCount;
 
       if (!json) {
         process.stderr.write(`✓ Build complete. ${artifactCount} app(s) built.\n`);
