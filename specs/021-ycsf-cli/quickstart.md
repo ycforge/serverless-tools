@@ -86,7 +86,7 @@ node dist/cli/index.js check --project-dir test/check/fixtures/canonical --json
 
 ## Sc6: `ycsf plan` на canonical fixture (terraform mock)
 
-**Fixture**: canonical fixture с mock terraform (scripts/mock-terraform.sh):
+**Fixture**: canonical fixture с mock terraform (`packages/pilot/test/cli/fixtures/terraform`):
 
 ```bash
 # Create mock terraform

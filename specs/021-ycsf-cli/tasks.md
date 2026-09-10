@@ -460,3 +460,18 @@ With multiple developers:
 
 ### `--project-dir` алиас `-p` из контракта не реализован (LOW)
 - [x] T156 [FR-004] `packages/pilot/src/cli/index.ts` — `.option('-p, --project-dir <path>', ...)` (алиас добавлен, mirror composer D-RE-9). Unit-тест `-p <dir> check` → projectDir передан в action (аналог `--project-dir`). **Ref**: FR-004, D-RE-9, contracts ycsf-cli.json `#/cliSurface`.
+
+---
+
+## Phase 16: Convergence
+
+**Purpose**: Final acceptance converge audit (2026-09-11, read-only, git HEAD c515253). Baseline: `pnpm --filter @ycforge/pilot test` → 105 files / 540 tests GREEN; vitest typecheck clean; eslint clean on scoped paths. Smoke probes against `packages/pilot/dist/cli/index.js` all green (--help/--version, `-p` alias, `--json frobnicate` → command `""` + exit 2, missing `--project-dir` → exit 2 for build/materialize/check/plan/apply, destroy non-TTY → exit 2 CLI_DESTROY_REQUIRES_YES, plan/apply/destroy with mock terraform → exit 0, `--target` unknown → exit 2, `--no-color` → NO_COLOR, SIGINT unit paths → 130). T155/T156 re-verified: `cleanedUp = removed > 0` (destroy.ts:69, probe: empty infra → false; 2 файла → true) и `-p, --project-dir` (index.ts:37, probe: `-p … check` → exit 0; contract `#/cliSurface/globalFlags.projectDir.alias = "p"`). Verdict: NOT CONVERGED — three NEW divergences (T157 behavior/UX LOW, T158–T159 docs LOW).
+
+### Bare `ycsf` (без subcommand) выводит плейсхолдер `(outputHelp)` и exit 2 (LOW)
+- [x] T157 [FR-001/US8] `packages/pilot/src/cli/index.ts` — guard в `main()`: bare-вызов (без subcommand и без --help/--version) → `program.outputHelp()` в stdout + exit 0 (аналог `ycsf --help`), без плейсхолдера `(outputHelp)`/exit 2. Unit-тест `unit/index.test.ts` (bare argv → exit 0, stdout содержит "Usage:", stderr чист). **Ref**: FR-001, US8 AC1, D-RE-9 (composer без leak).
+
+### data-model.md §4.2: `dispatch({ target })` противоречит D-RE-12 (LOW)
+- [x] T158 [FR-012] `specs/021-ycsf-cli/data-model.md:195` — из псевдокода §4.2 убран `{ target }` из вызова `dispatch(...)`; добавлен комментарий, что таргет-фильтр по имени файла (`${target}.ycsf.tf.json`) применяется ПОСЛЕ dispatch (D-RE-12, соответствует `pipeline.ts`). **Ref**: FR-012, D-RE-12, T141, T147.
+
+### quickstart.md ссылается на несуществующий `scripts/mock-terraform.sh` (LOW)
+- [x] T159 [T125] `specs/021-ycsf-cli/quickstart.md:89` — ссылка заменена на реальный герметичный mock `packages/pilot/test/cli/fixtures/terraform` (committed, bash-скрипт init/plan/apply/destroy). **Ref**: quickstart Sc6/Sc9, T125.

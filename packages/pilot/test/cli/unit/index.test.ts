@@ -88,4 +88,14 @@ describe('ycsf CLI entry point (T015)', () => {
     await main(['node', 'ycsf', '--no-color', 'check', '--project-dir', '/abs/project/root']);
     expect(process.env.NO_COLOR).toBe('1');
   });
+
+  it('T157: bare ycsf (no subcommand) → full help to stdout, exit 0', async () => {
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const code = await main(['node', 'ycsf']);
+    expect(code).toBe(ExitCode.Success);
+    const out = spy.mock.calls.map((c) => String(c[0])).join('');
+    expect(out).toContain('Usage:');
+    expect(out.toLowerCase()).toContain('commands');
+    spy.mockRestore();
+  });
 });

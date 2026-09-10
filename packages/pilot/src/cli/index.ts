@@ -146,6 +146,14 @@ export async function main(argv: string[] = process.argv): Promise<number> {
     if (code === 'commander.helpDisplayed' || code === 'commander.version') {
       return ExitCode.Success;
     }
+    // Bare `ycsf` (no args, no subcommand): commander 12 routes to
+    // `help({ error: true })` → throws 'commander.help' with placeholder
+    // `(outputHelp)` and writes the real help to the (suppressed) error
+    // stream. Surface the full help on stdout and exit 0 (T157).
+    if (code === 'commander.help') {
+      process.stdout.write(program.helpInformation());
+      return ExitCode.Success;
+    }
     // Any other commander input error (unknown command, unknown option, missing
     // argument) is a user-input error → exit 2 (FR-001), reported as CLI_* code.
     if (typeof code === 'string' && code.startsWith('commander.')) {

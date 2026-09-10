@@ -192,9 +192,9 @@ buildApps(rootDir, options?)
 ```
 runMaterialize(rootDir, projectModel, registry, target?)
 │
-├─ 1. dispatch(projectModel, registry, { target })
-│   └─ kind: invalid → exit 1 + MTL_*
-│
+├─ 1. dispatch(projectModel, registry)          // D-RE-12: dispatch selects ALL apps;
+│   └─ kind: invalid → exit 1 + MTL_*           // --target фильтруется ПОСТ-фактум
+│                                               // по имени файла (см. шаг 6)
 ├─ 2. loadExtensions(rootDir)
 │   └─ loaded:
 │       ├─ applyExtensions(resources, extensions)
