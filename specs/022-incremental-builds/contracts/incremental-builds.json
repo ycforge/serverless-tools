@@ -1,0 +1,196 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/incremental-builds.json",
+  "title": "@ycforge/pilot — incremental builds CLI surface (spec 022)",
+  "description": "Machine-readable contract for the incremental build cache CLI flags and --json summary.cache (spec 022, S-5..S-6, FR-018..024). Extends ycsf-cli.json (spec 021). Codes compared via constants in src/cli/errors.ts and src/cache/index.ts.",
+  "type": "object",
+
+  "definitions": {
+    "cacheSummary": {
+      "$id": "#/definitions/cacheSummary",
+      "title": "CacheSummary (--json summary.cache)",
+      "type": "object",
+      "description": "Structured cache stats for ycsf build|plan|apply --json (S-6, FR-023). Absent when cache not applicable (check/destroy/materialize).",
+      "properties": {
+        "hits": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of apps that were cache hits in this invocation."
+        },
+        "misses": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of apps that were cache misses."
+        },
+        "entries": {
+          "type": "array",
+          "description": "Per-app entries in topologicalOrder build order.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string",
+                "description": "App ID as in .ycsf/apps.yaml."
+              },
+              "hit": {
+                "type": "boolean",
+                "description": "True = skipped build (hit), false = built (miss)."
+              },
+              "fingerprint": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$",
+                "description": "Effective fingerprint (64-char lower-case hex sha256) computed for this run."
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "hit",
+                  "no_entry",
+                  "source_changed",
+                  "build_config_changed",
+                  "build_env_changed",
+                  "builder_changed",
+                  "dependency_changed",
+                  "no_cache",
+                  "blob_missing",
+                  "corrupted"
+                ],
+                "description": "First applicable miss reason (S-6, FR-011) or \"hit\"."
+              }
+            },
+            "required": ["appId", "hit", "fingerprint", "reason"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["hits", "misses", "entries"],
+      "additionalProperties": false
+    }
+  },
+
+  "cliFlags": {
+    "$id": "#/cliFlags",
+    "title": "Incremental-build CLI flags (S-5, FR-018..021)",
+    "type": "object",
+    "description": "Cache-related flags for ycsf build|plan|apply. Default: cache enabled (opt-out). Explicit only, no env/config toggle (Constitution V, FR-020).",
+    "properties": {
+      "noCache": {
+        "type": "boolean",
+        "default": false,
+        "const": false,
+        "description": "When false (default) cache is enabled. Flag --no-cache sets true: bypass read and write (treat all as miss, but overwrite manifest/blobs after successful build). Available on build, plan, apply."
+      },
+      "force": {
+        "type": "boolean",
+        "default": false,
+        "description": "Alias for --no-cache (identical behavior, DX for npm/docker users). Either flag bypasses cache."
+      },
+      "cacheDir": {
+        "type": "string",
+        "default": ".ycsf/cache",
+        "description": "Override cache root (default .ycsf/cache relative to projectRoot). For tests/CI with ephemeral FS. Relative paths resolved from projectRoot. Ignored when --no-cache/--force."
+      }
+    }
+  },
+
+  "commands": {
+    "$id": "#/commands",
+    "title": "Commands affected by incremental cache (S-4)",
+    "type": "object",
+    "properties": {
+      "build": {
+        "type": "object",
+        "description": "ycsf build: before Builder.build() check effectiveFingerprint against manifest+blob; hit copies blobs/<fp>/ → artifacts/<appId>/ without builder call (FR-014).",
+        "properties": {
+          "cache": { "type": "boolean", "const": true },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "noCache": { "type": "boolean" },
+              "force": { "type": "boolean" },
+              "cacheDir": { "type": "string" },
+              "target": { "type": "string", "description": "Fingerprint computed only for target + its dependency closure (FR-021)." },
+              "json": { "type": "boolean", "description": "summary.cache in JSON output (FR-023)." }
+            }
+          }
+        }
+      },
+      "plan": {
+        "type": "object",
+        "description": "ycsf plan: build phase cached (build → materialize → terraform plan). Materialize/terraform always run (not cached).",
+        "properties": {
+          "cache": { "type": "boolean", "const": true, "description": "Cache in build phase only; materialize/plan unchanged." }
+        }
+      },
+      "apply": {
+        "type": "object",
+        "description": "ycsf apply: build phase cached as in plan (+ terraform apply).",
+        "properties": {
+          "cache": { "type": "boolean", "const": true }
+        }
+      },
+      "materialize": {
+        "type": "object",
+        "description": "ycsf materialize: no cache (always dispatch).",
+        "properties": { "cache": { "type": "boolean", "const": false } }
+      },
+      "destroy": {
+        "type": "object",
+        "description": "ycsf destroy: no cache, does not touch .ycsf/cache/ (S-1).",
+        "properties": { "cache": { "type": "boolean", "const": false } }
+      },
+      "check": {
+        "type": "object",
+        "description": "ycsf check: no cache (pure validation).",
+        "properties": { "cache": { "type": "boolean", "const": false } }
+      }
+    }
+  },
+
+  "observability": {
+    "$id": "#/observability",
+    "title": "Cache observability (S-6, FR-022..024)",
+    "type": "object",
+    "description": "Per-app hit/miss logging in stderr (human-readable) and summary.cache in --json.",
+    "properties": {
+      "humanReadable": {
+        "type": "object",
+        "description": "When --json NOT set, stderr per-app line (one per app, before or instead of \"Building app …\"). Grep-stable.",
+        "properties": {
+          "hit": {
+            "type": "string",
+            "pattern": "cache hit",
+            "description": "Example: \"  • cache hit  user_service  (a1b2c3d4) — skipped build\""
+          },
+          "miss": {
+            "type": "string",
+            "pattern": "cache miss",
+            "description": "Examples: \"  • cache miss  analytics  (e5f6g7h8) — source changed\" / \" — dependency user_service changed\" / \" — --no-cache\" / \" — no cache entry\" / \"  ! cache corrupted for … — rebuilding\""
+          }
+        }
+      },
+      "json": {
+        "type": "object",
+        "description": "When --json, stderr cache lines suppressed; summary.cache present (FR-023).",
+        "properties": {
+          "summaryCache": { "$ref": "#/definitions/cacheSummary" }
+        }
+      }
+    }
+  },
+
+  "exitCodes": {
+    "$id": "#/exitCodes",
+    "title": "Cache vs project-model exit codes (S-7, FR-025..027)",
+    "type": "object",
+    "description": "Cache warnings never change exit code (fail-safe). Project model / builder failures remain fail-fast.",
+    "properties": {
+      "CACHE_CORRUPTED": { "type": "string", "description": "Warning to stderr (CACHE_CORRUPTED / cache corrupted), treat as miss, exit 0 if build succeeded." },
+      "CACHE_BLOB_MISSING": { "type": "string", "description": "Warning + miss, exit 0 if build succeeded." },
+      "CACHE_WRITE_FAILED": { "type": "string", "description": "Warning on saveBlob/saveManifest failure, exit 0 (artifacts already valid)." },
+      "CACHE_VERSION_MISMATCH": { "type": "string", "description": "Warning + reset (all miss), exit 0 if build succeeded." },
+      "PML_DEPENDS_CYCLE": { "type": "string", "description": "Fail-fast exit 1/2 before any cache I/O (FR-027)." },
+      "CLI_BUILD_FAILED": { "type": "string", "description": "Builder threw — fail-fast exit 1, cache not saved for failed app." }
+    }
+  }
+}
