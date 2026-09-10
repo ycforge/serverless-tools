@@ -14,7 +14,7 @@ CLI layer Project C (`ycsf`): thin wrapper dispatching library functions buildAp
 
 **Primary Dependencies**: `commander` v12 (CLI framework, added as runtime dependency). Internal `@ycforge/pilot` library functions. `node:child_process` (spawn for terraform), `node:readline` (destroy prompt). No other external dependencies.
 
-**Storage**: File system — read-only for project model (`.ycsf/*.yaml`), write during materialize (`.ycsf/*.ycsf.tf.json`). terraform manages its own state.
+**Storage**: File system — read-only for project model (`.ycsf/*.yaml`), write during materialize to `<root>/infra/*.ycsf.tf.json` (+ `99-ycsf-outputs.tf.json`). terraform manages its own state.
 
 **Testing**: Vitest (unit + integration tests). Test-first per Constitution II: каждый AC US1–US8 → ≥1 тест, RED → GREEN. `typecheck`/`lint` чисто.
 

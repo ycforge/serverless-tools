@@ -177,11 +177,34 @@ export async function main(argv: string[] = process.argv): Promise<number> {
 }
 
 /** Determine the invoked subcommand from argv (used for CLIResult.command).
- *  Unknown command → '' (program-level error, FR-001; T151). */
+ *  Unknown command or a bare invocation (no subcommand parsed) → '' (T151/T164).
+ *  Flag values that happen to equal a command name (e.g. `-p check`) are NOT
+ *  mistaken for the command — value-taking flags (--project-dir/-p, --target)
+ *  and their value token are skipped, as are nullary flags (--json/--no-color
+ *  etc.). Only a real positional subcommand token counts. */
 function detectCommand(argv: readonly string[]): string {
   const commands = ['build', 'materialize', 'check', 'plan', 'apply', 'destroy'];
-  for (const arg of argv.slice(2)) {
-    if (commands.includes(arg)) return arg;
+  const valueFlags = new Set(['-p', '--project-dir', '--target']);
+  const args = argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i];
+    if (token === undefined) continue;
+    // `--flag=value` form: flag + value embedded in one token.
+    if (token.startsWith('--') && token.includes('=')) {
+      continue;
+    }
+    // A value-taking flag consumes the next token as its argument.
+    if (valueFlags.has(token)) {
+      i += 1;
+      continue;
+    }
+    // A nullary flag (e.g. --json).
+    if (token.startsWith('-')) {
+      continue;
+    }
+    // First positional token: a valid subcommand counts; anything else is an
+    // unknown command → no subcommand parsed (command "").
+    return commands.includes(token) ? token : '';
   }
   return '';
 }

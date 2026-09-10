@@ -98,4 +98,15 @@ describe('ycsf CLI entry point (T015)', () => {
     expect(out.toLowerCase()).toContain('commands');
     spy.mockRestore();
   });
+
+  it('T164: flag value equal to a command name is not mistaken for the command', async () => {
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const code = await main(['node', 'ycsf', '--json', '-p', 'check', 'frobnicate']);
+    expect(code).toBe(ExitCode.InputError);
+    const json = JSON.parse(String(spy.mock.calls[0]?.[0]));
+    expect(json.exitCode).toBe(2);
+    expect(json.command).toBe('');
+    expect(json.diagnostics[0]?.code).toBe('CLI_UNKNOWN_COMMAND');
+    spy.mockRestore();
+  });
 });

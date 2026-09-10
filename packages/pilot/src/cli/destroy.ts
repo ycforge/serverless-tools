@@ -1,5 +1,5 @@
 // spec 021 ycsf-cli — ycsf destroy command action (US6, FR-026..029).
-import { existsSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import { readdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from 'commander';
@@ -51,10 +51,17 @@ export async function destroyAction(cmd: Command): Promise<void> {
 
   try {
     // FR-004/data-model §7: --project-dir must resolve to an existing
-    // directory → InputError (exit 2) BEFORE any terraform dispatch. Without
-    // this guard a missing dir would surface as an ENOENT from the missing
-    // infra/ cwd and be misreported as CLI_TERRAFORM_NOT_FOUND (T162).
-    if (!existsSync(rootDir)) {
+    // *directory* → InputError (exit 2) BEFORE any terraform dispatch.
+    // Using statSync().isDirectory() rejects both a missing path and a path
+    // that is a plain file (which would otherwise yield an ENOENT/ENOTDIR
+    // from the missing infra/ cwd and be misreported, T162/T163).
+    let isDir = false;
+    try {
+      isDir = statSync(rootDir).isDirectory();
+    } catch {
+      isDir = false;
+    }
+    if (!isDir) {
       throw new InputError(
         `project directory does not exist — '${rootDir}' is not a serverless-tools project root`,
         CLI_MISSING_PROJECT_DIR,

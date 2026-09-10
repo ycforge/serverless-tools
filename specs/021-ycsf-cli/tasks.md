@@ -489,3 +489,19 @@ With multiple developers:
 
 ### `destroy --yes` на несуществующий `--project-dir`: exit 1 + ошибочный CLI_TERRAFORM_NOT_FOUND вместо exit 2 (LOW)
 - [x] T162 [FR-004/FR-021] `packages/pilot/src/cli/destroy.ts` — guard `existsSync(rootDir)` в начале destroyAction → `InputError` `CLI_MISSING_PROJECT_DIR`/exit 2 ДО terraform dispatch (terraform.spawn ENOENT от несуществующего `cwd: infra/` больше не атрибутируется как CLI_TERRAFORM_NOT_FOUND). Unit-тест (несуществующий dir → exit 2, spawn не вызван) + integration (destroy --yes /nonexistent → exit 2, без CLI_TERRAFORM_NOT_FOUND). **Ref**: spec.md:73, spec.md:305, FR-004, data-model.md:295, D-RE-3.
+
+---
+
+## Phase 18: Convergence
+
+**Purpose**: FINAL ACCEPTANCE CONVERGE audit (2026-09-11, read-only, git HEAD 21f94cf). Baseline: `pnpm --filter @ycforge/pilot test` → 105 files / 543 tests GREEN; vitest typecheck clean; eslint clean on scoped paths. T160–T162 re-verified: doc refs синхронизированы с `infra/` (data-model.md:243, spec.md:190/194/198), destroy на НЕсуществующий `--project-dir` → exit 2 `CLI_MISSING_PROJECT_DIR` (destroy.ts:57 guard). Sanity probes against `packages/pilot/dist/cli/index.js` (rebuilt pretest) all green: bare → help exit 0, `--help`/`--version` (1.0.0), `-p` alias, `--json frobnicate` → `command ""` + exit 2, missing `.ycsf/apps.yaml` → exit 2 для build/materialize/check/plan/apply, destroy non-TTY → exit 2 `CLI_DESTROY_REQUIRES_YES`, plan/apply/destroy mock terraform → exit 0, build `--json` summary `{apps,artifacts}` (--target → apps=1), standalone materialize `{files:3,extensions:1}`, `plan --json` → `summary.tfPlanOutput` + чистый stdout, `--cleanup` удаляет только `infra/*.ycsf.tf.json`+`99-ycsf-outputs.tf.json` (`.ycsf/` не тронут), `cleanedUp = removed > 0`. Verdict: NOT CONVERGED — три NEW дивергенции (T163–T165).
+
+### destroy guard принимает не-директорию в `--project-dir` → exit 1 CLI_UNEXPECTED_ERROR вместо exit 2 (LOW)
+- [x] T163 [US6] `packages/pilot/src/cli/destroy.ts` — guard реализован через `statSync(rootDir).isDirectory()` (rejects и missing path, и plain file → ENOTDIR), guard встал до terraform dispatch → `InputError` `CLI_MISSING_PROJECT_DIR` exit 2. Probe: `destroy --yes --project-dir /tmp/afile.txt` (файл) → exit 2, а не `CLI_UNEXPECTED_ERROR` exit 1. Тест: `destroy.test.ts` T162 (nonexistent dir) + AC1/AC4 с temp dir. **Ref**: spec.md:73, FR-004, data-model.md:295, T162.
+  - NOTE: суб-случай «rootDir существует, но `infra/` отсутствует» (e.g. `destroy` без предварительного materialize/plan→apply) всё ещё приводит к ENOENT от `spawn` и `CLI_TERRAFORM_NOT_FOUND` exit 1 — спека (data-model §4.4 destroy pipeline) не определяет это, а `terraform init` (FR-029) в обычном flow требует `infra/` (создаётся на этапах build/materialize). Оставлено как spec-ambiguous; не считается finding (корректно для реального deployed-state проекта, где infra/ существует).
+
+### `detectCommand` принимает значение глобального флага за subcommand → неверный `command` в JSON-ошибке (LOW)
+- [x] T164 [FR-001/US7] `packages/pilot/src/cli/index.ts` `detectCommand` теперь пропускает value-taking флаги (`-p`/`--project-dir`, `--target`) и их значение, а также nullary-флаги (`--json`, `--no-color`, …) и `--flag=value` форму; первая позиция-токен, не являющаяся командой → `''`. Probe: `--json -p check frobnicate` → `{command:"", exitCode:2, CLI_UNKNOWN_COMMAND}`. Unit-тест добавлен. **Ref**: FR-001, contracts `#/definitions/cliResult.command`, T151.
+
+### plan.md:17 осталась stale-ссылка `.ycsf/*.ycsf.tf.json` после T160/T161 (LOW, docs)
+- [x] T165 [FR-028] `specs/021-ycsf-cli/plan.md:17` — «write during materialize (`.ycsf/*.ycsf.tf.json`)» → `infra/*.ycsf.tf.json` (+ `99-ycsf-outputs.tf.json`), согласовано с `pipeline.ts:125-126` и T160/T161. **Ref**: FR-028, T152, T160, T161.
