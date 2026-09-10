@@ -58,6 +58,22 @@ describe('ycsf check CLI action (T070)', () => {
     expect(mockCheck).toHaveBeenCalledWith('/test/root', { validateTf: true });
   });
 
+  it('AC4: base errors + --validate-tf → exit 1, only base diagnostics (no terraform token)', async () => {
+    mockCheck.mockResolvedValue({
+      diagnostics: [
+        { code: 'PML_ENV_NOT_SET', message: 'env not set', file: '.ycsf/apps.yaml' },
+      ],
+    });
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    await checkAction(fakeCmd({ validateTf: true }));
+    expect(process.exitCode).toBe(ExitCode.Error);
+    expect(mockCheck).toHaveBeenCalledTimes(1);
+    const output = spy.mock.calls.map((c) => String(c[0])).join('');
+    expect(output).toContain('PML_ENV_NOT_SET');
+    expect(output).not.toContain('terraform');
+    spy.mockRestore();
+  });
+
   it('AC5: --json → valid JSON output', async () => {
     mockCheck.mockResolvedValue({ diagnostics: [] });
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);

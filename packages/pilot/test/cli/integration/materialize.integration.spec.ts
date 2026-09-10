@@ -46,4 +46,13 @@ describe('materialize integration (T061)', () => {
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('CLI_APP_NOT_FOUND');
   });
+
+  it('--target user_service → only infra/user_service.ycsf.tf.json exists', async () => {
+    project = createBuildableProject();
+    const result = await runCli(project.root, ['materialize', '--project-dir', project.root, '--target', 'user_service']);
+    expect(result.code).toBe(0);
+    expect(result.stderr).toContain('Generated:');
+    expect(existsSync(join(project.root, 'infra/user_service.ycsf.tf.json'))).toBe(true);
+    expect(existsSync(join(project.root, 'infra/analytics.ycsf.tf.json'))).toBe(false);
+  });
 });

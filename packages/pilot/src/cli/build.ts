@@ -14,7 +14,14 @@ export async function buildAction(cmd: Command): Promise<void> {
   let exitCode: 0 | 1 | 2 = 0;
 
   try {
-    const result = await buildApps(rootDir, target !== undefined ? { target } : undefined);
+    const buildOpts: { target?: string; onAppProgress?: (appId: string) => void } = {};
+    if (target !== undefined) buildOpts.target = target;
+    if (!json) {
+      buildOpts.onAppProgress = (appId: string) => {
+        process.stderr.write(`Building app ${appId}...\n`);
+      };
+    }
+    const result = await buildApps(rootDir, buildOpts);
 
     if (result.kind === 'ok') {
       const artifactCount = result.artifacts.length;

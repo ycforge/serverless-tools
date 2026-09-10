@@ -255,9 +255,9 @@ Global flags: `--project-dir`, `--json`, `--no-color` (set on program root).
 3. Фильтруем apps map: `new Map([[target, model.apps.get(target)]])`
 4. Для filtered model: проверяем build_configs, запускаем builders
 
-В `dispatch` (materialize): `DispatchOptions` уже имеет `target` фильтр (spec 014).
+В `materialize` (CLI) `--target` фильтр применяется ПОСЛЕ `dispatch` по имени файла: из `generatedFiles` остаются только записи `{target}.ycsf.tf.json`. Это НЕ поле `DispatchOptions` — тип `DispatchOptions` не содержит `target` (спецификация target-фильтра в dispatch отсутствует; константа-коллбэк `_options` в `src/materialize/dispatch.ts` не используется).
 
-**Rationale**: Фильтрация на уровне model, не на уровне runner. Чистый approach: model загружается полностью, фильтруется до запуска.
+**Rationale**: Фильтрация на уровне model, не на уровне runner. Чистый approach: model загружается полностью, фильтруется до запуска. Для materialize фильтр по имени файла после dispatch — единственный безопасный канал target-семантики (FR-012); план/apply НЕ передают target, поэтому материализуют все apps.
 
 ---
 

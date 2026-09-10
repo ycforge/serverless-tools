@@ -26,4 +26,6 @@ export interface BuiltArtifact {
 /** Options for buildApps invocation. */
 export interface BuildAppsOptions {
   readonly target?: string;
+  /** Per-app progress callback, invoked before each builder with the app ID (FR-009). */
+  readonly onAppProgress?: (appId: string) => void;
 }

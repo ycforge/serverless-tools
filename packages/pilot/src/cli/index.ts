@@ -93,10 +93,20 @@ program
 program.exitOverride();
 for (const sub of program.commands) sub.exitOverride();
 
-async function fail(error: unknown, commandName: string): Promise<void> {
+// Wire --no-color to the NO_COLOR standard (D-RE-13): the negatable option
+// `--no-color` surfaces as `opts.color === false` (commander attribute name
+// strips the `no-` prefix). preAction runs right before every action so the
+// env var is set before any progress/error output is emitted (FR-006).
+program.hook('preAction', (thisCommand: Command): void => {
+  const opts = thisCommand.optsWithGlobals() as { color?: boolean };
+  if (opts.color === false) {
+    process.env.NO_COLOR = '1';
+  }
+});
+
+async function fail(error: unknown, commandName: string, json: boolean): Promise<void> {
   const diagnostics: CLIDiagnostic[] = [];
   let exitCode: 0 | 1 | 2 = ExitCode.Error;
-  const json = process.argv.includes('--json');
 
   const emit = (result: CLIResult): void => {
     if (json) {
@@ -122,6 +132,9 @@ async function fail(error: unknown, commandName: string): Promise<void> {
 /** Run the CLI. Commands may be parsed through a list of raw args. */
 export async function main(argv: string[] = process.argv): Promise<number> {
   const commandName = detectCommand(argv);
+  // json is derived from the parsed argv (not the global process.argv) so
+  // in-process invocation stays consistent with the real binary (FR-005).
+  const json = argv.includes('--json');
   try {
     await program.parseAsync(argv);
 
@@ -145,13 +158,12 @@ export async function main(argv: string[] = process.argv): Promise<number> {
         exitCode: 2,
         diagnostics,
       };
-      const json = process.argv.includes('--json');
       if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
       else process.stderr.write(`Error: ${cleanMsg}\n`);
       process.exitCode = ExitCode.InputError;
       return 2;
     }
-    await fail(error, commandName || 'ycsf');
+    await fail(error, commandName || 'ycsf', json);
     return typeof process.exitCode === 'number' ? process.exitCode : ExitCode.Error;
   }
 }

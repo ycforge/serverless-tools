@@ -285,6 +285,37 @@ description: "Task list for ycsf-cli — CLI layer Project C (build/materialize/
 
 ---
 
+## Phase 12: Convergence
+
+**Purpose**: Resume gaps found during `/speckit.converge` (2026-09-11). Baseline: `pnpm --filter @ycforge/pilot test` → 103 files / 513 tests GREEN; `typecheck` clean; `eslint packages/pilot/src/cli packages/pilot/src/index.ts packages/pilot/test/cli` clean. Verdict: NOT CONVERGED — FR-009 (per-app progress) не реализован; три помеченные [x] test-задачи (T015, T026, T027) не имеют файлов-артефактов; ряд тест-задач (T031, T060, T061, T070, T100, T104) покрыты частично; FR-012 target-семантика опирается на неверную предпосылку D-RE-12 (`DispatchOptions` не имеет поля `target`).
+
+### FR-009 — per-app progress messages (не реализовано)
+
+- [x] T138 [US1] Implement per-app progress messages in `ycsf build` human-readable stderr: `packages/pilot/src/cli/build.ts` должен выводить `Building app {appId}...` для каждого app (FR-009 требует progress messages per app; quickstart Sc1 ожидает "Building app user_service..."). Требуется механизм, чтобы CLI знал имена app до/во время `buildApps` (например прокинуть список app ids из `buildApps` результата/колбэка или выводить имена после успешной сборки каждого app по `artifacts[].appId`). Suppress при `--json` (FR-005). Update `packages/pilot/test/cli/integration/build.integration.spec.ts` Sc1 to assert per-app message in stderr. **Ref**: FR-009, US1 AC1, SC-001, quickstart Sc1. **Depends**: T052.
+
+### Missing test files for tasks marked [x]
+
+- [x] T139 [P] [US1] Create missing unit test `packages/pilot/test/build/build-apps.spec.ts` (T026 claimed done, file absent): mock `loadProjectModel`/`prepareBuildEnv`/`loadRegistry`/`validateBuilders`/`getBuilder`, assert `buildApps` itself: (a) valid 2-app → kind:'ok', artifacts.length===2; (b) missing ENV → kind:'invalid', errors contains PML_ENV_NOT_SET; (c) unknown builder → kind:'invalid', BRG_UNKNOWN_BUILDER; (d) `--target` valid app → 1 artifact; (e) `--target` unknown app → CLI_APP_NOT_FOUND; (f) empty project → kind:'ok', artifacts.length===0 (FR-010). **Ref**: US1 AC2, AC3, FR-010, SC-001, D-RE-1.
+- [x] T140 [P] [US1] Create missing integration test `packages/pilot/test/build/build-apps.integration.spec.ts` (T027 claimed done, file absent): buildApps on buildable/canonical fixture → kind:'ok', 2 artifacts; buildApps(fixture, { target: 'unknown_app' }) → CLI_APP_NOT_FOUND. **Ref**: SC-001, SC-008, D-RE-1.
+
+### Partially covered tests (дописать недостающие assertions)
+
+- [x] T141 [P] [US2] Complete `packages/pilot/test/cli/unit/materialize.test.ts` AC3: `--target user_service` → materialize ограничен только user_service (assert файл analytics НЕ записывается). Complete `packages/pilot/test/cli/integration/materialize.integration.spec.ts` (b): `--target user_service` → только `infra/user_service.ycsf.tf.json` существует, analytics отсутствует. Note: `DispatchOptions` (spec 014) не имеет поля `target` — фильтрация по имени файла после `dispatch` допустима, но зафиксировать тестом. **Ref**: FR-012, US2 AC3.
+- [x] T142 [P] [US6] Complete `packages/pilot/test/cli/unit/terraform.test.ts` (T031 d/e): (d) SIGINT handler: mock child.kill, verify SIGTERM → 2s → SIGKILL sequence; (e) non-zero terraform exit → RuntimeError CLI_TERRAFORM_FAILED (exit code 1). Complete `packages/pilot/test/cli/unit/destroy.test.ts` US6 AC5: SIGINT during runTerraform → child killed, exit 130. **Ref**: US6 AC5, D-RE-4, FR-021, SC-009, SC-010.
+- [x] T143 [P] [US1] Create `packages/pilot/test/cli/unit/index.test.ts` (T015 claimed done, file absent): (a) unknown command → exit code 2 + CLI_UNKNOWN_COMMAND; (b) `--project-dir` resolves path correctly; (c) `--json` flag present in opts; (d) mock `.parseAsync` for FR-003 error-handler path (unhandled error → CLI_UNEXPECTED_ERROR + exit 1). **Ref**: FR-001, FR-003, FR-004, FR-005, SC-006.
+- [x] T144 [P] [US3] Complete `packages/pilot/test/cli/unit/check.test.ts` AC4: base errors + `--validate-tf` → `check` вызывается, но terraform validate НЕ выполняется (fail-fast). Library-level fail-fast уже покрыт в `packages/pilot/test/check/terraform-validate.spec.ts` (AC2) — нужен CLI-уровневый assertion. **Ref**: US3 AC4.
+- [x] T145 [P] [US7] Complete `packages/pilot/test/cli/integration/json.integration.spec.ts` AC3: `plan --json` + mock terraform (`packages/pilot/test/cli/fixtures/terraform`) → stdout — pure JSON, `summary.tfPlanOutput` содержит stdout terraform plan (дополнить к unit coverage в `plan.test.ts` AC1). **Ref**: US7 AC3, FR-022, FR-005.
+
+### FR-006 — `--no-color` wiring (partial)
+
+- [x] T146 [FR-006] Wire `--no-color` in `packages/pilot/src/cli/index.ts`: текущий флаг принят commander, но не имеет эффекта. По D-RE-13: установить `process.env.NO_COLOR = '1'` и проверить/отключить ANSI в human-readable выводе; добавить assertion в `packages/pilot/test/cli/unit/index.test.ts` (d) или `help.integration.spec.ts`. **Ref**: FR-006, D-RE-13, contracts/ycsf-cli.json `#/cliSurface/globalFlags`.
+
+### FR-012/D-RE-12 premise fix + standalone materialize consistency (low)
+
+- [x] T147 [US2] Align `ycsf materialize` (standalone) с spec pipeline order: spec line 50 включает outputs → moves в materialize step; текущая реализация `packages/pilot/src/cli/materialize.ts` выполняет только dispatch → applyExtensions → writeGeneratedTerraform (без loadMoves/buildMovedFile/buildOutputs, в отличие от `packages/pilot/src/cli/pipeline.ts` runBuildAndMaterialize). Решение: добавить moves/outputs в standalone materialize ИЛИ зафиксировать решение оставить их только в plan/apply (дивергенция спецификации) — зафиксировать тестом. Также исправить неверную предпосылку D-RE-12 в `specs/021-ycsf-cli/research.md` («DispatchOptions имеет target фильтр») — dispatch таргет не применяется, фильтр по имени файла. **Ref**: FR-011, FR-012, spec.md Pipeline order (line 50), D-RE-12.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

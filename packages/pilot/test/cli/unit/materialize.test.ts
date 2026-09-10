@@ -66,4 +66,36 @@ describe('ycsf materialize action (T060)', () => {
     await materializeAction(fakeCmd());
     expect(process.exitCode).toBe(ExitCode.Error);
   });
+
+  it('AC3: --target user_service → only user_service files written', async () => {
+    const model = {
+      apps: new Map([
+        ['user_service', { app_id: 'user_service' }],
+        ['analytics', { app_id: 'analytics' }],
+      ]),
+    } as never;
+    vi.mocked(loadProjectModel).mockReturnValue({ kind: 'ok', model });
+    vi.mocked(loadRegistry).mockResolvedValue({ kind: 'ok', registry: { records: new Map() } });
+    vi.mocked(dispatch).mockResolvedValue({
+      kind: 'ok',
+      resources: [],
+      generatedFiles: [
+        { filename: 'user_service.ycsf.tf.json', content: '{}' },
+        { filename: 'analytics.ycsf.tf.json', content: '{}' },
+      ],
+    });
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await materializeAction(fakeCmd({ target: 'user_service' }));
+    expect(process.exitCode).toBe(ExitCode.Success);
+    const written = (vi.mocked(writeGeneratedTerraform).mock.calls[0]?.[1] ?? []) as Array<{
+      filename: string;
+      content: string;
+    }>;
+    const filenames = written.map((f) => f.filename);
+    expect(filenames).toContain('user_service.ycsf.tf.json');
+    expect(filenames).not.toContain('analytics.ycsf.tf.json');
+    const json = JSON.parse(String(spy.mock.calls[0]?.[0]));
+    expect(json.summary?.files).toBe(1);
+    spy.mockRestore();
+  });
 });

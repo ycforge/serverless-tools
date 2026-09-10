@@ -2,14 +2,8 @@
 import type { Command } from 'commander';
 import { loadProjectModel } from '../model/loader.js';
 import { loadRegistry } from '../registry/index.js';
-import { dispatch } from '../materialize/dispatch.js';
-import { loadExtensions, applyExtensions } from '../extensions/index.js';
-import { writeGeneratedTerraform } from '../materialize/write.js';
-import {
-  CLI_MISSING_PROJECT_DIR,
-  CLI_BUILD_FAILED,
-  CLI_APP_NOT_FOUND,
-} from './errors.js';
+import { runMaterializeGeneration } from './pipeline.js';
+import { CLIError, CLI_BUILD_FAILED, CLI_MISSING_PROJECT_DIR, CLI_APP_NOT_FOUND } from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
 
 export async function materializeAction(cmd: Command): Promise<void> {
@@ -60,8 +54,8 @@ export async function materializeAction(cmd: Command): Promise<void> {
       return;
     }
 
-    // Filter apps by target before loading the registry so an unknown app
-    // fails fast (exit code 2) regardless of builders.yaml state.
+    // Filter apps by target before materialization so an unknown app fails
+    // fast (exit code 2) regardless of registry state.
     if (target) {
       if (!model.apps.has(target)) {
         const available = [...model.apps.keys()].join(', ');
@@ -110,67 +104,31 @@ export async function materializeAction(cmd: Command): Promise<void> {
       return;
     }
 
-    const dispatchResult = await dispatch(model, registry);
-    if (dispatchResult.kind === 'invalid') {
-      diagnostics.push(...dispatchResult.errors.map((e) => ({ code: e.code, message: e.message })));
-      exitCode = exitCode === 0 ? 1 : exitCode;
-    } else {
-      const resources = dispatchResult.resources;
-      const generatedFiles = dispatchResult.generatedFiles.filter((f) => {
-        if (!target) return true;
-        const appId = target;
-        return f.filename === `${appId}.ycsf.tf.json`;
-      });
+    // Materialize generation — dispatch + extensions + moves + outputs + write
+    // (pipeline order, spec line 50; FR-011/FR-012, shared with plan/apply).
+    const genOpts: { json?: boolean; target?: string } = { json };
+    if (target !== undefined) genOpts.target = target;
+    const { files, extensionsApplied } = await runMaterializeGeneration(rootDir, model, registry, genOpts);
 
-      let extensionsApplied = 0;
-      try {
-        const extensions = loadExtensions(rootDir);
-        if (extensions.kind === 'ok') {
-          const applied = applyExtensions(resources, extensions.data);
-          if (applied.kind === 'invalid') {
-            diagnostics.push(...applied.errors.map((e) => ({ code: e.code, message: e.message })));
-            exitCode = exitCode === 0 ? 1 : exitCode;
-          } else {
-            extensionsApplied = extensions.data.extensions.length;
-          }
-        }
-      } catch {
-        // extensions.yaml missing — skip extension step.
-      }
-
-      const infraDir = `${rootDir}/infra`;
-      await writeGeneratedTerraform(infraDir, generatedFiles);
-
-      const filePaths = generatedFiles.map((f) => `${infraDir}/${f.filename}`);
-      for (const path of filePaths) {
-        if (!json) process.stderr.write(`✓ Generated: ${path}\n`);
-      }
-
-      const result: CLIResult = {
-        command: 'materialize',
-        exitCode,
-        diagnostics,
-        summary: { files: generatedFiles.length, extensions: extensionsApplied },
-      };
-      if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-      else for (const d of diagnostics) process.stderr.write(`✗ ${d.code}: ${d.message}\n`);
-      process.exitCode = exitCode;
-      return;
+    const infraDir = `${rootDir}/infra`;
+    for (const file of files) {
+      if (!json) process.stderr.write(`✓ Generated: ${infraDir}/${file.filename}\n`);
     }
 
     const result: CLIResult = {
       command: 'materialize',
       exitCode,
       diagnostics,
-      summary: { files: 0, extensions: 0 },
+      summary: { files: files.length, extensions: extensionsApplied },
     };
     if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     else for (const d of diagnostics) process.stderr.write(`✗ ${d.code}: ${d.message}\n`);
     process.exitCode = exitCode;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    diagnostics.push({ code: CLI_BUILD_FAILED, message });
-    exitCode = 1;
+    const code = err instanceof CLIError ? err.code : CLI_BUILD_FAILED;
+    diagnostics.push({ code, message });
+    exitCode = err instanceof CLIError ? err.exitCode : 1;
     const result: CLIResult = {
       command: 'materialize',
       exitCode,
@@ -178,7 +136,7 @@ export async function materializeAction(cmd: Command): Promise<void> {
       summary: { files: 0, extensions: 0 },
     };
     if (json) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-    else process.stderr.write(`✗ CLI_BUILD_FAILED: ${message}\n`);
+    else process.stderr.write(`✗ ${code}: ${message}\n`);
     process.exitCode = exitCode;
   }
 }

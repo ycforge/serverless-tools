@@ -35,7 +35,20 @@ describe('build integration (T051)', () => {
     project = createBuildableProject();
     const result = await runCli(project.root, ['build', '--project-dir', project.root]);
     expect(result.code).toBe(0);
-    expect(result.stderr).toContain('Build complete.');
+    expect(result.stderr).toContain('Building app user_service...');
+    expect(result.stderr).toContain('Building app analytics...');
+    expect(result.stderr).toContain('✓ Build complete.');
+  });
+
+  it('Sc3: build --json → per-app progress suppressed, stdout is pure JSON', async () => {
+    project = createBuildableProject();
+    const result = await runCli(project.root, ['build', '--project-dir', project.root, '--json']);
+    expect(result.stderr).not.toContain('Building app');
+    expect(result.stderr).not.toContain('Build complete');
+    expect(() => JSON.parse(result.stdout)).not.toThrow();
+    const json = JSON.parse(result.stdout) as { command: string; exitCode: number };
+    expect(json.command).toBe('build');
+    expect(json.exitCode).toBe(0);
   });
 
   it('Sc2: --target unknown_app → exit 2, CLI_APP_NOT_FOUND', async () => {

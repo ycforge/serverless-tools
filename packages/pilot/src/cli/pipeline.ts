@@ -6,7 +6,7 @@ import { loadOutputs, buildOutputs } from '../outputs/index.js';
 import { dispatch } from '../materialize/dispatch.js';
 import { writeGeneratedTerraform } from '../materialize/write.js';
 import { moveEndpointsFromResources } from './resource-endpoints.js';
-import type { GeneratedTfFile } from '../contracts/index.js';
+import type { GeneratedTfFile, PluginRegistry, ProjectModel } from '../contracts/index.js';
 import { spawnTerraform } from './terraform.js';
 import { RuntimeError, CLI_BUILD_FAILED } from './errors.js';
 
@@ -14,26 +14,26 @@ function stderr(msg: string, json?: boolean): void {
   if (!json) process.stderr.write(`${msg}\n`);
 }
 
+/** Result of materialize generation (files + how many extensions applied). */
+export interface MaterializeGenerationResult {
+  readonly files: readonly GeneratedTfFile[];
+  readonly extensionsApplied: number;
+}
+
 /**
- * Build → materialize (dispatch + extensions + moves + outputs + writes).
+ * Materialize generation: dispatch → extensions → moves → outputs → write
+ * (spec pipeline order). Shared by both `runBuildAndMaterialize` (plan/apply)
+ * and standalone `ycsf materialize` (T147) so generated files are equivalent.
  * Fail-fast: any step error aborts before the next step runs.
  */
-export async function runBuildAndMaterialize(
+export async function runMaterializeGeneration(
   rootDir: string,
+  projectModel: ProjectModel,
+  registry: PluginRegistry,
   opts?: { target?: string; json?: boolean },
-): Promise<void> {
+): Promise<MaterializeGenerationResult> {
   const json = opts?.json;
-
-  stderr('Building apps...', json);
-  const buildResult = await buildApps(rootDir, opts?.target !== undefined ? { target: opts.target } : undefined);
-  if (buildResult.kind === 'invalid') {
-    const first = buildResult.errors[0];
-    throw new RuntimeError(
-      first?.message ?? 'build failed',
-      String(first?.code ?? CLI_BUILD_FAILED),
-    );
-  }
-  const { projectModel, registry } = buildResult;
+  const target = opts?.target;
 
   stderr('Materializing artifacts...', json);
   const dispatchResult = await dispatch(projectModel, registry);
@@ -48,6 +48,7 @@ export async function runBuildAndMaterialize(
 
   // Extensions (validation + deep-merge; fail-fast on error).
   stderr('Applying extensions...', json);
+  let extensionsApplied = 0;
   try {
     const extensions = loadExtensions(rootDir);
     if (extensions.kind === 'ok') {
@@ -59,6 +60,7 @@ export async function runBuildAndMaterialize(
           String(first?.code ?? 'EXT_ERROR'),
         );
       }
+      extensionsApplied = extensions.data.extensions.length;
     }
   } catch (err) {
     // extensions.yaml missing (EXT_MISSING_FILE, plain Error) — optional step, skip.
@@ -107,9 +109,44 @@ export async function runBuildAndMaterialize(
     if (err instanceof RuntimeError) throw err;
   }
 
-  const files = [...dispatchResult.generatedFiles, ...movedFiles, ...outputFiles];
+  const allFiles = [...dispatchResult.generatedFiles, ...movedFiles, ...outputFiles];
+  // --target filters per-app files by filename (FR-012); moves/outputs are
+  // project-level and dropped under a target (T141 AC3, T147).
+  const files =
+    target !== undefined
+      ? allFiles.filter((f) => f.filename === `${target}.ycsf.tf.json`)
+      : allFiles;
   const infraDir = `${rootDir}/infra`;
   await writeGeneratedTerraform(infraDir, files);
+
+  return { files, extensionsApplied };
+}
+
+/**
+ * Build → materialize (dispatch + extensions + moves + outputs + writes).
+ * Fail-fast: any step error aborts before the next step runs.
+ */
+export async function runBuildAndMaterialize(
+  rootDir: string,
+  opts?: { target?: string; json?: boolean },
+): Promise<void> {
+  const json = opts?.json;
+
+  stderr('Building apps...', json);
+  const buildResult = await buildApps(rootDir, opts?.target !== undefined ? { target: opts.target } : undefined);
+  if (buildResult.kind === 'invalid') {
+    const first = buildResult.errors[0];
+    throw new RuntimeError(
+      first?.message ?? 'build failed',
+      String(first?.code ?? CLI_BUILD_FAILED),
+    );
+  }
+  const { projectModel, registry } = buildResult;
+
+  const genOpts: { json?: boolean; target?: string } = {};
+  if (json !== undefined) genOpts.json = json;
+  if (opts?.target !== undefined) genOpts.target = opts.target;
+  const { files } = await runMaterializeGeneration(rootDir, projectModel, registry, genOpts);
 
   stderr(`Build + materialize complete. ${buildResult.artifacts.length} app(s) built, ${files.length} file(s) written.`, json);
 }
