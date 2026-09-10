@@ -8,7 +8,13 @@ import { writeGeneratedTerraform } from '../materialize/write.js';
 import { moveEndpointsFromResources } from './resource-endpoints.js';
 import type { GeneratedTfFile, PluginRegistry, ProjectModel } from '../contracts/index.js';
 import { spawnTerraform } from './terraform.js';
-import { RuntimeError, CLI_BUILD_FAILED } from './errors.js';
+import {
+  RuntimeError,
+  InputError,
+  CLI_BUILD_FAILED,
+  CLI_MISSING_PROJECT_DIR,
+  CLI_APP_NOT_FOUND,
+} from './errors.js';
 
 function stderr(msg: string, json?: boolean): void {
   if (!json) process.stderr.write(`${msg}\n`);
@@ -136,10 +142,13 @@ export async function runBuildAndMaterialize(
   const buildResult = await buildApps(rootDir, opts?.target !== undefined ? { target: opts.target } : undefined);
   if (buildResult.kind === 'invalid') {
     const first = buildResult.errors[0];
-    throw new RuntimeError(
-      first?.message ?? 'build failed',
-      String(first?.code ?? CLI_BUILD_FAILED),
-    );
+    const code = String(first?.code ?? CLI_BUILD_FAILED);
+    // Input/config errors (D-3, spec edge case: no .ycsf/apps.yaml, unknown
+    // --target) must surface as exit code 2, not 1. T149.
+    if (code === CLI_MISSING_PROJECT_DIR || code === CLI_APP_NOT_FOUND) {
+      throw new InputError(first?.message ?? 'build input error', code);
+    }
+    throw new RuntimeError(first?.message ?? 'build failed', code);
   }
   const { projectModel, registry } = buildResult;
 

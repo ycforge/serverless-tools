@@ -53,4 +53,15 @@ describe('plan integration (T081)', () => {
     expect(output).toContain('Running terraform plan...');
     expect(result.code).toBe(0);
   });
+
+  it('T149: non-project dir → exit 2, CLI_MISSING_PROJECT_DIR', async () => {
+    project = createBuildableProject();
+    const result = await runCli(
+      project.root,
+      ['plan', '--project-dir', resolve(project.root, '..')],
+      envWithMockTerraform(),
+    );
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('CLI_MISSING_PROJECT_DIR');
+  });
 });

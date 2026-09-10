@@ -38,4 +38,11 @@ describe('apply integration (T091)', () => {
     expect(result.stderr).toContain('Running terraform apply...');
     expect(result.stderr).toContain('Terraform apply complete');
   });
+
+  it('T149: non-project dir → exit 2, CLI_MISSING_PROJECT_DIR', async () => {
+    project = createBuildableProject();
+    const result = await runCli(project.root, ['apply', '--project-dir', resolve(project.root, '..')]);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('CLI_MISSING_PROJECT_DIR');
+  });
 });

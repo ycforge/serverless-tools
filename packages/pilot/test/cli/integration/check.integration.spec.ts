@@ -7,6 +7,7 @@ const exec = promisify(execFile);
 const CLI = resolve(import.meta.dirname, '../../../dist/cli/index.js');
 const CANONICAL = resolve(import.meta.dirname, '../../check/fixtures/canonical');
 const MISSING_TARGET = resolve(import.meta.dirname, '../../check/fixtures/missing-target');
+const NOT_A_PROJECT = resolve(import.meta.dirname, '../../check/fixtures');
 
 function runCli(args: string[]) {
   return exec('node', [CLI, ...args], {
@@ -41,5 +42,11 @@ describe('check integration (T071)', () => {
     expect(json.command).toBe('check');
     expect(json.exitCode).toBe(0);
     expect(Array.isArray(json.diagnostics)).toBe(true);
+  });
+
+  it('T148: non-project dir → exit 2, CLI_MISSING_PROJECT_DIR', async () => {
+    const result = await runCli(['check', '--project-dir', NOT_A_PROJECT]);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('CLI_MISSING_PROJECT_DIR');
   });
 });

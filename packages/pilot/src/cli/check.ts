@@ -1,7 +1,9 @@
 // spec 021 ycsf-cli — ycsf check command action (US3, FR-014..017).
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Command } from 'commander';
 import { check } from '../check/index.js';
-import { CLI_UNEXPECTED_ERROR } from './errors.js';
+import { CLI_UNEXPECTED_ERROR, CLI_MISSING_PROJECT_DIR } from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
 import type { Diagnostic } from '../contracts/index.js';
 
@@ -25,6 +27,28 @@ export async function checkAction(cmd: Command): Promise<void> {
   let exitCode: 0 | 1 | 2 = 0;
 
   try {
+    // Missing .ycsf/apps.yaml → input error (exit 2). The check() library
+    // (spec 020) swallows the loader throw and returns empty diagnostics, so
+    // the CLI guards the project-root precondition itself. T148.
+    if (!existsSync(join(rootDir, '.ycsf', 'apps.yaml'))) {
+      const message = `missing .ycsf/apps.yaml — '${rootDir}' is not a serverless-tools project root`;
+      diagnostics.push({ code: CLI_MISSING_PROJECT_DIR, message });
+      exitCode = 2;
+      if (json) {
+        const cliResult: CLIResult = {
+          command: 'check',
+          exitCode,
+          diagnostics,
+          summary: { total: diagnostics.length },
+        };
+        process.stdout.write(JSON.stringify(cliResult, null, 2) + '\n');
+      } else {
+        process.stderr.write(`✗ ${CLI_MISSING_PROJECT_DIR}: ${message}\n`);
+      }
+      process.exitCode = exitCode;
+      return;
+    }
+
     const result = await check(rootDir, { validateTf });
     diagnostics.push(...result.diagnostics.map(diagToCLI));
     exitCode = result.diagnostics.length > 0 ? 1 : 0;

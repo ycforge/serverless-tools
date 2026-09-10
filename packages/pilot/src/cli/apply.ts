@@ -15,6 +15,7 @@ export async function applyAction(cmd: Command): Promise<void> {
   const json = Boolean(opts.json);
 
   const diagnostics: CLIDiagnostic[] = [];
+  let exitCode: 0 | 1 | 2 = 0;
 
   try {
     await runBuildAndMaterialize(rootDir, { json });
@@ -38,11 +39,12 @@ export async function applyAction(cmd: Command): Promise<void> {
     const message = err instanceof Error ? err.message : String(err);
     const code = err instanceof CLIError ? err.code : CLI_UNEXPECTED_ERROR;
     diagnostics.push({ code, message });
+    exitCode = err instanceof CLIError ? err.exitCode : 1;
 
     if (json) {
       const result: CLIResult = {
         command: 'apply',
-        exitCode: 1,
+        exitCode,
         diagnostics,
         summary: { tfApplyOutput: '' },
       };
@@ -50,7 +52,7 @@ export async function applyAction(cmd: Command): Promise<void> {
     } else {
       process.stderr.write(`✗ ${code}: ${message}\n`);
     }
-    process.exitCode = 1;
+    process.exitCode = exitCode;
   }
 }
 
