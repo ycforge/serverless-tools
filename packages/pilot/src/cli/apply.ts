@@ -21,8 +21,10 @@ export async function applyAction(cmd: Command): Promise<void> {
   const diagnostics: CLIDiagnostic[] = [];
   let exitCode: 0 | 1 | 2 = 0;
 
+  // Cache entries collected during build phase for observability (T150: preserve in catch).
+  const cacheEntries: CacheCheckResult[] = [];
+
   try {
-    const cacheEntries: CacheCheckResult[] = [];
     const onCacheProgress = (r: CacheCheckResult) => {
       cacheEntries.push(r);
       if (!json) process.stderr.write(formatCacheLine(r) + '\n');
@@ -55,12 +57,15 @@ export async function applyAction(cmd: Command): Promise<void> {
     diagnostics.push({ code, message });
     exitCode = err instanceof CLIError ? err.exitCode : 1;
 
+    // Preserve cache stats from build phase for FR-023 (T150).
+    const cache = { hits: cacheEntries.filter((e) => e.hit).length, misses: cacheEntries.filter((e) => !e.hit).length, entries: cacheEntries };
+
     if (json) {
       const result: CLIResult = {
         command: 'apply',
         exitCode,
         diagnostics,
-        summary: { tfApplyOutput: '', cache: { hits: 0, misses: 0, entries: [] } },
+        summary: { tfApplyOutput: '', cache },
       };
       process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     } else {

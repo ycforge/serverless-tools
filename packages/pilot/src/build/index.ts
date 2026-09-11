@@ -1,9 +1,8 @@
 // spec 021 ycsf-cli — buildApps orchestrator (D-RE-1, D-RE-11, D-RE-12) + spec 022 cache.
-import { createHash } from 'node:crypto';
 import type { BuildAppsOptions, BuildAppsResult, BuiltArtifact } from '../contracts/build.js';
 import type { Diagnostic } from '../contracts/check.js';
 import type { PluginLoadError, RegistryError } from '../contracts/registry.js';
-import { CLI_APP_NOT_FOUND, CLI_BUILD_FAILED, CLI_MISSING_PROJECT_DIR, CACHE_CORRUPTED, CACHE_VERSION_MISMATCH } from '../cli/errors.js';
+import { CLI_APP_NOT_FOUND, CLI_BUILD_FAILED, CLI_MISSING_PROJECT_DIR } from '../cli/errors.js';
 import { loadProjectModel } from '../model/loader.js';
 import { prepareBuildEnv } from '../build-env/index.js';
 import { loadRegistry, validateBuilders } from '../registry/index.js';
@@ -11,7 +10,7 @@ import { getBuilder } from '../registry/shape.js';
 import { canonicalJson, computeEffectiveFingerprint, computeFilesHash, computeOwnFingerprint, hashString, resolveBuilderVersion } from '../cache/fingerprint.js';
 import { getCacheDir, loadManifest, saveManifest } from '../cache/manifest.js';
 import { checkCache } from '../cache/index.js';
-import { hasValidBlob, restoreBlob, saveBlob } from '../cache/blobs.js';
+import { restoreBlob, saveBlob } from '../cache/blobs.js';
 import type { CacheCheckResult, CacheManifest } from '../contracts/cache.js';
 
 function toDiagnostic(err: RegistryError): Diagnostic {
@@ -137,7 +136,12 @@ export async function buildApps(
     manifest = loaded.manifest;
     manifestWarning = loaded.warning;
     if (manifestWarning) {
-      try { process.stderr.write(`! ${manifestWarning}: cache will be rebuilt\n`); } catch {}
+      try {
+        process.stderr.write(`! ${manifestWarning}: cache will be rebuilt\n`);
+      } catch (err) {
+        // If stderr write fails (e.g., closed pipe), log to console.error as last resort.
+        console.error(`Failed to write cache warning to stderr: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 

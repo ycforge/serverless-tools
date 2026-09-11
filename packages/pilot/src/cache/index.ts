@@ -23,24 +23,13 @@ export async function checkCache(opts: CheckCacheOpts): Promise<CacheCheckResult
     return { appId, hit: false, fingerprint: effectiveFingerprint, reason: 'no_entry' };
   }
   const entry = manifest.entries[appId]!;
-  // blob validity
-  const valid = await hasValidBlob(cacheDir, effectiveFingerprint);
-  // If effective matches and blob valid → hit, otherwise check blob for stored effective?
-  // Need to check blob for the computed effective, not stored? spec FR-010: hit only if effective == computed && blob exists
-  // Also if stored effective != computed → miss, but blob missing also miss
-  // We check computed blob existence; if missing treat as blob_missing even if fingerprint matches stored
+  // Fingerprint mismatch → miss with component-level reason (FR-011 priority)
   if (entry.effectiveFingerprint !== effectiveFingerprint) {
-    // Determine reason priority
-    // If blob missing for computed fp, but also fingerprint mismatch, priority: blob_missing still? spec says blob_missing check before fingerprint diff
-    // But we already checked valid for computed fp; if not valid → blob_missing
-    if (!valid) {
-      return { appId, hit: false, fingerprint: effectiveFingerprint, reason: 'blob_missing' };
-    }
-    // Compare component diff
     const reason = detectReason(entry, own, depFingerprints);
     return { appId, hit: false, fingerprint: effectiveFingerprint, reason };
   }
-  // effective matches
+  // Fingerprint matches → check blob validity (corruption self-heal)
+  const valid = await hasValidBlob(cacheDir, effectiveFingerprint);
   if (!valid) {
     return { appId, hit: false, fingerprint: effectiveFingerprint, reason: 'blob_missing' };
   }

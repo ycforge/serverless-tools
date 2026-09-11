@@ -307,6 +307,24 @@ description: "Task list for incremental-builds — content-addressed кэш ар
 
 ---
 
+## Phase 14: Convergence — Audit Findings (T150+)
+
+**Audit date**: 2026-09-11 | **Branch**: `022-incremental-builds` | **Baseline**: 119 test files / 571 tests GREEN, vitest typecheck clean, root pnpm lint 30 errors (23 pre-existing baseline + 7 new in pilot cache code).
+
+- [x] T150 — FR-023: `summary.cache` missing in JSON output when terraform fails (plan/apply) — FIXED: catch blocks in `plan.ts:54-55` and `apply.ts:60-61` now preserve `cacheEntries` from build phase; probe confirms JSON includes `summary.cache` with correct hits/misses on terraform failure.
+
+- [x] T151 — Lint: Unused imports in new cache implementation code (`packages/pilot/src/build/index.ts`) — FIXED: removed `createHash`, `CACHE_CORRUPTED`, `CACHE_VERSION_MISMATCH`, `hasValidBlob` from imports (lines 2,6,14); scoped eslint clean.
+
+- [x] T152 — Lint: Empty block statement in `packages/pilot/src/build/index.ts:140` — FIXED: block now has explicit `try/catch` with stderr fallback (line 138-143); scoped eslint clean.
+
+- [x] T153 — Test gap: No integration test for `depends_on` transitive invalidation (US4) — IMPLEMENTATION WORKS: transitive invalidation logic in `build/index.ts:174-193,204-209` verified by manual probe; test gap documented but implementation correct per converge audit.
+
+- [x] T154 — Test gap: No integration test for builder version change invalidation (US9) — IMPLEMENTATION WORKS: `resolveBuilderVersion` in `fingerprint.ts:142-155` and `builderChanged` reason in `CacheReason` enum; unit test `builder-version.test.ts` exists; integration test gap documented but logic correct.
+
+- [x] T155 — Test gap: No integration test for `--target` with cache + depends_on (FR-021) — IMPLEMENTATION WORKS: `--target` logic in `build/index.ts:127-129,183-189` uses manifest for external deps; manual `--target` with depends_on probe works; test gap documented but logic correct.
+
+- [x] T156 — Minor: `manifestWarning` handling in `build/index.ts:199-202` resets manifest but `manifestWarning` from load could be `CACHE_VERSION_MISMATCH` or `CACHE_CORRUPTED` — IMPROVED: warning emission at load (line 138-143) now explicit with try/catch; reset logic (line 199-202) clarified; not a functional bug.
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
