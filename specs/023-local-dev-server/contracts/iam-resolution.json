@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/iam-resolution.json",
+  "title": "@ycforge/js-dev-tools — IAM token resolution contract (spec 023)",
+  "description": "Machine-readable contract for resolveIamToken (spec 023, S-8, FR-023..025, D-7). Priority chain env → OAuth (~/.yc/config.yaml) → SA key (~/.yc/keys/*), first success wins. Fail-open: any unresolvable step yields undefined + a reason code; the local server keeps running without a token (warning JDT_IAM_UNAVAILABLE, once per start). No refresh/retry in v1 (A-8/A-9). IamTokenExchanger is injection-seam for tests (mocked; tests never talk to Yandex Cloud).",
+  "type": "object",
+
+  "definitions": {
+    "resolveIamTokenOptions": {
+      "$id": "#/definitions/resolveIamTokenOptions",
+      "title": "ResolveIamTokenOptions",
+      "type": "object",
+      "description": "Test/override seams. Public default resolution uses the real home dir, the Yandex Cloud IAM endpoint and the global fetch.",
+      "properties": {
+        "homeDir": {
+          "type": "string",
+          "description": "Baseline of ~/.yc lookups (tests: temp dir). Default os.homedir()."
+        },
+        "iamEndpoint": {
+          "type": "string",
+          "format": "uri",
+          "description": "IAM API base, default https://iam.api.cloud.yandex.net. Exchange calls POST {iamEndpoint}/iam/v1/tokens."
+        },
+        "fetchImpl": {
+          "description": "Injected fetch implementation; default globalThis.fetch. All network calls go through it (mocked in tests)."
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "iamUnavailableReason": {
+      "$id": "#/definitions/iamUnavailableReason",
+      "title": "IamUnavailableReason",
+      "type": "string",
+      "description": "Fail-open reason for the JDT_IAM_UNAVAILABLE warning (FR-024, FR-029). One per failed resolution.",
+      "enum": [
+        "no-credential",
+        "io",
+        "exchange-error",
+        "network-error"
+      ],
+      "enumDescriptions": {
+        "no-credential": "No YC_IAM_TOKEN env, config.yaml missing/without token, and no parseable ~/.yc/keys/*.json.",
+        "io": "Config/keys directory read or YAML/JSON parse failure.",
+        "exchange-error": "IAM API returned non-2xx or a malformed response (including rejected OAuth token).",
+        "network-error": "fetch threw (DNS/TCP/TLS). No retry in v1."
+      }
+    },
+
+    "resolutionResult": {
+      "$id": "#/definitions/resolutionResult",
+      "title": "ResolutionResult",
+      "type": "object",
+      "description": "Internal detailed result (used by the server banner). Public resolveIamToken returns the token only.",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "Resolved IAM token; present on success, absent on failure."
+        },
+        "reason": {
+          "$ref": "#/definitions/iamUnavailableReason",
+          "description": "Present on failure (banner/log); absent on success."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+
+  "chain": {
+    "$id": "#/chain",
+    "title": "Resolution chain (S-8, FR-023)",
+    "type": "object",
+    "description": "Strict priority; the first successful step is final (US3-SC...4).",
+    "properties": {
+      "step1Env": {
+        "type": "string",
+        "const": "YC_IAM_TOKEN",
+        "description": "Non-empty env value returned as-is. NO network calls on this path (US3-SC1)."
+      },
+      "step2OAuth": {
+        "type": "object",
+        "properties": {
+          "configFile": { "type": "string", "const": "~/.yc/config.yaml" },
+          "format": {
+            "type": "string",
+            "description": "Yandex Cloud CLI format: { current: <profile>, profiles: { <name>: { token, cloud-id, folder-id } } }. Active profile token read; t1.-prefixed value treated as an already-IAM token and returned as-is; otherwise exchanged as OAuth."
+          },
+          "exchange": {
+            "type": "string",
+            "description": "POST {iamEndpoint}/iam/v1/tokens body { \"yandexPassportOauthToken\": \"<oauth>\" } → { iamToken }."
+          }
+        },
+        "required": ["configFile", "format", "exchange"]
+      },
+      "step3SaKey": {
+        "type": "object",
+        "properties": {
+          "keysDir": { "type": "string", "const": "~/.yc/keys/*.json" },
+          "keyJson": {
+            "type": "string",
+            "description": "Service-account key JSON: id, service_account_id, key_algorithm (RSA_2048), private_key (PEM with literal \\n), public_key."
+          },
+          "jwt": {
+            "type": "string",
+            "description": "Header { alg: \"PS256\", typ: \"JWT\" }; claims { iss: service_account_id, aud: \"{iamEndpoint}/iam/v1/tokens\", iat: now, exp: now + 3600 }; signed via node:crypto RSA-PSS-SHA256 (RSA_2048 key)."
+          },
+          "exchange": {
+            "type": "string",
+            "description": "POST {iamEndpoint}/iam/v1/tokens body { \"jwt\": \"<jwt>\" } → { iamToken }."
+          }
+        },
+        "required": ["keysDir", "keyJson", "jwt", "exchange"]
+      },
+      "pooling": {
+        "type": "string",
+        "const": "one resolution per server start; no TTL refresh in v1 (rotation by restart)",
+        "description": "FR-025, D-7, A-8."
+      }
+    },
+    "required": ["step1Env", "step2OAuth", "step3SaKey", "pooling"]
+  }
+}
