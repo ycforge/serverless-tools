@@ -70,26 +70,25 @@ pnpm vitest run test/payload.spec.ts
 
 ---
 
-## Sc3: Raw context: `@YandexContext()` видит токен/folderId/trace (US1-SC3, FR-016..020)
+## Sc3: Raw context + trace correlation (US1-SC3, FR-016..020)
 
-Fixture-controller `GET /context` возвращает поля `YandexExecutionContext` (через `@YandexContext()`).
+Единица контракта контекста — **raw context**, который синтезирует эмулятор (`buildRawContext`) и из которого коннектор строит `YandexExecutionContext`. Заполнение `@YandexContext()`-параметра over-HTTP — известная граница Project A (spec A-13): fixture-контроллер с `@YandexContext()` локально вернёт 500 (`undefined`). Поэтому сценарий проверяется в двух плоскостях:
+
+**unit — контракт raw context** (`pnpm vitest run test/context.spec.ts`): `token` присутствует только когда задан; `functionFolderId === 'folder123'`; defaults `functionName === 'local-function'`, `functionVersion === 'local-dev'`, `memoryLimitInMB === '1024'`, `logGroupName === ''`; `awsRequestId === requestId`; `deadlineMs ≈ now+15000`; `cloudId` (если задан); `uberTraceId` verbatim из заголовка `Uber-Trace-Id`.
+
+**trace correlation — end-to-end**: error-маршрут `/respond/error` возвращает 500, и `body.trace_id ===` заголовок `X-Trace-Id` ответа `===` `trace_id` в per-request лог-строке (один uuid); два запроса дают разные uuid. Коннектор строит `YandexExecutionContext` с `trace_id == awsRequestId`.
 
 ```bash
 node --import tsx -e "
 import { createYcsfLocalServer } from './dist/server/index.js';
-const s = await createYcsfLocalServer({
-  entry: './test/fixtures/user-service/app.module.ts', port: 0,
-  yandexContext: { token: 'abc', folderId: 'folder123' },
-});
-const r = await fetch(s.baseUrl + '/context', { headers: { 'Uber-Trace-Id': 't:s:p:1' } });
-console.log(await r.text());
+const s = await createYcsfLocalServer({ entry: './test/fixtures/user-service/app.module.ts', port: 0 });
+const r = await fetch(s.baseUrl + '/respond/error', { headers: { connection: 'close' } });
+console.log(r.status, r.headers.get('x-trace-id'), await r.text());
 await s.stop();
 "
 ```
 
-**Ожидания**: `token === 'abc'`, `functionFolderId === 'folder123'`, `functionName === 'local-function'`, `functionVersion === 'local-dev'`, `memoryLimitInMB === '1024'`, `logGroupName === ''`, `uberTraceId === 't:s:p:1'`, и равенство `ctx.trace_id === ctx.awsRequestId === event.requestContext.requestId` (FR-019).
-
-Per-request: `requestId` в событии и `awsRequestId` в контексте — один uuid; `deadlineMs` ≈ now+15000; `cloudId` доступен через `ctx.raw.cloudId`.
+**Ожидания**: `500`; значение заголовка `x-trace-id` равно `trace_id` из JSON-body; в stderr per-request лог `GET /respond/error → 500 (N ms) trace_id=<тот же uuid>`.
 
 ---
 
@@ -101,7 +100,7 @@ Unit: `test/iam.spec.ts` (mock `fetchImpl`, temp `~/.yc` через `homeDir`):
 2. Нет env, `~/.yc/config.yaml` `{ current: dev, profiles: { dev: { token: <oauth> } } }` → мок exchange вернул `iamToken` → результат из обмена (US3-SC2).
 3. Нет env/config, `~/.yc/keys/sa-key.json` → JWT (iss/aud/iat/exp, PS256) формируется, мок exchange возвращает токен (US3-SC3).
 4. env + OAuth-конфиг одновременно → результат из env, config не читается (приоритет, US3-SC4).
-5. Нет ни одного источника / сетевой сбой → `undefined` + `reason`; `createYcsfLocalServer` стартует с warning `JDT_IAM_UNAVAILABLE`, `@YandexContext().token === undefined`, запросы работают (US3-SC5, FR-024).
+5. Нет ни одного источника / сетевой сбой → `undefined` + `reason`; `createYcsfLocalServer` стартует с warning `JDT_IAM_UNAVAILABLE`, в raw context поле `token` отсутствует (контракт контекста — unit, A-13), запросы работают (US3-SC5, FR-024).
 6. Banner со значением токена — **отсутствует** (US3-SC6, FR-026/028).
 
 ---
@@ -114,7 +113,7 @@ Fixture-controller честно возвращает: `201 + X-Custom`; `302 + L
 - 201 + `X-Custom: v` + тело `{"ok":true}`.
 - Оба `Set-Cookie` **отдельными строками** (не comma-join).
 - Бинарный body — байт-в-байт (base64 decode).
-- Throw handler → HTTP 500 JSON `{ error, message, trace_id }`, header `X-Trace-Id`, секретов нет; stack в логе с тем же trace_id (US7-SC3/FR-022).
+- Throw handler → HTTP 500 с `trace_id` в body, header `X-Trace-Id`, секретов нет; stack в логе с тем же trace_id (US7-SC3/FR-022). Наблюдаемый body для throw внутри NestJS: `{ statusCode: 500, message, trace_id }` (T050/A-13 probe); для не-envelope результата handler-а сервер отдаёт собственный `{ error, message, trace_id }`.
 
 **Тест**: `test/response.spec.ts` (+ интеграционный прогон в `server.integration.spec.ts`).
 
@@ -222,7 +221,7 @@ node --import tsx dist/server/index.js …   # примеры выше
 |----------|---------|-----------|
 | Sc1 | US1, FR-001..003/007 | `test/server.integration.spec.ts` |
 | Sc2 | US2, FR-010..015 | `test/payload.spec.ts` |
-| Sc3 | US1-SC3, FR-016..020 | `test/context.spec.ts` |
+| Sc3 | US1-SC3, FR-016..020 | `test/context.spec.ts` (unit: raw context contract), `test/server.integration.spec.ts` (trace correlation) |
 | Sc4 | US3, FR-023..025 | `test/iam.spec.ts` |
 | Sc5 | US4, FR-021..022 | `test/response.spec.ts`, `test/server.integration.spec.ts` |
 | Sc6 | US5, FR-004/029 | `test/server.integration.spec.ts` |

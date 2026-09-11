@@ -14,7 +14,7 @@
       "properties": {
         "token": {
           "type": "string",
-          "description": "IAM token for @YandexContext().token. Secret: never logged, never echoed in banners/responses (FR-017, FR-028). When absent the raw context has no token key."
+          "description": "IAM token written into the raw-context token key (FR-017). Secret: never logged, never echoed in banners/responses (FR-017, FR-028). When absent the raw context has no token key. Reads via connector @YandexContext() are a connector-side contract; over the HTTP dispatch path the connector does not fill them (boundary A-13), so the raw-context contract is verified at unit level (buildRawContext)."
         },
         "folderId": {
           "type": "string",
@@ -22,7 +22,7 @@
         },
         "cloudId": {
           "type": "string",
-          "description": "Becomes cloudId in the raw context, readable via @YandexContext().raw escape hatch; no normalized typed field exists (Q-2, FR-018)."
+          "description": "Becomes cloudId in the raw context (escape-hatch key); no normalized typed field exists in YandexExecutionContext (Q-2, FR-018). Reading raw over HTTP via @YandexContext() is a connector boundary (A-13)."
         }
       },
       "additionalProperties": true

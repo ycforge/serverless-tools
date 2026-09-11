@@ -65,7 +65,7 @@ Specs создаются **перед реализацией соответст�
 
 | # | Spec | Scope | Статус | Зависимости |
 |---|------|-------|--------|-------------|
-| 023 | local-dev-server — `@ycforge/js-dev-tools/server`, payload 2.0 эмуляция | §38 | 🚧 | 001 |
+| 023 | local-dev-server — `@ycforge/js-dev-tools/server`, payload 2.0 эмуляция | §38 | ✅ | 001 |
 | 024 | e2e-reference — reference-проект (user_service + orders + frontend + openapi), build → terraform plan | §30, §41 | ⬜ | все волны 1–3 |
 
 ## Правила

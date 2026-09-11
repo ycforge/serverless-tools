@@ -16,7 +16,7 @@ Spec 023 добавляет новый dev-tooling пакет `packages/js-dev-t
 
 **Storage**: N/A (без диска; `~/.yc/config.yaml` и `~/.yc/keys/*` — read-only input IAM-цепочки с override через `homeDir` в тестах).
 
-**Testing**: Vitest (unit + integration). Test-first per Constitution II: каждый FR-001..029 / US1..7 → ≥1 тест, RED → GREEN (quickstart Sc1..Sc12). Unit: чистые преобразования `payload`/`context`/`response`/`iam` (без сети — exchange через мок `fetchImpl`, temp `~/.yc`); интеграция: fixture `test/fixtures/user-service/` (включая `@YandexContext()`-контроллер) через `createYandexHandler`, реальный `await createYcsfLocalServer` + `fetch(baseUrl)`; e2e: child process `node --import tsx` для host-loader (A-2). Vitest-конфиг = nest-bridge со swc emit-decorator-metadata-плагином (зарезолвленные `design:paramtypes` в fixture-контроллерах), `maxWorkers: 2`. Тесты не ходят в Yandex Cloud (SC-007).
+**Testing**: Vitest (unit + integration). Test-first per Constitution II: каждый FR-001..029 / US1..7 → ≥1 тест, RED → GREEN (quickstart Sc1..Sc12). Unit: чистые преобразования `payload`/`context`/`response`/`iam` (без сети — exchange через мок `fetchImpl`, temp `~/.yc`); интеграция: fixture `test/fixtures/user-service/` (контроллеры с NestJS DI; `@YandexContext()`-параметр over-HTTP не заполняется коннектором — граница A-13, контракт контекста на unit-уровне) через `createYandexHandler`, реальный `await createYcsfLocalServer` + `fetch(baseUrl)`; e2e: child process `node --import tsx` для host-loader (A-2). Vitest-конфиг = nest-bridge со swc emit-decorator-metadata-плагином (зарезолвленные `design:paramtypes` в fixture-контроллерах), `maxWorkers: 2`. Тесты не ходят в Yandex Cloud (SC-007).
 
 **Target Platform**: Node 22+ ESM-пакет `packages/js-dev-tools`, собран tsup (esm+cjs+dts), единственный export subpath `./server`. Дублистайл nest-bridge (`exports["./server"]`, `dist/server/index.js`).
 
@@ -89,7 +89,7 @@ packages/js-dev-tools/
 └── test/
     ├── fixtures/
     │   ├── user-service/
-    │   │   ├── app.module.ts         # AppModule (named), AppController: GET /api/users, GET /context (@YandexContext())
+    │   │   ├── app.module.ts         # AppModule (named), AppController: GET /api/users, GET /respond/error (throws → 500 envelope with trace_id)
     │   │   ├── default-export.ts     # модуль как default export
     │   │   ├── ambiguous.ts          # named AppModule + другой default → JDT_ENTRY_MODULE_AMBIGUOUS
     │   │   └── no-module.ts          # без экспорта модуля → JDT_ENTRY_MODULE_NOT_FOUND

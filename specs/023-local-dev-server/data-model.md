@@ -33,7 +33,7 @@ packages/js-dev-tools/
 └── test/
     ├── fixtures/
     │   ├── user-service/
-    │   │   ├── app.module.ts        # @@Module AppController: GET /api/users, @YandexContext() controller export
+    │   │   ├── app.module.ts        # @@Module AppController: GET /api/users, GET /respond/error (throws → 500 envelope with trace_id)
     │   │   ├── default-export.ts    # вариант с default export'ом модуля
     │   │   ├── ambiguous.ts         # named AppModule + другой default-класс (JDT_ENTRY_MODULE_AMBIGUOUS)
     │   │   └── no-module.ts         # экспортов модуля нет (JDT_ENTRY_MODULE_NOT_FOUND)

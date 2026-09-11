@@ -36,7 +36,7 @@ createYcsfLocalServer({
 });
 ```
 
-Сервер поднимает HTTP-сервер, транслирует входящие запросы в **API Gateway v2 payload (payload 2.0)**, вызывает handler из Project A (`createYandexHandler(appModule)`), возвращает ответ клиенту и прокидывает `trace-id` / IAM-токен в `@YandexContext()`.
+Сервер поднимает HTTP-сервер, транслирует входящие запросы в **API Gateway v2 payload (payload 2.0)**, вызывает handler из Project A (`createYandexHandler(appModule)`), возвращает ответ клиенту и синтезирует raw context с `trace-id`/IAM-полями. Конечный контракт `@YandexContext()` живёт внутри коннектора: по HTTP-пути (`YandexHttpAdapter.dispatch`) параметр декоратора не заполняется — это известная граница Project A (см. A-13) и follow-up за spec 001.
 
 Это **НЕ Project A и НЕ Project C**: `@ycforge/js-dev-tools` — отдельный dev-tooling пакет, который **только эмулирует окружение вызова** (HTTP → payload 2.0 → handler → response). Все runtime-семантики он делегирует nest-bridge через публичный API (`createYandexHandler`), а bootstrap NestJS, transpile/build, deploy/provision — вне его ответственности (Constitution I).
 
@@ -144,7 +144,7 @@ Connector строит `YandexExecutionContext` из raw context через `bui
 
 `trace_id` = `awsRequestId` ставит сам коннектор (spec 004) — сервер гарантирует равенство `trace_id == awsRequestId == requestId`, чтобы локально и в облаке корреляция совпадала.
 
-**Trace propagation**: ответ сервера содержит заголовок `X-Trace-Id` (значение = per-request trace id), а `uberTraceId` в контексте зеркалит входящий `Uber-Trace-Id` — так цепочки локальных вызовов коррелируются (IDEA §38: «Прокидывает `trace-id` … в `@YandexContext()`»).
+**Trace propagation**: ответ сервера содержит заголовок `X-Trace-Id` (значение = per-request trace id), а `uberTraceId` в raw context зеркалит входящий `Uber-Trace-Id` — так цепочки локальных вызовов коррелируются. IDEA §38 формулирует требование как прокидывание `trace-id`/IAM в `@YandexContext()`; на уровне 023 это реализуется синтезом корректного raw context, а коннектор строит из него `YandexExecutionContext` (заполнение параметров декоратора при HTTP-диспатче — внутренняя граница Project A, см. A-13).
 
 ### S-7 — Response mapping (`YandexFunctionHttpResponse` → HTTP-ответ)
 
@@ -158,7 +158,7 @@ Handler коннектора возвращает envelope `YandexFunctionHttpRe
 | `body` + `isBase64Encoded: false` | строка как body |
 | `body` + `isBase64Encoded: true` | `Buffer.from(body, 'base64')` как бинарный body |
 
-**Ошибка инвокации**: если handler бросает — сервер возвращает клиенту HTTP 500 с JSON `{ "error": <code/name>, "message": <safe message>, "trace_id": <id> }` и заголовком `X-Trace-Id`. Детали ошибки пишутся в лог (стек), но secret-поля (token, `Authorization`, `Cookie`) из ошибки и ответа исключаются.
+**Ошибка инвокации**: если результат handler-а не является валидным envelope — сервер возвращает клиенту HTTP 500 с JSON `{ "error": <code/name>, "message": <safe message>, "trace_id": <id> }` и заголовком `X-Trace-Id` (errorResponse). Если ошибка брошена внутри NestJS (throw в controller-е) — эмулятор возвращает envelope коннектора как есть: наблюдаемый 500-body `{ "statusCode": 500, "message": "...", "trace_id": <id> }` (Nest default exception layer + коннектор добавляет `trace_id` к ответам >=400). В обоих случаях `body.trace_id === X-Trace-Id === per-request лог trace_id`. Детали ошибки пишутся в лог (стек), но secret-поля (token, `Authorization`, `Cookie`) из ошибки и ответа исключаются.
 
 ### S-8 — IAM token resolution (`resolveIamToken`)
 
@@ -171,7 +171,7 @@ Handler коннектора возвращает envelope `YandexFunctionHttpRe
 Правила:
 
 - Порядок приоритетный: env → OAuth → SA key; первый успешный — финальный.
-- **Fail-open**: если токен не разрешился (нет env, нет конфига, сетевой сбой) → вернуть `undefined` (и код причины). Локальный сервер продолжает работу без токена (в `@YandexContext().token` поле отсутствует), на старте выдаётся один warning `JDT_IAM_UNAVAILABLE`. Local dev НЕ падает из-за токена.
+- **Fail-open**: если токен не разрешился (нет env, нет конфига, сетевой сбой) → вернуть `undefined` (и код причины). Локальный сервер продолжает работу без токена (в raw context поле `token` отсутствует; через HTTP-диспатч Nest router `@YandexContext().token` не заполняется в любом случае — известная граница Project A, см. A-13), на старте выдаётся один warning `JDT_IAM_UNAVAILABLE`. Local dev НЕ падает из-за токена.
 - **Один резолв на старт**: сервер резолвит токен до начала слушания (или принимает уже разрешённый из `yandexContext.token`) и использует его на всех инвокациях без refresh (TTL ~12ч платформенного IAM-токена локально не управляется в v1 — documented limitation, ротация = перезапуск).
 - Вызовы IAM API выполняются только когда это реально нужно (env-путь не делает сетевых вызовов). В тестах обмен мокается.
 
@@ -242,7 +242,7 @@ Handler коннектора возвращает envelope `YandexFunctionHttpRe
 
 **Решение**: Цепочка env → OAuth (`~/.yc/config.yaml`) → SA key (`~/.yc/keys/*`), каждый шаг обмена — через IAM API. Отсутствие токена/сетевые сбои → `undefined` + warning, сервер работает. Один резолв на старт, без TTL-refresh.
 
-**Рациональность**: Local dev не должен фейлиться из-за отсутствия/протухания токена: без токена `@YandexContext().token` просто отсутствует (опциональность уже заложена в контракте коннектора). Fail-open — правильная семантика окружения (в отличие от fail-fast на конфигурации, D-10). Refresh — отдельная фича (TTL управление), не обязательна для дебага локально.
+**Рациональность**: Local dev не должен фейлиться из-за отсутствия/протухания токена: без токена поле `token` в raw context просто отсутствует (опциональность уже заложена в контракте коннектора; при HTTP-диспатче `@YandexContext()`-параметр не заполняется в любом случае — граница A-13). Fail-open — правильная семантика окружения (в отличие от fail-fast на конфигурации, D-10). Refresh — отдельная фича (TTL управление), не обязательна для дебага локально.
 
 ### D-8 — `messageQueue: true` → fail-fast `JDT_MQ_UNSUPPORTED` (Constitution V)
 
@@ -254,7 +254,7 @@ Handler коннектора возвращает envelope `YandexFunctionHttpRe
 
 **Решение**: `uberTraceId` контекста зеркалит входящий `Uber-Trace-Id`; ответ содержит `X-Trace-Id`; `trace_id == awsRequestId == requestId`.
 
-**Рациональность**: IDEA §38 прямо требует «прокидывает `trace-id` … в `@YandexContext()`». Наблюдаемо у платформы: `uberTraceId` соответствует `Uber-Trace-Id` header, а тёплый/холодный trace — сквозной. Отдавая `X-Trace-Id` в ответе, локальная цепочка вызовов (приложение → исходящие вызовы) коррелируется так же, как в облаке. Коннектор уже ставит `trace_id = awsRequestId` — сервер лишь гарантирует равенство id в сыром контексте/событии.
+**Рациональность**: IDEA §38 описывает прокидывание `trace-id`/IAM в `@YandexContext()`; на уровне 023 это означает синтез raw context с корректными полями (коннектор строит из него `YandexExecutionContext`; заполнение параметров декоратора при HTTP-диспатче — внутренняя граница Project A, см. A-13). Наблюдаемо у платформы: `uberTraceId` соответствует `Uber-Trace-Id` header, а тёплый/холодный trace — сквозной. Отдавая `X-Trace-Id` в ответе, локальная цепочка вызовов (приложение → исходящие вызовы) коррелируется так же, как в облаке. Коннектор уже ставит `trace_id = awsRequestId` — сервер лишь гарантирует равенство id в сыром контексте/событии.
 
 ### D-10 — Error semantics: fail-fast на конфигурацию, fail-open на окружение, 500 на инвокацию
 
@@ -279,7 +279,7 @@ createYcsfLocalServer({
 });
 ```
 
-Затем открывает `http://127.0.0.1:3100/api/users` — NestJS-контроллер отвечает как в облаке: сервер перевёл запрос в payload 2.0, вызвал handler коннектора (cold start на первом запросе), вернул envelope обратно. В контроллере `@YandexContext()` содержит `token`, `functionFolderId`, `trace_id`.
+Затем открывает `http://127.0.0.1:3100/api/users` — NestJS-контроллер отвечает как в облаке: сервер перевёл запрос в payload 2.0, вызвал handler коннектора (cold start на первом запросе), вернул envelope обратно. Контракт полей raw context проверяется unit-уровнем (`buildRawContext`, T018), сквозная корреляция per-request id (`trace_id == awsRequestId == requestId`) — через совпадение envelope-`trace_id`, ответного заголовка `X-Trace-Id` и лог-`trace_id` (см. AC3).
 
 **Why this priority**: Ядро §38 — рабочая локальная инвокация через настоящий handler. Без неё остальные US бессмысленны.
 
@@ -289,7 +289,7 @@ createYcsfLocalServer({
 
 1. **Given** fixture-приложение и свободный порт, **When** `await createYcsfLocalServer(...)`, **Then** promise резолвится, `baseUrl` доступен, `fetch(baseUrl + '/api/users')` возвращает 200 и ожидаемый JSON.
 2. **Given** первый запрос после старта, **When** он выполнен, **Then** ответ корректный (cold start завершён), повторный запрос отвечает быстрее (warm, handler переиспользован).
-3. **Given** controller с параметром `@YandexContext()`, **When** запрос выполнен, **Then** `ctx.token === <переданный token>`, `ctx.functionFolderId === 'folder123'`, `ctx.functionName === 'local-function'`, `ctx.trace_id === ctx.awsRequestId` и равен requestId из события.
+3. **Given** fixture-приложение с маршрутом, бросающим ошибку, **When** сервер обработал инвокацию, **Then** `trace_id` в JSON-envelope ошибки === значение заголовка `X-Trace-Id` ответа === `trace_id` в per-request лог-строке сервера (один uuid), а два разных запроса дают разные uuid. Контракт полей raw context (`token`, `functionFolderId`, defaults) проверяется unit-уровнем (`buildRawContext`, T018): `awsRequestId === requestId`, `token` присутствует только при заданном токене. Заполнение `@YandexContext()`-параметра при HTTP-диспатче — внутренняя граница Project A (см. A-13); fixture-контроллер, читающий `@YandexContext()`, локально вернёт 500 (`undefined`).
 4. **Given** запрос с несуществующим путём, **When** передан, **Then** NestJS отдаёт 404 (маршрутизация локального приложения, а не сервера).
 
 ---
@@ -327,7 +327,7 @@ createYcsfLocalServer({
 2. **Given** нет env, `~/.yc/config.yaml` с OAuth-токеном, **When** `resolveIamToken()`, **Then** выполняется обмен (мок IAM API), возвращается IAM-токен.
 3. **Given** нет env и нет config.yaml, но есть `~/.yc/keys/sa-key.json`, **When** `resolveIamToken()`, **Then** формируется JWT (iss/sub от ключа) и выполняется обмен (мок), возвращается IAM-токен.
 4. **Given** приоритет env + присутствует OAuth-конфиг, **When** `resolveIamToken()`, **Then** результат из env (порядок приоритетный, config не читается).
-5. **Given** разрешить токен невозможно (нет env/config/ключей или сетевой сбой), **When** `createYcsfLocalServer({ entry, yandexContext: {} })`, **Then** сервер стартует, warning `JDT_IAM_UNAVAILABLE` один раз, `@YandexContext().token === undefined`, запросы работают.
+5. **Given** разрешить токен невозможно (нет env/config/ключей или сетевой сбой), **When** `createYcsfLocalServer({ entry, yandexContext: {} })`, **Then** сервер стартует, warning `JDT_IAM_UNAVAILABLE` один раз, в raw context поле `token` отсутствует, запросы работают.
 6. **Given** сервер стартовал с токеном, **When** лог старта выведен, **Then** значение токена в логе отсутствует (секрет).
 
 ---
@@ -449,7 +449,7 @@ createYcsfLocalServer({
 **Execution context**
 
 - **FR-016**: System MUST синтезировать raw context со всеми required-полями коннектора: `awsRequestId` (string), `functionName`, `functionVersion`, `functionFolderId`, `memoryLimitInMB` (string), `logGroupName` (string), `deadlineMs` (number); defaults для платформенных полей: `"local-function"`, `"local-dev"`, `"1024"`, `Date.now()+15000`, `""`; поля `yandexContext` merged поверх defaults.
-- **FR-017**: System MUST пробрасывать `yandexContext.token` → `token` в raw context (→ `@YandexContext().token`); без токена поле отсутствует. Значение токена MUST NOT попадать в логи или body ответа.
+- **FR-017**: System MUST пробрасывать `yandexContext.token` → `token` в raw context (поле присутствует в raw context — вход для `buildYandexExecutionContext`; чтение в приложении идёт через контракт `@YandexContext()`, заполнение которого при HTTP-диспатче — граница Project A, см. A-13); без токена поле отсутствует. Значение токена MUST NOT попадать в логи или body ответа.
 - **FR-018**: System MUST пробрасывать `yandexContext.folderId` → `functionFolderId` и `yandexContext.cloudId` → поле `cloudId` в raw context.
 - **FR-019**: System MUST генерировать per-request id, одинаковый для `awsRequestId`, `requestContext.requestId` и (через коннектор) `trace_id`.
 - **FR-020**: System MUST устанавливать `uberTraceId` raw context из заголовка `Uber-Trace-Id` входящего запроса (если есть) и MUST включать `X-Trace-Id` в response headers.
@@ -457,7 +457,7 @@ createYcsfLocalServer({
 **Response mapping**
 
 - **FR-021**: System MUST мапить `YandexFunctionHttpResponse`: `statusCode` → HTTP-статус; `headers` → одиночные заголовки; `multiValueHeaders` → каждый элемент отдельным заголовком (не comma-join); `body` + `isBase64Encoded` → строка либо `Buffer.from(body,'base64')`.
-- **FR-022**: System MUST при throw handler-а отвечать HTTP 500 JSON `{ error, message, trace_id }` с заголовком `X-Trace-Id`, детали (stack) в лог, секреты из response/логов исключены.
+- **FR-022**: System MUST при ошибке инвокации отвечать HTTP 500 с JSON и заголовком `X-Trace-Id`; для результатов вне valid envelope — `{ error, message, trace_id }` (errorResponse), при throw внутри NestJS — envelope коннектора как есть (наблюдаемый body `{ statusCode, message, trace_id }`; T050 probe); в обоих случаях `body.trace_id === X-Trace-Id === лог trace_id`; детали (stack) в лог, секреты из response/логов исключены.
 
 **IAM token resolution**
 
@@ -473,7 +473,7 @@ createYcsfLocalServer({
 
 **Diagnostics**
 
-- **FR-029**: System MUST использовать коды семейства `JDT_*`: `JDT_MQ_UNSUPPORTED`, `JDT_NO_TRANSPORT`, `JDT_PORT_IN_USE`, `JDT_ENTRY_RESOLVE_FAILED`, `JDT_ENTRY_MODULE_NOT_FOUND`, `JDT_ENTRY_MODULE_AMBIGUOUS` (ошибки старта), `JDT_IAM_UNAVAILABLE` (warning).
+- **FR-029**: System MUST использовать коды семейства `JDT_*`: `JDT_MQ_UNSUPPORTED`, `JDT_NO_TRANSPORT`, `JDT_PORT_IN_USE`, `JDT_INVALID_PORT` (некорректное значение порта — не целое число в [0, 65535], fail-fast до probe/bind), `JDT_ENTRY_RESOLVE_FAILED`, `JDT_ENTRY_MODULE_NOT_FOUND`, `JDT_ENTRY_MODULE_AMBIGUOUS` (ошибки старта), `JDT_IAM_UNAVAILABLE` (warning).
 
 ### Key Entities
 
@@ -495,7 +495,7 @@ createYcsfLocalServer({
 
 - **SC-001**: `await createYcsfLocalServer(...)` на fixture-приложении (`user_service` fixture) → первый запрос обработан (cold start) и повторный (warm) показывает p50 latency тёплой инвокации < 50 ms на локальной машине; ответ по shape эквивалентен облачному.
 - **SC-002**: Payload-фиделити: для ≥6 типов запросов (GET без query, GET с query/повторами, POST JSON, form, бинарный body, encoded path) сгенерированное `RawHttpApiGatewayV2Event` совпадает с эталонной структурой по 100% полей, определённых S-5.
-- **SC-003**: Контракт контекста: `@YandexContext()` в fixture-контроллере видит `token`, `functionFolderId`, `trace_id == awsRequestId == requestId`, `uberTraceId` из входящего `Uber-Trace-Id`.
+- **SC-003**: Контракт контекста (unit-уровень): `buildRawContext` даёт raw context с `token` (только если задан), `functionFolderId`, defaults `functionName`/`functionVersion`/`memoryLimitInMB`/`logGroupName`/`deadlineMs`, `awsRequestId === requestId`, `uberTraceId` verbatim из входящего `Uber-Trace-Id`; сквозная корреляция `trace_id == awsRequestId` подтверждается интеграционно: envelope-`trace_id` ошибки === `X-Trace-Id` ответа === лог-`trace_id` (Project A ставит `trace_id = awsRequestId` при построении `YandexExecutionContext`). Заполнение `@YandexContext()`-параметров при HTTP-диспатче — известная граница Project A (A-13), фиксируется как follow-up за spec 001.
 - **SC-004**: IAM-цепочка подтверждена тестами: env-путь без сети; OAuth- и SA-key пути с моком IAM API; приоритет и fail-open (сервер стартует без токена) покрыты.
 - **SC-005**: Response mapping без потерь: 201+заголовок, 302+Location, два `Set-Cookie` (отдельные строки), бинарный body — байт-в-байт.
 - **SC-006**: Error paths: `messageQueue:true`, `!apiGatewayV2&&!messageQueue`, занятый порт, bad entry — отклонение promise с правильным кодом `JDT_*` до любых побочных эффектов; throw handler-а → HTTP 500 с `trace_id`.
@@ -518,6 +518,7 @@ createYcsfLocalServer({
 - **A-10 — `multiValueParameters` vs `pathParameters`**: локально отсутствует gateway-спека; пустые значения не влияют на NestJS-маршрутизацию (D-5).
 - **A-11 — Кодирование body де-факто**: text/JSON content-type или валидный UTF-8 buffer → string; иначе base64. Грей-зоны (бинарный content-type, но валидный UTF-8 buffer) разрешаются детерминированно в пользу text — документируется в README пакета.
 - **A-12 — Секретный класс безопасности**: токен/авторизационные заголовки не логируются (AGENTS.md 6.2), не попадают в ответы; это проверяется тестами.
+- **A-13 — Известная граница Project A: HTTP-диспатч не заполняет `@YandexContext()`-параметры**: эмулятор ответственен за синтез raw context, а контракт `@YandexContext()`-параметров заполняется внутри коннектора. Эмпирически (spec 001): коннектор диспатчит HTTP-контроллеры через нативный Nest router (`YandexHttpAdapter.dispatch` / `runDispatch`) и НЕ инжектит значения в параметры декоратора; параметры заполняются только на MQ-пути (`getYandexContextParameterIndexes`). Поэтому fixture-контроллер, читающий `@YandexContext()`, локально получит `undefined`/500. 023 фиксирует это как известную границу с follow-up за spec 001 (amendment/future, вне 023): контракт контекста тестируется unit-уровнем (`buildRawContext` → `buildYandexExecutionContext`, T018), интеграция — trace-correlation по per-request id (US1-SC3 AC3, SC-003).
 
 ---
 
@@ -540,6 +541,7 @@ createYcsfLocalServer({
 - **Q-2 — Куда попадает `cloudId`, если в normalized-контексте его нет?** → **Решение**: В raw context (через escape hatch `@YandexContext().raw`). Добавление typed-поля `cloudId` в `YandexExecutionContext` — изменение контракта коннектора (spec 001 amendment/future), вне 023.
 - **Q-3 — IAM-токен протухает (TTL ~12ч/1ч). Refresh или один резолв?** → **Решение**: v1 — один резолв на старт, ротация перезапуском; refresh с TTL-планированием — отдельная future-фича (D-7).
 - **Q-4 — Bind host: только loopback или опция?** → **Решение**: v1 — `127.0.0.1` (A-3); опция host — future.
+- **Q-5 — `@YandexContext()` не заполняется при HTTP-диспатче (Project A gap)**: коннектор инжектит параметры декоратора только на MQ-пути; HTTP-маршрут диспатчится нативным Nest router без заполнения параметров → fixture-контроллер с `@YandexContext()` возвращает 500. **Не блокирует v1**: 023 фиксирует границу A-13 — контракт контекста верифицируется unit-уровнем (`buildRawContext`), сквозная корреляция — trace-correlation (US1-SC3 AC3). Заполнение параметров по HTTP-пути — follow-up за Project A (spec 001 amendment/future), вне 023.
 
 Все вопросы — **не блокируют** v1; ответы зафиксированы как решения/assumptions.
 
@@ -547,7 +549,7 @@ createYcsfLocalServer({
 
 ## References
 
-- IDEA.md §38: Local development — `@ycforge/js-dev-tools`, `createYcsfLocalServer`, payload 2.0, token-цепочка `YC_IAM_TOKEN` → `~/.yc/config.yaml` → `~/.yc/keys`, прокидывание `trace-id`/IAM в `@YandexContext()`
+- IDEA.md §38: Local development — `@ycforge/js-dev-tools`, `createYcsfLocalServer`, payload 2.0, token-цепочка `YC_IAM_TOKEN` → `~/.yc/config.yaml` → `~/.yc/keys`, прокидывание `trace-id`/IAM через синтез raw context (реализация `@YandexContext()`-параметров — граница Project A, A-13)
 - Constitution I: A/B/C/Terraform separation — js-dev-tools это dev-tooling, не runtime (A), не orchestration (C), не provisioning
 - Constitution II: Spec-first, Test-first (каждый FR → ≥1 тест, RED → GREEN)
 - Constitution III: Contracts versioned — 023 не меняет контракты коннектора, использует public API
