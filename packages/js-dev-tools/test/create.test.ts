@@ -28,13 +28,13 @@ class FakeServer extends EventEmitter {
   }
 }
 
-function mockRequest(url: string): IncomingMessage {
+function mockRequest(url: string, headers: Record<string, string> = {}): IncomingMessage {
   const req = new EventEmitter() as unknown as IncomingMessage;
   Object.assign(req, {
     method: 'GET',
     url,
     rawHeaders: [] as string[],
-    headers: {} as Record<string, string>,
+    headers,
   });
   process.nextTick(() => req.emit('end'));
   return req;
@@ -208,5 +208,52 @@ describe('createYcsfLocalServerInternal (FR-003/004/009, S-2)', () => {
     await handle.stop();
 
     expect(handlerClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('pipes the Uber-Trace-Id request header into the raw context uberTraceId (FR-020 wiring)', async () => {
+    const UBER = '195befaa12da73b5:59ea0be13cb39c87:41d0f3eae511878e:1';
+    const captured: { event: Record<string, unknown>; context: Record<string, unknown> }[] = [];
+    const { deps, server } = setup({
+      handlerImpl: async (event: unknown, context: unknown) => {
+        captured.push({ event: event as Record<string, unknown>, context: context as Record<string, unknown> });
+        return ENVELOPE;
+      },
+    });
+    const handle = await createYcsfLocalServerInternal({ entry: './probe.ts' }, deps);
+    const requestHandler = (server.listeners('request')[0] as (req: IncomingMessage, res: ServerResponse) => Promise<void>);
+
+    await requestHandler(mockRequest('/api/users', { 'uber-trace-id': UBER }), mockResponse().res);
+    expect(captured[0]?.context.uberTraceId).toBe(UBER);
+
+    await requestHandler(mockRequest('/api/users'), mockResponse().res);
+    expect(captured[1]?.context.uberTraceId).toBeUndefined();
+
+    await handle.stop();
+  });
+
+  it('redacts the effective IAM token from the 500 body and stderr when a handler error embeds it (FR-022, data-model §2.5)', async () => {
+    const TOKEN = 'test-token-value+extra';
+    const { deps, server } = setup({
+      yandexContext: { token: TOKEN },
+      handlerImpl: async () => {
+        throw new Error(`auth failed token=${TOKEN}`);
+      },
+    });
+    const handle = await createYcsfLocalServerInternal({ entry: './probe.ts' }, deps);
+    const requestHandler = (server.listeners('request')[0] as (req: IncomingMessage, res: ServerResponse) => Promise<void>);
+    const { res, ended } = mockResponse();
+
+    await requestHandler(mockRequest('/api/users'), res);
+
+    const body = String(ended.mock.calls[0]?.[0] ?? '');
+    expect(body).toContain('[REDACTED]');
+    expect(body).not.toContain(TOKEN);
+
+    const logLines = (deps.logWriter.mock.calls as unknown[][]).map((call) => String(call[0]));
+    for (const line of logLines) {
+      expect(line).not.toContain(TOKEN);
+    }
+
+    await handle.stop();
   });
 });

@@ -297,6 +297,15 @@ description: "Task list for local-dev-server — @ycforge/js-dev-tools/server, p
 
 ---
 
+## Phase 14: Convergence — post-audit gaps
+
+**Purpose**: Independent `/speckit.converge` audit opened two evidence-backed gaps. Base spec 023 implementation and verification are sound (T150 lock): FR-001..029/US1..7 matrix holds, Constitution I/V boundaries verified statically, A-13 amendment consistent across spec/plan/tasks/quickstart/data-model/contracts/tests/fixtures. Both gaps are spec-required redaction/observability surface, not scaffolding.
+
+- [x] T151 [M] [FR-028] IAM token missing from per-request redaction secret set — `extractPerRequestSecrets()` in `packages/js-dev-tools/src/server/create.ts:193-197` returns `[authorization, cookie]` but omits the IAM token, diverging from data-model §2.5/§5 (`secrets = { yandexContext.token, request.headers.authorization, request.headers.cookie }`). A token value embedded in a handler error message (or in a non-envelope handler result) currently leaks into the HTTP 500 body and server stderr unredacted (US7 secret test passes only because the fixture `boom` message does not embed the token). Green: pass the effective token (`yandexContext.token` or the resolved IAM token, create.ts:82-97) into the per-request redaction set and add a spec-locked RED→GREEN test asserting a token-embedded error is `[REDACTED]` in both the response body and the stderr log. **Ref**: spec FR-028, S-9, US7-SC4, quickstart Sc3; data-model §2.5/§5. **Depends**: T071, T100. **Done**: create.ts now adds `yandexContext.token` (string) to the per-request secrets array; `test/create.test.ts` "redacts the effective IAM token..." drove RED (token visible in 500 body) then GREEN (`[REDACTED]` in body, token absent from all logWriter lines).
+- [x] T152 [L] [FR-020] `Uber-Trace-Id` header plumbing lacks a fail-asserting test — `req.headers['uber-trace-id']` → `uberTraceId` (create.ts:161) is untested end-to-end: only `buildRawContext`'s verbatim mirror is unit-covered (context.spec), and A-13 keeps the value unobservable via `@YandexContext()` over HTTP, so removing the header wiring would keep all current tests green. Green: add a test (create.test via the request handler, or an integration probe with a probe-handler asserting the raw context) that an incoming `Uber-Trace-Id` request header reaches the `uberTraceId` field of the raw context handed to the handler, verbatim; RED before GREEN. **Ref**: spec FR-020, S-6, US1-SC3, SC-003. **Depends**: T018, T051. **Done**: `test/create.test.ts` "pipes the Uber-Trace-Id request header into the raw context uberTraceId" probes the request-handler wiring through `mockRequest({ 'uber-trace-id': ... })` — asserts verbatim mirror into `context.uberTraceId` and `undefined` when absent; would fail if line 161 were removed.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

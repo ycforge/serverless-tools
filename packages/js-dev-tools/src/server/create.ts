@@ -151,7 +151,10 @@ async function onRequest(
   const traceId = newRequestId();
   const start = Date.now();
   let statusCode = 500;
-  const secrets = extractPerRequestSecrets(req.headers);
+  const secrets = [
+    ...extractPerRequestSecrets(req.headers),
+    typeof yandexContext.token === 'string' ? yandexContext.token : undefined,
+  ];
 
   try {
     const body = await readBody(req);
