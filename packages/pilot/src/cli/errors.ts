@@ -10,6 +10,11 @@ export const CLI_TERRAFORM_NOT_FOUND = 'CLI_TERRAFORM_NOT_FOUND' as const;
 export const CLI_DESTROY_REQUIRES_YES = 'CLI_DESTROY_REQUIRES_YES' as const;
 export const CLI_UNEXPECTED_ERROR = 'CLI_UNEXPECTED_ERROR' as const;
 
+export const CACHE_CORRUPTED = 'CACHE_CORRUPTED' as const;
+export const CACHE_BLOB_MISSING = 'CACHE_BLOB_MISSING' as const;
+export const CACHE_WRITE_FAILED = 'CACHE_WRITE_FAILED' as const;
+export const CACHE_VERSION_MISMATCH = 'CACHE_VERSION_MISMATCH' as const;
+
 export enum ExitCode {
   Success = 0,
   Error = 1,

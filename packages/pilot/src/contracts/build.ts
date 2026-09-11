@@ -11,6 +11,7 @@ export type BuildAppsResult =
       readonly projectModel: ProjectModel;
       readonly registry: PluginRegistry;
       readonly artifacts: readonly BuiltArtifact[];
+      readonly cache?: import('./cache.js').CacheSummary;
     }
   | {
       readonly kind: 'invalid';
@@ -28,4 +29,7 @@ export interface BuildAppsOptions {
   readonly target?: string;
   /** Per-app progress callback, invoked before each builder with the app ID (FR-009). */
   readonly onAppProgress?: (appId: string) => void;
+  readonly noCache?: boolean;
+  readonly cacheDir?: string;
+  readonly onCacheProgress?: (result: import('./cache.js').CacheCheckResult) => void;
 }

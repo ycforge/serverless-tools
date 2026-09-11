@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/cache-manifest.json",
+  "title": "@ycforge/pilot — cache manifest contract (spec 022)",
+  "description": "Machine-readable contract for the incremental build cache manifest (spec 022, S-1, FR-001..004, FR-028). Cache lives under <projectRoot>/.ycsf/cache/manifest.json (version: 1). Compared via constants in src/cache/manifest.ts. Additive and non-breaking.",
+  "type": "object",
+
+  "definitions": {
+    "cacheEntry": {
+      "$id": "#/definitions/cacheEntry",
+      "title": "CacheEntry",
+      "type": "object",
+      "description": "One entry per app (last-build-wins, S-1). Hit iff effectiveFingerprint equals computed + blob valid (FR-010).",
+      "properties": {
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Own fingerprint: sha256(canonicalJson({ filesHash, buildConfig, buildEnv, builder })) — 64-char hex (S-2, FR-005)."
+        },
+        "effectiveFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Effective fingerprint: sha256(ownFingerprint + '|' + sortedJoin(depEffects)) — 64-char hex, blob key (S-2, FR-008, D-4)."
+        },
+        "artifactType": {
+          "type": "string",
+          "pattern": "^[^:]+:[^:]+$",
+          "description": "Artifact type of last build (e.g. \"ycforge:function\"), convention <package-scope>:<kind>."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of last successful build for this app."
+        },
+        "dependsOnFingerprints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "description": "Effective fingerprints of direct depends_on neighbours at build time (debug, S-1)."
+        }
+      },
+      "required": ["fingerprint", "effectiveFingerprint", "artifactType", "createdAt", "dependsOnFingerprints"],
+      "additionalProperties": false
+    },
+
+    "cacheReason": {
+      "$id": "#/definitions/cacheReason",
+      "title": "CacheReason",
+      "type": "string",
+      "description": "Per-app cache hit/miss reason for stderr and --json summary.cache.entries[].reason (S-6, FR-011, FR-023).",
+      "enum": [
+        "hit",
+        "no_entry",
+        "source_changed",
+        "build_config_changed",
+        "build_env_changed",
+        "builder_changed",
+        "dependency_changed",
+        "no_cache",
+        "blob_missing",
+        "corrupted"
+      ]
+    },
+
+    "cacheCheckResult": {
+      "$id": "#/definitions/cacheCheckResult",
+      "title": "CacheCheckResult",
+      "type": "object",
+      "description": "Per-app cache result for observability and --json summary.cache.entries (S-6, FR-022..023).",
+      "properties": {
+        "appId": {
+          "type": "string",
+          "description": "App ID as in .ycsf/apps.yaml."
+        },
+        "hit": {
+          "type": "boolean",
+          "description": "True = cache hit (skipped build), false = miss (built or failed)."
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Effective fingerprint (64-char hex) computed for this build."
+        },
+        "reason": {
+          "$ref": "#/definitions/cacheReason"
+        },
+        "blobPath": {
+          "type": "string",
+          "description": "Absolute blob directory path; present only on hit."
+        }
+      },
+      "required": ["appId", "hit", "fingerprint", "reason"],
+      "additionalProperties": false
+    },
+
+    "cacheSummary": {
+      "$id": "#/definitions/cacheSummary",
+      "title": "CacheSummary",
+      "type": "object",
+      "description": "Aggregated cache stats for --json summary.cache (S-6, FR-023).",
+      "properties": {
+        "hits": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of apps that were cache hits."
+        },
+        "misses": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of apps that were cache misses."
+        },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/cacheCheckResult" },
+          "description": "Per-app entries in build order (topologicalOrder)."
+        }
+      },
+      "required": ["hits", "misses", "entries"],
+      "additionalProperties": false
+    }
+  },
+
+  "manifest": {
+    "$id": "#/manifest",
+    "title": "CacheManifest",
+    "type": "object",
+    "description": "Content of <projectRoot>/.ycsf/cache/manifest.json (S-1, FR-001, FR-004, FR-028). Lazily created on first successful build; absent = empty (no error).",
+    "properties": {
+      "version": {
+        "type": "integer",
+        "const": 1,
+        "description": "Format version — must be 1 (Constitution III). Mismatch → CACHE_VERSION_MISMATCH warning + reset (all miss)."
+      },
+      "entries": {
+        "type": "object",
+        "description": "Map appId → CacheEntry, last-build-wins per app (S-1).",
+        "additionalProperties": { "$ref": "#/definitions/cacheEntry" }
+      }
+    },
+    "required": ["version", "entries"],
+    "additionalProperties": false
+  },
+
+  "blobLayout": {
+    "$id": "#/blobLayout",
+    "title": "CacheBlob layout",
+    "type": "object",
+    "description": "On-disk layout of .ycsf/cache/blobs/<effectiveFingerprint>/ (S-1, D-8, FR-003). Content-addressed by effectiveFingerprint.",
+    "properties": {
+      "blobsDir": {
+        "type": "string",
+        "const": ".ycsf/cache/blobs/<effectiveFingerprint>/",
+        "description": "Blob directory keyed by 64-char hex effectiveFingerprint."
+      },
+      "artifactJson": {
+        "type": "object",
+        "description": "File blobs/<fp>/artifact.json — Artifact { type, value } as returned by Builder.build().",
+        "properties": {
+          "type": { "type": "string", "pattern": "^[^:]+:[^:]+$" },
+          "value": { "description": "Opaque artifact value (builder-specific)." }
+        },
+        "required": ["type", "value"]
+      },
+      "files": {
+        "type": "string",
+        "description": "Snapshot of builder's outputDir (recursive copy of .ycsf/artifacts/<appId>/) — files subtree inside blobs/<fp>/."
+      }
+    }
+  },
+
+  "diagnostics": {
+    "$id": "#/diagnostics",
+    "title": "CACHE_* diagnostic code catalog",
+    "type": "object",
+    "description": "Cache warnings (FR-030, D-7). Emitted to stderr as warnings, NOT in --json diagnostics array; reason also in summary.cache.entries[].reason. Exit code stays 0 if build succeeded (fail-safe).",
+    "properties": {
+      "CACHE_CORRUPTED": {
+        "const": "CACHE_CORRUPTED",
+        "description": "Manifest is unparseable or I/O error on read (S-7, FR-025). Warning + treat as miss, self-heal on next successful build."
+      },
+      "CACHE_BLOB_MISSING": {
+        "const": "CACHE_BLOB_MISSING",
+        "description": "Blob directory for cached fingerprint missing or lacks artifact.json/files (FR-013, S-3). Warning + miss + delete stale entry self-heal."
+      },
+      "CACHE_WRITE_FAILED": {
+        "const": "CACHE_WRITE_FAILED",
+        "description": "I/O error on manifest/blob write (disk full, EACCES) (FR-026). Warning, build still exit 0 (artifacts in .ycsf/artifacts/ valid); next run miss."
+      },
+      "CACHE_VERSION_MISMATCH": {
+        "const": "CACHE_VERSION_MISMATCH",
+        "description": "Manifest version !== 1 (FR-004). Warning + reset (treat all as miss, overwrite with version: 1 on next save)."
+      }
+    },
+    "required": ["CACHE_CORRUPTED", "CACHE_BLOB_MISSING", "CACHE_WRITE_FAILED", "CACHE_VERSION_MISMATCH"],
+    "additionalProperties": false
+  }
+}
