@@ -1911,7 +1911,7 @@ createYcsfLocalServer({
 });
 ```
 
-Сервер поднимает HTTP-сервер, транслирует входящие запросы в API Gateway v2 payload, вызывает handler из Project A, возвращает ответ. Прокидывает `trace-id` / IAM-токен в `@YandexContext()`.
+Сервер поднимает HTTP-сервер, транслирует входящие запросы в API Gateway v2 payload, вызывает handler из Project A, возвращает ответ. Идентификатор трассировки прокидывается сквозь запрос (envelope/заголовок ответа/per-request лог видят один `trace_id`); IAM-токен синтезируется в raw runtime context (`token`-ключ). Контракт raw-context проверяется на уровне unit (`buildRawContext`): через HTTP-диспатч Nest router connector параметры `@YandexContext()` не заполняет — известная граница Project A (spec 023, A-13).
 
 ---
 
