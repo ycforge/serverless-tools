@@ -46,6 +46,7 @@ describe('ycsf materialize action (T060)', () => {
     vi.mocked(dispatch).mockResolvedValue({
       kind: 'ok', resources: [],
       generatedFiles: [{ filename: 'a.ycsf.tf.json', content: '{}' }],
+      materializerOutputs: new Map(),
     });
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await materializeAction(fakeCmd());
@@ -83,6 +84,7 @@ describe('ycsf materialize action (T060)', () => {
         { filename: 'user_service.ycsf.tf.json', content: '{}' },
         { filename: 'analytics.ycsf.tf.json', content: '{}' },
       ],
+      materializerOutputs: new Map(),
     });
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await materializeAction(fakeCmd({ target: 'user_service' }));

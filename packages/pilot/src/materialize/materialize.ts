@@ -1,4 +1,5 @@
 import type {
+  AppIdArtifactMap,
   ArtifactDescriptor,
   DispatchDiagnostic,
   PluginRegistry,
@@ -10,7 +11,7 @@ import { createContext, createOutputBuilder } from './context.js';
 import type { OutputBuilderWithCollection } from './context.js';
 import { mtl } from './errors.js';
 import { getMaterializer } from './shape.js';
-import { deterministicOrder } from './select.js';
+import { buildArtifactDescriptors, deterministicOrder } from './select.js';
 
 /**
  * Phase 2 materialization (FR-005/006, research 7).
@@ -30,7 +31,14 @@ export type MaterializeAllResult =
   | { readonly kind: 'failed'; readonly error: DispatchDiagnostic };
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) {
+    // Materializers-core errors carry a `code` (e.g. YMT_INVALID_ARTIFACT_VALUE);
+    // surface it in the diagnostic message so the root cause is machine-readable.
+    const code = (error as { readonly code?: unknown }).code;
+    const base = error.message;
+    return typeof code === 'string' && code !== '' ? `${base} (${code})` : base;
+  }
+  return String(error);
 }
 
 export async function materializeAll(
@@ -38,8 +46,12 @@ export async function materializeAll(
   registry: PluginRegistry,
   matches: ReadonlyMap<string, string>,
   outputBuilder: OutputBuilderWithCollection = createOutputBuilder(),
+  artifacts?: AppIdArtifactMap,
 ): Promise<MaterializeAllResult> {
   const resources: DispatchedResource[] = [];
+  const descriptors = new Map(
+    buildArtifactDescriptors(model, artifacts).map((descriptor) => [descriptor.id, descriptor]),
+  );
 
   for (const appId of deterministicOrder(model)) {
     const materializerId = matches.get(appId);
@@ -50,12 +62,21 @@ export async function materializeAll(
     if (materializer === null) continue;
 
     const type = model.apps.get(appId)?.builder ?? 'unknown';
-    const artifact: ArtifactDescriptor = { id: appId, name: appId, type };
+    const descriptor = descriptors.get(appId);
+    const artifact: ArtifactDescriptor = descriptor ?? { id: appId, name: appId, type };
     const context = createContext(outputBuilder);
 
     try {
-      const resource = await materializer.materialize(artifact, context);
-      resources.push({ resource, appId, materializerId });
+      // Per the C-layer contract `materialize` returns a single resource;
+      // some real B-layer materializers (yandex-storage-bucket) return an
+      // array (bucket + its objects) at runtime. Flatten the array so every
+      // resource is serialized into the app's single file. Single-resource
+      // results are untouched (FR-005 contract pinned by test/types).
+      const produced = await materializer.materialize(artifact, context);
+      const producedList: readonly TerraformResource[] = Array.isArray(produced) ? produced : [produced];
+      for (const resource of producedList) {
+        resources.push({ resource, appId, materializerId });
+      }
     } catch (error) {
       return {
         kind: 'failed',

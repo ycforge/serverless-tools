@@ -1,0 +1,4 @@
+version: 1
+build_config:
+  DB_TOKEN: [tok]
+build_env: {}

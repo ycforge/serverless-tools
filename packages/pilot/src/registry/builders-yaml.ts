@@ -5,6 +5,7 @@ import {
   BRG_INVALID,
   BRG_KEY_COLLISION,
   BRG_VERSION,
+  isArtifactType,
 } from '../contracts/index.js';
 import { diag } from './errors.js';
 
@@ -12,7 +13,16 @@ export type ParseBuildersYamlResult =
   | { kind: 'ok'; data: { version: number; builders: Record<string, string>; materializers: Record<string, string> } }
   | { kind: 'invalid'; errors: readonly import('../contracts/index.js').ProjectModelDiagnostic[] };
 
-const KEY_RE = /^[\w-]+$/;
+const LEGACY_KEY_RE = /^[\w-]+$/;
+
+/**
+ * FR-009 (spec 025, BIG-2): builders/materializers keys accept the legacy
+ * bare-token form OR an artifact type `<scope>:<kind>` concordant with
+ * ARTIFACT_TYPE_PATTERN (D-5 — keys are never transformed, stored verbatim).
+ */
+function isValidBuildersKey(key: string): boolean {
+  return (!key.includes(':') && LEGACY_KEY_RE.test(key)) || isArtifactType(key);
+}
 
 export function parseBuildersYaml(text: string, file: string): ParseBuildersYamlResult {
   const doc = parseDocument(text, { uniqueKeys: true });
@@ -82,8 +92,8 @@ export function parseBuildersYaml(text: string, file: string): ParseBuildersYaml
 
   // Validate builder keys and values
   for (const [key, value] of Object.entries(rawBuilders)) {
-    if (!KEY_RE.test(key)) {
-      errors.push(diag({ code: BRG_INVALID, message: `invalid key '${key}' in builders (must match [\\w-]+)`, file }));
+    if (!isValidBuildersKey(key)) {
+      errors.push(diag({ code: BRG_INVALID, message: `invalid key '${key}' in builders (must match [\\w-]+ or artifact type <scope>:<kind>)`, file }));
       continue;
     }
     if (typeof value !== 'string' || value.length === 0) {
@@ -95,8 +105,8 @@ export function parseBuildersYaml(text: string, file: string): ParseBuildersYaml
 
   // Validate materializer keys and values
   for (const [key, value] of Object.entries(rawMaterializers)) {
-    if (!KEY_RE.test(key)) {
-      errors.push(diag({ code: BRG_INVALID, message: `invalid key '${key}' in materializers (must match [\\w-]+)`, file }));
+    if (!isValidBuildersKey(key)) {
+      errors.push(diag({ code: BRG_INVALID, message: `invalid key '${key}' in materializers (must match [\\w-]+ or artifact type <scope>:<kind>)`, file }));
       continue;
     }
     if (typeof value !== 'string' || value.length === 0) {

@@ -1,10 +1,13 @@
 import { describe, expectTypeOf, it } from 'vitest';
 
 import type {
+  AppIdArtifactMap,
   ArtifactDescriptor,
   DispatchDiagnostic,
+  DispatchOptions,
   DispatchResult,
   GeneratedTfFile,
+  OutputValue,
   TerraformResource,
 } from '../../src/contracts/index.js';
 import {
@@ -42,6 +45,27 @@ describe('dispatch API types (T026)', () => {
     expectTypeOf<ArtifactDescriptor['id']>().toEqualTypeOf<string>();
     expectTypeOf<ArtifactDescriptor['name']>().toEqualTypeOf<string>();
     expectTypeOf<ArtifactDescriptor['type']>().toEqualTypeOf<string>();
+  });
+
+  it('T001: ArtifactDescriptor.value is optional and opaque (FR-001, SC-007)', () => {
+    expectTypeOf<ArtifactDescriptor['value']>().toEqualTypeOf<unknown | undefined>();
+  });
+
+  it('T001: DispatchOptions.artifacts is an optional AppIdArtifactMap (FR-002, FR-016)', () => {
+    expectTypeOf<DispatchOptions['artifacts']>().toEqualTypeOf<AppIdArtifactMap | undefined>();
+    expectTypeOf<AppIdArtifactMap>().toMatchTypeOf<ReadonlyMap<string, { type: string; value: unknown }>>();
+  });
+
+  it('T001: DispatchResult ok branch exposes materializerOutputs in declaration order (FR-004)', () => {
+    expectTypeOf<Extract<DispatchResult, { kind: 'ok' }>>().toMatchTypeOf<{
+      readonly materializerOutputs: ReadonlyMap<string, OutputValue>;
+    }>();
+  });
+
+  it('T001: dispatch stays callable with (model, registry) and (model, registry, DispatchOptions)', () => {
+    expectTypeOf(dispatch).toBeCallableWith(model, registry);
+    const options: DispatchOptions = {};
+    expectTypeOf(dispatch).toBeCallableWith(model, registry, options);
   });
 
   it('MTL_* constants are literal single-codes (Constitution V — no string coercion)', () => {

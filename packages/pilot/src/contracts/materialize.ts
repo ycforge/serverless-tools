@@ -9,6 +9,8 @@
  * via the constants below, never string literals (Constitution V).
  */
 
+import type { Artifact } from './builder.js';
+import type { OutputValue } from './outputs.js';
 import type { TerraformResource } from './terraform.js';
 
 /**
@@ -18,19 +20,31 @@ import type { TerraformResource } from './terraform.js';
  * Invariants: `id === name === app.app_id`; `type` is the app builder id
  * (the dispatch key from `builders.yaml`), NOT a full `package-scope:kind`
  * artifact type.
+ *
+ * `value` (spec 025, FR-001) is the built artifact value threaded from
+ * `DispatchOptions.artifacts` — opaque `unknown` (Constitution I: C does not
+ * interpret it). Absent on standalone `ycsf materialize` (no build cache).
  */
 export interface ArtifactDescriptor {
   readonly id: string;
   readonly name: string;
   readonly type: string;
+  readonly value?: unknown;
 }
+
+/** Built artifacts keyed by appId, threaded from `ycsf build` (spec 025, FR-002). */
+export type AppIdArtifactMap = ReadonlyMap<string, Artifact>;
 
 /**
  * Dispatch options. `infraDir` is reserved for the API surface;
  * the actual I/O is executed by `writeGeneratedTerraform` (FR-015).
+ * `artifacts` (spec 025, FR-002) carries built values for apps that were
+ * built in the same pipeline run; when absent, every descriptor is produced
+ * without `value` (standalone materialize keeps today's behavior).
  */
 export interface DispatchOptions {
   readonly infraDir?: string;
+  readonly artifacts?: AppIdArtifactMap;
 }
 
 /**
@@ -75,6 +89,8 @@ export type DispatchResult =
       readonly kind: 'ok';
       readonly resources: readonly TerraformResource[];
       readonly generatedFiles: readonly GeneratedTfFile[];
+      /** Declared materializer outputs, in declaration order (spec 025, FR-004). */
+      readonly materializerOutputs: ReadonlyMap<string, OutputValue>;
     }
   | { readonly kind: 'invalid'; readonly errors: readonly DispatchDiagnostic[] };
 

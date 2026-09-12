@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
+import { type YckDiagnostic } from '../../src/contracts/check.js';
 import {
   type BuildOutputsInput,
   type BuildOutputsResult,
@@ -64,5 +65,14 @@ describe('outputs contract types (T030)', () => {
       (input: BuildOutputsInput) => BuildOutputsResult
     >();
     expectTypeOf(loadInput).not.toMatchTypeOf<Promise<unknown>>();
+  });
+
+  it('T002: OUT_INVALID_AUTO_PREFIX stays exported as a literal (frozen, superseded by FR-008)', () => {
+    expectTypeOf(OUT_INVALID_AUTO_PREFIX).toEqualTypeOf<'OUT_INVALID_AUTO_PREFIX'>();
+  });
+
+  it('T002: YckDiagnostic carries optional key/reason fields (FR-016, SC-007)', () => {
+    expectTypeOf<YckDiagnostic['key']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<YckDiagnostic['reason']>().toEqualTypeOf<string | undefined>();
   });
 });

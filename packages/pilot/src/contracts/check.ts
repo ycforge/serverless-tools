@@ -22,6 +22,9 @@ export const YCK_TERRAFORM_INVALID = 'YCK_TERRAFORM_INVALID' as const;
 /** terraform binary not found in PATH (C13, FR-019). */
 export const YCK_TERRAFORM_UNAVAILABLE = 'YCK_TERRAFORM_UNAVAILABLE' as const;
 
+/** A key name in a .ycsf/*.yaml or build_config.yaml looks secret-like (C14, spec 025 FR-012). */
+export const YCK_SUSPICIOUS_KEY = 'YCK_SUSPICIOUS_KEY' as const;
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /** Check-specific diagnostic shape (YCK_* family). */
@@ -38,6 +41,10 @@ export interface YckDiagnostic {
   readonly file?: string;
   /** Available IDLs in generated model when target was missing (C1). */
   readonly availableIdls?: readonly string[];
+  /** Suspicious key name (C14, spec 025 FR-014). */
+  readonly key?: string;
+  /** Machine-readable match reason: `exact-match:<normalized>` | `suffix-match:<suffix>` (C14, FR-014). */
+  readonly reason?: string;
 }
 
 /** Union of all diagnostic families. */

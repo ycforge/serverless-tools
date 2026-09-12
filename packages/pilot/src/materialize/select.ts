@@ -1,4 +1,5 @@
 import type {
+  AppIdArtifactMap,
   ArtifactDescriptor,
   DispatchDiagnostic,
   PluginRegistry,
@@ -61,11 +62,24 @@ export function deterministicOrder(model: ProjectModel): readonly string[] {
   return order;
 }
 
-/** One app → one flat descriptor, in deterministic order (FR-001). */
-export function buildArtifactDescriptors(model: ProjectModel): readonly ArtifactDescriptor[] {
+/**
+ * One app → one flat descriptor, in deterministic order (FR-001/002/003).
+ * When `artifacts` is provided and holds the appId, the descriptor carries the
+ * built `value`; otherwise `value` stays absent (US-5 backward compatibility).
+ */
+export function buildArtifactDescriptors(
+  model: ProjectModel,
+  artifacts?: AppIdArtifactMap,
+): readonly ArtifactDescriptor[] {
   return deterministicOrder(model).map((id) => {
     const app = model.apps.get(id);
-    return { id, name: id, type: app?.builder ?? 'unknown' };
+    const artifact = artifacts?.get(id);
+    return {
+      id,
+      name: id,
+      type: app?.builder ?? 'unknown',
+      ...(artifact !== undefined ? { value: artifact.value } : {}),
+    };
   });
 }
 
@@ -77,9 +91,13 @@ export type SelectionResult =
     }
   | { readonly kind: 'invalid'; readonly orderedAppIds: readonly string[]; readonly errors: readonly DispatchDiagnostic[] };
 
-export function selectArtifacts(model: ProjectModel, registry: PluginRegistry): SelectionResult {
+export function selectArtifacts(
+  model: ProjectModel,
+  registry: PluginRegistry,
+  artifacts?: AppIdArtifactMap,
+): SelectionResult {
   const orderedAppIds = deterministicOrder(model);
-  const descriptors = buildArtifactDescriptors(model);
+  const descriptors = buildArtifactDescriptors(model, artifacts);
   const entries = [...registry.records.values()].filter((entry) => entry.kind === 'materializer');
 
   const matches = new Map<string, string>();

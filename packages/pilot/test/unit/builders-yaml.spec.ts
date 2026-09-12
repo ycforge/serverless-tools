@@ -141,4 +141,51 @@ materializers:
     const r2 = parseBuildersYaml(matOnly, 'f');
     expect(r2.kind).toBe('ok');
   });
+
+  it('T020: artifact-type keys accepted — ycforge:function + yandex-function → ok, keys preserved verbatim (FR-009, D-5)', () => {
+    const yaml = `version: 1
+builders:
+  ycforge:function: "pkg-a"
+materializers:
+  yandex-function: "pkg-b"
+`;
+    const result = parseBuildersYaml(yaml, '.ycsf/builders.yaml');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.data.builders).toEqual({ 'ycforge:function': 'pkg-a' });
+    expect(result.data.materializers).toEqual({ 'yandex-function': 'pkg-b' });
+  });
+
+  it('T020: legacy bare token nestjs_function still accepted (SC-004, 0 regressions)', () => {
+    const yaml = `version: 1
+builders:
+  nestjs_function: "pkg-a"
+materializers:
+  yandex-function: "pkg-b"
+`;
+    const result = parseBuildersYaml(yaml, '.ycsf/builders.yaml');
+    expect(result.kind).toBe('ok');
+  });
+
+  it('T020: YC:Function (uppercase) → BRG_INVALID (edge §8, FR-009)', () => {
+    const yaml = `version: 1
+builders:
+  YC:Function: "pkg-a"
+`;
+    const result = parseBuildersYaml(yaml, '.ycsf/builders.yaml');
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.errors.some((e) => e.code === BRG_INVALID)).toBe(true);
+  });
+
+  it('T020: ycforge :function (whitespace before colon) → BRG_INVALID (FR-009)', () => {
+    const yaml = `version: 1
+builders:
+  "ycforge :function": "pkg-a"
+`;
+    const result = parseBuildersYaml(yaml, '.ycsf/builders.yaml');
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.errors.some((e) => e.code === BRG_INVALID)).toBe(true);
+  });
 });
