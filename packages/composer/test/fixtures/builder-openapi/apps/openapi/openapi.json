@@ -1,0 +1,21 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "builder-openapi",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/v1/hello": {
+      "description": "reads ${resources.buckets.frontend.name}",
+      "get": {
+        "operationId": "getHello",
+        "summary": "greets you",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    }
+  }
+}

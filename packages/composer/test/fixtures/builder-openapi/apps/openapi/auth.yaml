@@ -1,0 +1,6 @@
+version: 1
+defaultScheme: authorizer
+schemes:
+  authorizer:
+    type: function
+    function: functions.user_service
