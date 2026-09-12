@@ -151,4 +151,42 @@ apps: {}
       expect(gateway.spy.count.supports).toBe(4);
     }
   });
+
+  it('T008: artifacts map threads value into the supports descriptor only for present appIds (FR-002/003)', () => {
+    const model = appsModel(`version: 1
+apps:
+  analytics:    { source_path: analytics,    builder: nestjs-function }
+  user_service: { source_path: user_service, builder: nestjs-function }
+`);
+    const nest = matNest();
+    const registry = makeRegistry([materializerEntry(nest)]);
+
+    const artifacts = new Map([
+      ['analytics', { type: 'ycforge:function', value: { archivePath: 'dist/func.zip', entryPoint: 'index.handler' } }],
+    ]);
+    const result = selectArtifacts(model, registry, artifacts);
+
+    expect(result.kind).toBe('ok');
+    // Deterministic order: analytics < user_service.
+    expect(nest.spy.supportsCalls[0]).toMatchObject({ id: 'analytics' });
+    expect(nest.spy.supportsCalls[0]?.value).toEqual({ archivePath: 'dist/func.zip', entryPoint: 'index.handler' });
+    expect(nest.spy.supportsCalls[1]).toMatchObject({ id: 'user_service' });
+    expect('value' in (nest.spy.supportsCalls[1] ?? {})).toBe(false);
+  });
+
+  it('T008: no artifacts option → every supports descriptor has no value (US-5 backward-compat)', () => {
+    const model = appsModel(`version: 1
+apps:
+  analytics:    { source_path: analytics,    builder: nestjs-function }
+  user_service: { source_path: user_service, builder: nestjs-function }
+`);
+    const nest = matNest();
+    const result = selectArtifacts(model, makeRegistry([materializerEntry(nest)]));
+
+    expect(result.kind).toBe('ok');
+    expect(nest.spy.supportsCalls).toHaveLength(2);
+    for (const descriptor of nest.spy.supportsCalls) {
+      expect('value' in descriptor).toBe(false);
+    }
+  });
 });

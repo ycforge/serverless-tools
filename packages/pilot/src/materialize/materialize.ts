@@ -1,4 +1,5 @@
 import type {
+  AppIdArtifactMap,
   ArtifactDescriptor,
   DispatchDiagnostic,
   PluginRegistry,
@@ -10,7 +11,7 @@ import { createContext, createOutputBuilder } from './context.js';
 import type { OutputBuilderWithCollection } from './context.js';
 import { mtl } from './errors.js';
 import { getMaterializer } from './shape.js';
-import { deterministicOrder } from './select.js';
+import { buildArtifactDescriptors, deterministicOrder } from './select.js';
 
 /**
  * Phase 2 materialization (FR-005/006, research 7).
@@ -38,8 +39,12 @@ export async function materializeAll(
   registry: PluginRegistry,
   matches: ReadonlyMap<string, string>,
   outputBuilder: OutputBuilderWithCollection = createOutputBuilder(),
+  artifacts?: AppIdArtifactMap,
 ): Promise<MaterializeAllResult> {
   const resources: DispatchedResource[] = [];
+  const descriptors = new Map(
+    buildArtifactDescriptors(model, artifacts).map((descriptor) => [descriptor.id, descriptor]),
+  );
 
   for (const appId of deterministicOrder(model)) {
     const materializerId = matches.get(appId);
@@ -50,7 +55,8 @@ export async function materializeAll(
     if (materializer === null) continue;
 
     const type = model.apps.get(appId)?.builder ?? 'unknown';
-    const artifact: ArtifactDescriptor = { id: appId, name: appId, type };
+    const descriptor = descriptors.get(appId);
+    const artifact: ArtifactDescriptor = descriptor ?? { id: appId, name: appId, type };
     const context = createContext(outputBuilder);
 
     try {

@@ -5,12 +5,13 @@ import {
   YCK_ENV_IN_PATCH,
   YCK_MISSING_TARGET,
   YCK_REF_UNRESOLVED,
+  YCK_SUSPICIOUS_KEY,
   YCK_TERRAFORM_INVALID,
   YCK_TERRAFORM_UNAVAILABLE,
   type YckDiagnostic,
 } from '../contracts/check.js';
 
-export { YCK_MISSING_TARGET, YCK_ENV_IN_PATCH, YCK_REF_UNRESOLVED, YCK_TERRAFORM_INVALID, YCK_TERRAFORM_UNAVAILABLE };
+export { YCK_MISSING_TARGET, YCK_ENV_IN_PATCH, YCK_REF_UNRESOLVED, YCK_TERRAFORM_INVALID, YCK_TERRAFORM_UNAVAILABLE, YCK_SUSPICIOUS_KEY };
 
 export interface YckOptions {
   readonly code: string;
@@ -20,6 +21,8 @@ export interface YckOptions {
   readonly field?: string;
   readonly file?: string;
   readonly availableIdls?: readonly string[];
+  readonly key?: string;
+  readonly reason?: string;
 }
 
 export function yck(opts: YckOptions): YckDiagnostic {
@@ -31,6 +34,8 @@ export function yck(opts: YckOptions): YckDiagnostic {
     field?: string;
     file?: string;
     availableIdls?: readonly string[];
+    key?: string;
+    reason?: string;
   } = { code: opts.code, message: opts.message };
 
   if (opts.target !== undefined) diagnostic.target = opts.target;
@@ -38,6 +43,8 @@ export function yck(opts: YckOptions): YckDiagnostic {
   if (opts.field !== undefined) diagnostic.field = opts.field;
   if (opts.file !== undefined) diagnostic.file = opts.file;
   if (opts.availableIdls !== undefined) diagnostic.availableIdls = opts.availableIdls;
+  if (opts.key !== undefined) diagnostic.key = opts.key;
+  if (opts.reason !== undefined) diagnostic.reason = opts.reason;
 
   return diagnostic as YckDiagnostic;
 }

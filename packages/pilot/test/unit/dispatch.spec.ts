@@ -12,6 +12,7 @@ import {
   matDocker,
   matNest,
   matVite,
+  matWithOutput,
 } from '../helpers/materialize-fixtures.js';
 
 // T019–T021: dispatch.spec.ts — end-to-end pure dispatch (Sc1/4/9/12).
@@ -95,5 +96,43 @@ describe('dispatch.ts', () => {
     expect(docker.spy.materializeCalls).toHaveLength(1);
     expect(vite.spy.materializeCalls).toHaveLength(1);
     expect(gateway.spy.materializeCalls).toHaveLength(1);
+  });
+
+  it('T010: artifacts option threads value through to materializers and dispatchResult.materializerOutputs (FR-004/FR-002)', async () => {
+    const model = appsModel(`version: 1
+apps:
+  user_service: { source_path: user_service, builder: nestjs-function }
+`);
+    const outputMat = matWithOutput();
+    const registry = makeRegistry([materializerEntry(outputMat)]);
+
+    const artifacts = new Map([
+      ['user_service', { type: 'ycforge:function', value: { archivePath: 'dist/func.zip', entryPoint: 'index.handler' } }],
+    ]);
+    const result = await dispatch(model, registry, { artifacts });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+
+    // value reached the materializer
+    expect(outputMat.spy.materializeArtifacts).toHaveLength(1);
+    expect(outputMat.spy.materializeArtifacts[0]?.value).toEqual({ archivePath: 'dist/func.zip', entryPoint: 'index.handler' });
+
+    // declared outputs surfaced
+    expect(result.materializerOutputs.size).toBe(1);
+    expect(result.materializerOutputs.get('url')).toEqual({ value: 'function_url(user_service)', description: 'URL' });
+  });
+
+  it('T010: no options → ok with empty materializerOutputs (US-5 backward-compat)', async () => {
+    const model = appsModel(`version: 1
+apps:
+  user_service: { source_path: user_service, builder: nestjs-function }
+`);
+    const nest = matNest();
+    const result = await dispatch(model, makeRegistry([materializerEntry(nest)]));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.materializerOutputs.size).toBe(0);
   });
 });

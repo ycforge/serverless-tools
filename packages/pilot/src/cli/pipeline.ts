@@ -6,7 +6,13 @@ import { loadOutputs, buildOutputs } from '../outputs/index.js';
 import { dispatch } from '../materialize/dispatch.js';
 import { writeGeneratedTerraform } from '../materialize/write.js';
 import { moveEndpointsFromResources } from './resource-endpoints.js';
-import type { GeneratedTfFile, PluginRegistry, ProjectModel } from '../contracts/index.js';
+import type {
+  AppIdArtifactMap,
+  DispatchOptions,
+  GeneratedTfFile,
+  PluginRegistry,
+  ProjectModel,
+} from '../contracts/index.js';
 import { spawnTerraform } from './terraform.js';
 import {
   RuntimeError,
@@ -37,12 +43,14 @@ export async function runMaterializeGeneration(
   projectModel: ProjectModel,
   registry: PluginRegistry,
   opts?: { target?: string; json?: boolean },
+  artifacts?: AppIdArtifactMap,
 ): Promise<MaterializeGenerationResult> {
   const json = opts?.json;
   const target = opts?.target;
 
   stderr('Materializing artifacts...', json);
-  const dispatchResult = await dispatch(projectModel, registry);
+  const dispatchOptions: DispatchOptions = artifacts !== undefined ? { artifacts } : {};
+  const dispatchResult = await dispatch(projectModel, registry, dispatchOptions);
   if (dispatchResult.kind === 'invalid') {
     const first = dispatchResult.errors[0];
     throw new RuntimeError(
@@ -99,7 +107,7 @@ export async function runMaterializeGeneration(
     if (outputsResult.kind === 'ok') {
       const outputs = buildOutputs({
         outputsYaml: outputsResult.data,
-        materializerOutputs: new Map(),
+        materializerOutputs: dispatchResult.materializerOutputs,
         resources,
       });
       if (outputs.kind === 'ok') {
@@ -158,10 +166,16 @@ export async function runBuildAndMaterialize(
   }
   const { projectModel, registry } = buildResult;
 
+  // Built values (spec 025 FR-002): thread built artifacts so materializers
+  // receive artifact.value during a full build+materialize run.
+  const appArtifacts: AppIdArtifactMap = new Map(
+    buildResult.artifacts.map(({ appId, artifact }) => [appId, artifact]),
+  );
+
   const genOpts: { json?: boolean; target?: string } = {};
   if (json !== undefined) genOpts.json = json;
   if (opts?.target !== undefined) genOpts.target = opts.target;
-  const { files } = await runMaterializeGeneration(rootDir, projectModel, registry, genOpts);
+  const { files } = await runMaterializeGeneration(rootDir, projectModel, registry, genOpts, appArtifacts);
 
   stderr(`Build + materialize complete. ${buildResult.artifacts.length} app(s) built, ${files.length} file(s) written.`, json);
   const c = (buildResult as unknown as { cache?: import('../contracts/cache.js').CacheSummary }).cache;

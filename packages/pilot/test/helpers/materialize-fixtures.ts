@@ -49,6 +49,8 @@ export interface MaterializerSpy {
   readonly supportsCalls: ArtifactDescriptor[];
   /** Every context passed to `materialize`, in call order. */
   readonly materializeCalls: MaterializationContext[];
+  /** Every artifact descriptor passed to `materialize`, in call order (spec 025 T012). */
+  readonly materializeArtifacts: ArtifactDescriptor[];
   readonly count: {
     readonly supports: number;
     readonly materialize: number;
@@ -77,6 +79,12 @@ export interface MakeMaterializerOptions {
   /** If true, `materialize` always throws `Error(errorMessage)`. */
   readonly materializeThrows?: boolean;
   readonly errorMessage?: string;
+  /**
+   * If true, `materialize` throws when `artifact.value === undefined` — the
+   * documented MTL_MATERIALIZE_FAILED surface for real materializers that
+   * require built values (spec 025 FR-007).
+   */
+  readonly requiresValue?: boolean;
 }
 
 function defaultResource(artifact: ArtifactDescriptor): TerraformResource {
@@ -91,6 +99,7 @@ function defaultResource(artifact: ArtifactDescriptor): TerraformResource {
 export function makeMaterializer(id: string, options: MakeMaterializerOptions = {}): MaterializerFixture {
   const supportsCalls: ArtifactDescriptor[] = [];
   const materializeCalls: MaterializationContext[] = [];
+  const materializeArtifacts: ArtifactDescriptor[] = [];
 
   const supportsFn =
     options.supports ??
@@ -108,7 +117,11 @@ export function makeMaterializer(id: string, options: MakeMaterializerOptions = 
       return supportsFn(artifact);
     },
     async materialize(artifact, context) {
+      materializeArtifacts.push(artifact);
       materializeCalls.push(context);
+      if (options.requiresValue === true && artifact.value === undefined) {
+        throw new Error('artifact value missing: run a full build first (spec 025 FR-007)');
+      }
       if (options.materializeThrows === true) {
         throw new Error(options.errorMessage ?? 'plugin crashed');
       }
@@ -125,7 +138,7 @@ export function makeMaterializer(id: string, options: MakeMaterializerOptions = 
     },
   };
 
-  return { id, plugin, spy: { supportsCalls, materializeCalls, count } };
+  return { id, plugin, spy: { supportsCalls, materializeCalls, materializeArtifacts, count } };
 }
 
 /** Canonical fixture: supports `nestjs-function`, returns `yandex_function`. */

@@ -55,6 +55,10 @@ export const OUT_DUPLICATE_NAME = 'OUT_DUPLICATE_NAME' as const;
 /**
  * Auto-generated output name does NOT start with `ycsf_` (materializer
  * contract violation; Constitution V).
+ * @deprecated OUT_INVALID_AUTO_PREFIX: superseded by FR-008 (spec 025, D-3) —
+ * frozen, не использовать. Auto-outputs are now validated by grammar
+ * `[a-z][a-z0-9_]*` + uniqueness only; the code/export is kept for backward
+ * compatibility of references.
  */
 export const OUT_INVALID_AUTO_PREFIX = 'OUT_INVALID_AUTO_PREFIX' as const;
 

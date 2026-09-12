@@ -18,23 +18,28 @@ import { selectArtifacts } from './select.js';
  *  Phase 1 — SELECT: deterministic order → supports iteration → collect-ALL
  *  selection errors (FR-017). Any error → invalid, materialize never called.
  *  Phase 2 — MATERIALIZE: one shared OutputBuilder context; abort-on-first
- *  MTL_MATERIALIZE_FAILED (FR-006).
+ *  MTL_MATERIALIZE_FAILED (FR-006). `options.artifacts` (spec 025, FR-002/003)
+ *  threads built values into the ArtifactDescriptors; when absent, descriptors
+ *  carry no `value` (US-5 backward compatibility).
  *  SERIALIZE: address guard + filename per app → files.
+ *  RESULT: ok carries `materializerOutputs` (declared outputs, FR-004).
  */
 export async function dispatch(
   projectModel: ProjectModel,
   registry: PluginRegistry,
-  _options?: DispatchOptions,
+  options: DispatchOptions = {},
 ): Promise<DispatchResult> {
+  const { artifacts } = options;
+
   // Phase 1 — selection, all-or-nothing (FR-017).
-  const selection = selectArtifacts(projectModel, registry);
+  const selection = selectArtifacts(projectModel, registry, artifacts);
   if (selection.kind === 'invalid') {
     return { kind: 'invalid', errors: selection.errors };
   }
 
   // Phase 2 — materialize, abort-on-first (FR-006).
   const outputBuilder = createOutputBuilder();
-  const materialization = await materializeAll(projectModel, registry, selection.matches, outputBuilder);
+  const materialization = await materializeAll(projectModel, registry, selection.matches, outputBuilder, artifacts);
   if (materialization.kind === 'failed') {
     return { kind: 'invalid', errors: [materialization.error] };
   }
@@ -71,5 +76,10 @@ export async function dispatch(
     return { kind: 'invalid', errors: outputCollisions };
   }
 
-  return { kind: 'ok', resources, generatedFiles };
+  return {
+    kind: 'ok',
+    resources,
+    generatedFiles,
+    materializerOutputs: outputBuilder.declared,
+  };
 }

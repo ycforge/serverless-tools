@@ -23,12 +23,12 @@ vi.mock('../../../src/materialize/write.js', () => ({
   writeGeneratedTerraform: vi.fn(),
 }));
 
-import { runBuildAndMaterialize } from '../../../src/cli/pipeline.js';
+import { runBuildAndMaterialize, runMaterializeGeneration } from '../../../src/cli/pipeline.js';
 import { buildApps } from '../../../src/build/index.js';
 import { dispatch } from '../../../src/materialize/dispatch.js';
 import { writeGeneratedTerraform } from '../../../src/materialize/write.js';
 import { loadExtensions } from '../../../src/extensions/index.js';
-import { loadOutputs } from '../../../src/outputs/index.js';
+import { loadOutputs, buildOutputs } from '../../../src/outputs/index.js';
 import { loadMoves, buildMoves, buildMovedFile } from '../../../src/moves/index.js';
 
 describe('runBuildAndMaterialize pipeline (T036)', () => {
@@ -53,6 +53,7 @@ describe('runBuildAndMaterialize pipeline (T036)', () => {
       kind: 'ok',
       resources: [],
       generatedFiles: [{ filename: 'a.ycsf.tf.json', content: '{}' }],
+      materializerOutputs: new Map(),
     });
     await runBuildAndMaterialize('/root');
     expect(writeGeneratedTerraform).toHaveBeenCalledWith('/root/infra', expect.any(Array));
@@ -65,5 +66,62 @@ describe('runBuildAndMaterialize pipeline (T036)', () => {
     });
     await expect(runBuildAndMaterialize('/root')).rejects.toThrow();
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('T011: runMaterializeGeneration threads artifacts into dispatch and materializerOutputs into buildOutputs (FR-005/FR-006)', async () => {
+    const artifacts = new Map([
+      ['user_service', { type: 'ycforge:function', value: { archivePath: 'dist/func.zip', entryPoint: 'index.handler' } }],
+    ]);
+    const outputs = new Map<string, { value: string }>([['user_service_function_id', { value: 'yandex_function.user_service.id' }]]);
+    vi.mocked(loadOutputs).mockReturnValue({ kind: 'ok', data: { version: 1, outputs: {} } });
+    vi.mocked(buildOutputs).mockReturnValue({
+      kind: 'ok',
+      file: { filename: '99-ycsf-outputs.tf.json', content: '{"output":{}}' },
+    });
+    vi.mocked(dispatch).mockResolvedValue({
+      kind: 'ok',
+      resources: [],
+      generatedFiles: [{ filename: 'a.ycsf.tf.json', content: '{}' }],
+      materializerOutputs: outputs,
+    });
+
+    const model = { apps: new Map() } as never;
+    const registry = { records: new Map() } as never;
+    await runMaterializeGeneration('/root', model, registry, undefined, artifacts);
+
+    expect(dispatch).toHaveBeenCalledWith(model, registry, { artifacts });
+    expect(buildOutputs).toHaveBeenCalledWith(expect.objectContaining({ materializerOutputs: outputs }));
+  });
+
+  it('T011: runBuildAndMaterialize builds the AppIdArtifactMap from buildResult.artifacts and threads it (FR-005 characterization)', async () => {
+    const builtArtifacts = [
+      { appId: 'analytics', artifact: { type: 'ycforge:docker-image', value: { image: 'registry.example.com/analytics' } } },
+      { appId: 'user_service', artifact: { type: 'ycforge:function', value: { archivePath: 'dist/user_service.zip', entryPoint: 'index.handler' } } },
+    ];
+    vi.mocked(buildApps).mockResolvedValue({
+      kind: 'ok',
+      projectModel: { apps: new Map() } as never,
+      registry: { records: new Map() } as never,
+      artifacts: builtArtifacts,
+    });
+    vi.mocked(dispatch).mockResolvedValue({
+      kind: 'ok',
+      resources: [],
+      generatedFiles: [{ filename: 'a.ycsf.tf.json', content: '{}' }],
+      materializerOutputs: new Map(),
+    });
+
+    await runBuildAndMaterialize('/root');
+
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      {
+        artifacts: new Map([
+          ['analytics', { type: 'ycforge:docker-image', value: { image: 'registry.example.com/analytics' } }],
+          ['user_service', { type: 'ycforge:function', value: { archivePath: 'dist/user_service.zip', entryPoint: 'index.handler' } }],
+        ]),
+      },
+    );
   });
 });
