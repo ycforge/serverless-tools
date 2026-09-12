@@ -66,7 +66,13 @@ Specs создаются **перед реализацией соответст�
 | # | Spec | Scope | Статус | Зависимости |
 |---|------|-------|--------|-------------|
 | 023 | local-dev-server — `@ycforge/js-dev-tools/server`, payload 2.0 эмуляция | §38 | ✅ | 001 |
-| 024 | e2e-reference — reference-проект (user_service + orders + frontend + openapi), build → terraform plan | §30, §41 | ⬜ | все волны 1–3 |
+| 024 | e2e-reference — reference-проект (user_service + orders + frontend + openapi), build → terraform plan | §30, §41 | ⬜ | все волны 1–3, 025–027 |
+
+## Волна 5 — e2e enablement
+
+| # | Spec | Scope (IDEA.md) | Статус | Зависимости |
+|---|------|-----------------|--------|-------------|
+| 025 | pilot-e2e-enablement — значения артефактов через materialize (BIG-1), artifact-типы в builders-реестре (BIG-2), suspicious-keys в `ycsf check` (BIG-6) | §24, §26, §28, §36 | 🚧 | 013, 014, 016, 020, 021, 022 |
 
 ## Правила
 
