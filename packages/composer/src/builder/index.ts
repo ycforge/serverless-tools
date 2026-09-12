@@ -50,7 +50,12 @@ function resolveOpenapiEntry(buildConfig: unknown): string | undefined {
 
 export function deriveCompileSource(context: BuildContext): CompileSource {
   const appId = basename(resolve(context.outputDir));
-  const appDir = context.sourcePath === undefined ? undefined : resolve(context.sourcePath);
+  const appDir =
+    context.sourcePath === undefined
+      ? undefined
+      : isAbsolute(context.sourcePath)
+        ? resolve(context.sourcePath)
+        : resolve(context.projectRoot, context.sourcePath);
   if (appDir === undefined) {
     throw new BuilderError(
       'SOURCE_PATH_MISSING',
