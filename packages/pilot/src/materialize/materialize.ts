@@ -31,7 +31,14 @@ export type MaterializeAllResult =
   | { readonly kind: 'failed'; readonly error: DispatchDiagnostic };
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) {
+    // Materializers-core errors carry a `code` (e.g. YMT_INVALID_ARTIFACT_VALUE);
+    // surface it in the diagnostic message so the root cause is machine-readable.
+    const code = (error as { readonly code?: unknown }).code;
+    const base = error.message;
+    return typeof code === 'string' && code !== '' ? `${base} (${code})` : base;
+  }
+  return String(error);
 }
 
 export async function materializeAll(
@@ -60,8 +67,16 @@ export async function materializeAll(
     const context = createContext(outputBuilder);
 
     try {
-      const resource = await materializer.materialize(artifact, context);
-      resources.push({ resource, appId, materializerId });
+      // Per the C-layer contract `materialize` returns a single resource;
+      // some real B-layer materializers (yandex-storage-bucket) return an
+      // array (bucket + its objects) at runtime. Flatten the array so every
+      // resource is serialized into the app's single file. Single-resource
+      // results are untouched (FR-005 contract pinned by test/types).
+      const produced = await materializer.materialize(artifact, context);
+      const producedList: readonly TerraformResource[] = Array.isArray(produced) ? produced : [produced];
+      for (const resource of producedList) {
+        resources.push({ resource, appId, materializerId });
+      }
     } catch (error) {
       return {
         kind: 'failed',

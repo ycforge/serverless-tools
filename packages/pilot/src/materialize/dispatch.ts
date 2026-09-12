@@ -8,7 +8,11 @@ import type {
 } from '../contracts/index.js';
 import { createOutputBuilder } from './context.js';
 import { materializeAll } from './materialize.js';
-import { outputCollisionDiagnostics, serializeResourceFile, detectFilenameCollision } from './serialize.js';
+import {
+  outputCollisionDiagnostics,
+  serializeAppFile,
+  detectFilenameCollision,
+} from './serialize.js';
 import { selectArtifacts } from './select.js';
 
 /**
@@ -55,16 +59,25 @@ export async function dispatch(
     return { kind: 'invalid', errors: collisions };
   }
 
-  // Serialize each resource (address guard, FR-011; sorted keys, FR-009).
+  // Serialize per app: one artifact may yield several resources (e.g. a bucket
+  // plus its objects), all merged under one `resource` block in the app's
+  // single file (FR-008; addresses validated per resource, FR-011).
   const resources: TerraformResource[] = [];
   const generatedFiles: GeneratedTfFile[] = [];
+  const byApp = new Map<string, TerraformResource[]>();
   for (const { resource, appId } of materialization.resources) {
-    const serialized = serializeResourceFile(appId, resource);
+    resources.push(resource);
+    const list = byApp.get(appId);
+    if (list === undefined) byApp.set(appId, [resource]);
+    else list.push(resource);
+  }
+
+  for (const [appId, appResources] of byApp) {
+    const serialized = serializeAppFile(appId, appResources);
     if (serialized.kind === 'invalid') {
       return { kind: 'invalid', errors: serialized.errors };
     }
     generatedFiles.push(serialized.file);
-    resources.push(resource);
   }
 
   // Outputs (spec 014, superseded by spec 016): materializer-level duplicate

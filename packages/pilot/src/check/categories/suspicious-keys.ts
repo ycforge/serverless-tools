@@ -76,7 +76,7 @@ function scanObject(
           file,
           field: nextPath.join('.'),
           key: rawKey,
-          reason: verdict.reason,
+          ...(verdict.reason !== undefined ? { reason: verdict.reason } : {}),
         }),
       );
     }

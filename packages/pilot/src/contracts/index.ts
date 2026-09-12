@@ -22,3 +22,5 @@ export * from './moves.js';
 export * from './outputs.js';
 export * from './cache.js';
 export * from './build.js';
+export { YCK_SUSPICIOUS_KEY } from './check.js';
+export type { YckDiagnostic } from './check.js';

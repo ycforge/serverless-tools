@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { check } from '../../src/check/check.js';
+import type { YckDiagnostic } from '../../src/contracts/check.js';
 
 const FIXTURES = join(import.meta.dirname, 'fixtures');
 
@@ -20,7 +21,9 @@ describe('aggregation integration (T071)', () => {
 
   it('suspicious-keys fixture → YCK_SUSPICIOUS_KEY for apps.yaml and build_config.yaml (SC-005/SC-006)', async () => {
     const result = await check(join(FIXTURES, 'suspicious-keys'));
-    const suspicious = result.diagnostics.filter((d) => d.code === 'YCK_SUSPICIOUS_KEY');
+    const suspicious = result.diagnostics.filter(
+      (d): d is YckDiagnostic => d.code === 'YCK_SUSPICIOUS_KEY',
+    );
     expect(suspicious.length).toBeGreaterThanOrEqual(2);
 
     const byKey = new Map(suspicious.map((d) => [`${d.file}:${d.field}`, d]));

@@ -32,6 +32,23 @@ export function serializeResource(resource: TerraformResource): string {
   return serializeJson({ resource: { [resource.type]: { [resource.name]: resource.configuration } } });
 }
 
+/**
+ * Serialize several resources (possibly different types from one artifact,
+ * e.g. a bucket plus its objects) into a single merged
+ * `{ resource: { [type]: { [name]: cfg } … } }` document. Keys stay
+ * lexicographically sorted at every level (FR-009); type collisions across
+ * resources of one app are impossible (one `name` per type, spec 011).
+ */
+export function serializeResources(resources: readonly TerraformResource[]): string {
+  const byType: Record<string, Record<string, unknown>> = {};
+  for (const resource of resources) {
+    const byName: Record<string, unknown> = byType[resource.type] ?? {};
+    byName[resource.name] = resource.configuration;
+    byType[resource.type] = byName;
+  }
+  return serializeJson({ resource: byType });
+}
+
 /** Terraform identifier grammar `[a-zA-Z_][a-zA-Z0-9_]*` (FR-011). */
 const ADDRESS_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -118,6 +135,36 @@ export function serializeResourceFile(appId: string, resource: TerraformResource
     };
   }
   return { kind: 'ok', file: { filename, content: serializeResource(resource) } };
+}
+
+/**
+ * Per-app file builder for the dispatch serialize stage: validates the
+ * address of EVERY resource yielded by the app's artifact (one artifact may
+ * produce several resources, spec 019 materializers) and merges them into
+ * the app's single `{appId}.ycsf.tf.json`. Single-resource apps get exactly
+ * the same bytes as `serializeResourceFile`.
+ */
+export function serializeAppFile(appId: string, resources: readonly TerraformResource[]): SerializeResourceFileResult {
+  for (const resource of resources) {
+    const addressError = validateAddress(resource.type, resource.name);
+    if (addressError !== null) {
+      return { kind: 'invalid', errors: [addressError] };
+    }
+  }
+  const filename = computeFilename(appId);
+  if (!FILENAME_RE.test(filename)) {
+    return {
+      kind: 'invalid',
+      errors: [
+        mtl({
+          code: MTL_INVALID_TERRAFORM_ADDRESS,
+          message: `app id '${appId}' produces unsafe filename '${filename}' (MTL_INVALID_TERRAFORM_ADDRESS)`,
+          name: appId,
+        }),
+      ],
+    };
+  }
+  return { kind: 'ok', file: { filename, content: serializeResources(resources) } };
 }
 
 /** Duplicate declared output names → MTL_OUTPUT_NAME_COLLISION (FR-013). */
