@@ -1,7 +1,0 @@
-{
-  "type": "nestjs-function",
-  "value": {
-    "archivePath": "dist/src/analytics.zip",
-    "entryPoint": "index.handler"
-  }
-}
