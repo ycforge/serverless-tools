@@ -53,7 +53,6 @@ export function filterGatewayApps(config: AppConfig): GatewayApp[] {
       name: app.name,
       builder: 'yandex-api-gateway' as const,
       path: app.path,
-      openapiEntry: '',
       authPath: join(app.path, 'auth.yaml'),
       overridesPath: join(app.path, 'overrides.yaml'),
     }));
