@@ -9,6 +9,8 @@ import { OPENAPI_BUILD_FILENAME, ARTIFACT_TYPE, collectResourceReferences } from
 import type { ApiGatewayArtifactValue } from './artifact.js';
 import { BuilderError, toBuilderError, type BuilderErrorContext } from './errors.js';
 
+export type { ApiGatewayArtifactValue, ResourceReferenceValue } from './artifact.js';
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

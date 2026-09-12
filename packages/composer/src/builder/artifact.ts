@@ -11,13 +11,13 @@ export const ARTIFACT_TYPE = 'ycforge:api-gateway';
 export const OPENAPI_BUILD_FILENAME = 'openapi.json';
 
 export interface ResourceReferenceValue {
-  logical: string;
-  terraformType: string;
+  readonly logical: string;
+  readonly terraformType: string;
 }
 
 export interface ApiGatewayArtifactValue {
-  specPath: string;
-  resourceReferences: ResourceReferenceValue[];
+  readonly specPath: string;
+  readonly resourceReferences: readonly ResourceReferenceValue[];
 }
 
 /**

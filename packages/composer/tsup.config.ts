@@ -21,4 +21,13 @@ export default defineConfig([
     external: ['yaml', 'commander', '@ycforge/pilot'],
     banner: { js: '#!/usr/bin/env node' },
   },
+  {
+    entry: { 'builder/index': 'src/builder/index.ts' },
+    format: ['esm'],
+    dts: true,
+    clean: false,
+    sourcemap: true,
+    minify: false,
+    external: ['yaml', 'commander', '@ycforge/pilot'],
+  },
 ]);
