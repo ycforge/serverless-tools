@@ -96,4 +96,24 @@ builders:
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('T040: bare-token key (ycforge) in builders.yaml → registry record keyed by bare token (legacy form, FR-009)', async () => {
+    const root = tmpRoot();
+    try {
+      writeBuilders(
+        root,
+        `version: 1
+builders:
+  ycforge: "${join(FIXTURES_DIR, 'builder-default.mjs')}"
+`,
+      );
+      const result = await loadRegistry(root);
+      expect(result.kind).toBe('ok');
+      if (result.kind !== 'ok') return;
+      expect(result.registry.records.has('ycforge')).toBe(true);
+      expect(result.registry.records.get('ycforge')?.kind).toBe('builder');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

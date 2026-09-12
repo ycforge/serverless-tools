@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  OUT_DUPLICATE_NAME,
   OUT_INVALID,
   OUT_INVALID_AUTO_PREFIX,
   OUT_INVALID_VALUE,
@@ -98,7 +99,7 @@ describe('buildOutputs (T017–T028)', () => {
     );
   });
 
-  it('T020 auto output without ycsf_ prefix → OUT_INVALID_AUTO_PREFIX with name (US-2 AC2, FR-008, Constitution V, Sc4)', () => {
+  it('T020 auto output without ycsf_ prefix is VALID under D-3, key lands in merged file (US-2 AC2, FR-008, Sc4)', () => {
     const result = buildOutputs({
       outputsYaml: makeOutputsYaml({}),
       materializerOutputs: new Map([
@@ -106,11 +107,11 @@ describe('buildOutputs (T017–T028)', () => {
       ]),
       resources: canonicalResources(),
     });
-    expect(result.kind).toBe('invalid');
-    if (result.kind !== 'invalid') return;
-    const err = result.errors.find((e) => e.code === OUT_INVALID_AUTO_PREFIX);
-    expect(err).toBeDefined();
-    expect(err?.name).toBe('function_user_service_id');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const output = parsed(result);
+    expect(Object.keys(output)).toEqual(['function_user_service_id']);
+    expect(output['function_user_service_id']?.value).toBe('${yandex_function.user_service.id}');
   });
 
   it('T021 empty outputs → stable { "output": {} }, filename 99- (US-2 AC3, US-5 AC1, FR-014, Sc5)', () => {
@@ -254,7 +255,7 @@ describe('buildOutputs (T017–T028)', () => {
     const result = buildOutputs({ outputsYaml, materializerOutputs, resources });
     expect(result.kind).toBe('invalid');
     if (result.kind !== 'invalid') return;
-    expect(result.errors.map((e) => e.code)).toEqual([OUT_INVALID_VALUE, OUT_INVALID_AUTO_PREFIX]);
+    expect(result.errors.map((e) => e.code)).toEqual([OUT_INVALID_VALUE]);
 
     const after = JSON.stringify({
       outputsYaml,
@@ -262,5 +263,38 @@ describe('buildOutputs (T017–T028)', () => {
       resources,
     });
     expect(after).toBe(snapshot);
+  });
+
+  it('T021 auto output with invalid grammar (UpperCase) → OUT_INVALID, not prefix error (FR-008, D-3)', () => {
+    const result = buildOutputs({
+      outputsYaml: makeOutputsYaml({}),
+      materializerOutputs: new Map([
+        ['User_Service_Function_Id', { value: 'yandex_function.user_service.id' }],
+      ]),
+      resources: canonicalResources(),
+    });
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.errors.map((e) => e.code)).toEqual([OUT_INVALID]);
+    expect(result.errors[0]?.name).toBe('User_Service_Function_Id');
+  });
+
+  it('T021 auto name colliding with a user output → OUT_DUPLICATE_NAME, not a silent user-wins merge (edge §8, FR-013)', () => {
+    const result = buildOutputs({
+      outputsYaml: makeOutputsYaml({ api_url: { value: 'functions.user_service.id' } }),
+      materializerOutputs: new Map([
+        ['api_url', { value: 'yandex_api_gateway.openapi.domain' }],
+      ]),
+      resources: canonicalResources(),
+    });
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.errors.map((e) => e.code)).toEqual([OUT_DUPLICATE_NAME]);
+    expect(result.errors[0]?.name).toBe('api_url');
+  });
+
+  it('T021 frozen-guard: OUT_INVALID_AUTO_PREFIX still exported and typed as literal (SC-007, FR-016)', () => {
+    const code: typeof OUT_INVALID_AUTO_PREFIX = 'OUT_INVALID_AUTO_PREFIX';
+    expect(code.length).toBeGreaterThan(0);
   });
 });

@@ -2,8 +2,9 @@
 // all-or-nothing + deterministic assembly. Pure transform (no fs; FR-018).
 //
 // Phase 1 — validate: user outputs in file order (reserved prefix, IDL
-// resolver, duplicate names) + auto outputs in declaration order (`ycsf_`
-// prefix, duplicates vs user+auto). Every problem is collected; ANY error →
+// resolver, duplicate names) + auto outputs in declaration order (grammar
+// NAME_RE + duplicates vs user+auto; D-3 dropped the `ycsf_` prefix
+// requirement, spec 025 FR-008). Every problem is collected; ANY error →
 // `{kind:'invalid', errors: ALL}` and NOTHING is serialized.
 // Phase 2 — assembly (only when validation is clean): resolved user values
 // (RAW `tfType.name.property`) + auto values (RAW tf expressions) are merged
@@ -12,7 +13,6 @@
 import {
   OUT_DUPLICATE_NAME,
   OUT_INVALID,
-  OUT_INVALID_AUTO_PREFIX,
   OUT_RESERVED_PREFIX,
 } from '../contracts/index.js';
 import type {
@@ -75,12 +75,14 @@ export function buildOutputs(input: BuildOutputsInput): BuildOutputsResult {
 
   // Phase 1b — auto outputs, in declaration order. Values are raw Terraform
   // expressions (OutputBuilder.declare), NOT IDL references — no resolution.
+  // D-3 (spec 025 FR-008): the `ycsf_` prefix requirement is dropped — an
+  // auto-output is valid iff it passes NAME_RE + is unique in the merged file.
   const autoOutputs = new Map<string, OutputValue>();
   const seenAutoNames = new Set<string>();
   for (const [name, entry] of input.materializerOutputs) {
-    if (!name.startsWith(RESERVED_AUTO_PREFIX)) {
+    if (!NAME_RE.test(name)) {
       errors.push(
-        out({ code: OUT_INVALID_AUTO_PREFIX, message: `auto-generated output '${name}' does not start with '${RESERVED_AUTO_PREFIX}' (OUT_INVALID_AUTO_PREFIX)`, name }),
+        out({ code: OUT_INVALID, message: `invalid output name '${name}' (must match [a-z][a-z0-9_]*) (OUT_INVALID)`, name }),
       );
       continue;
     }

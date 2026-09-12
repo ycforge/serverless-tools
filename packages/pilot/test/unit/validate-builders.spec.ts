@@ -78,4 +78,21 @@ describe('validateBuilders', () => {
     const result = validateBuilders(model, registry);
     expect(result.kind).toBe('ok');
   });
+
+  it('T036: builder keyed by artifact type ycforge:function is resolved (not BRG_UNKNOWN_BUILDER) (FR-011)', () => {
+    const registry = makeRegistry('ycforge:function');
+    const model = makeModel({ user_service: 'ycforge:function' });
+    const result = validateBuilders(model, registry);
+    expect(result.kind).toBe('ok');
+  });
+
+  it('T036: builder: ycforge:function without the declared key → BRG_UNKNOWN_BUILDER listing it as absent (FR-011)', () => {
+    const registry = makeRegistry('nestjs-function');
+    const model = makeModel({ user_service: 'ycforge:function' });
+    const result = validateBuilders(model, registry);
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.errors[0]?.code).toBe(BRG_UNKNOWN_BUILDER);
+    expect(result.errors[0]?.app).toBe('user_service');
+  });
 });

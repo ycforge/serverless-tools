@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   OUT_INVALID,
-  OUT_INVALID_AUTO_PREFIX,
   OUT_INVALID_VALUE,
   OUT_RESERVED_PREFIX,
   OUT_UNRESOLVED_IDL,
@@ -139,7 +138,7 @@ describe('outputs quickstart (Sc1–Sc15)', () => {
     );
   });
 
-  it('Sc4: auto output without ycsf_ prefix → OUT_INVALID_AUTO_PREFIX (US-2 AC2, FR-008)', () => {
+  it('Sc4: auto output without ycsf_ prefix is VALID under D-3, key lands in merged file (US-2 AC2, FR-008)', () => {
     const builder = createOutputBuilder();
     builder.declare('function_user_service_id', { value: 'yandex_function.user_service.id' });
 
@@ -148,9 +147,11 @@ describe('outputs quickstart (Sc1–Sc15)', () => {
       materializerOutputs: builder.declared,
       resources: CANONICAL,
     });
-    expect(result.kind).toBe('invalid');
-    if (result.kind !== 'invalid') return;
-    expect(result.errors.some((e) => e.code === OUT_INVALID_AUTO_PREFIX)).toBe(true);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const output = parsed(result);
+    expect(Object.keys(output)).toEqual(['function_user_service_id']);
+    expect(output['function_user_service_id']?.value).toBe('${yandex_function.user_service.id}');
   });
 
   it('Sc5: empty outputs → stable {"output":{}} (US-2 AC3, US-5 AC1, FR-014)', () => {
