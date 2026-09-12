@@ -1,0 +1,6 @@
+version: 1
+api_key: [secret-value]
+apps:
+  user_service:
+    source_path: src/user_service
+    builder: nodejs-builder

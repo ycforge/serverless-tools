@@ -1,0 +1,5 @@
+version: 1
+builders:
+  nodejs-builder: ../../test/cli/fixtures/builder-e2e.mjs
+materializers:
+  yandex-function: ../../test/cli/fixtures/materializer-e2e.mjs

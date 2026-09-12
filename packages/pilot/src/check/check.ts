@@ -13,6 +13,7 @@ import { checkOverrideTargets } from './categories/override-targets.js';
 import { scanPatchForEnvRefs } from './categories/env-in-patch.js';
 import { checkResourceConsistency } from './categories/resource-consistency.js';
 import { runTerraformValidate } from './categories/terraform-validate.js';
+import { scanSuspiciousKeys } from './categories/suspicious-keys.js';
 
 export async function check(rootDir: string, options?: CheckOptions): Promise<CheckResult> {
   const diagnostics: Diagnostic[] = [];
@@ -105,6 +106,10 @@ export async function check(rootDir: string, options?: CheckOptions): Promise<Ch
       diagnostics.push(...(validated.errors as Diagnostic[]));
     }
   }
+
+  // 9. C16: suspicious-keys scan (spec 025 FR-012..FR-015, US-4). Value-free
+  // raw-YAML denylist walk; A-5 holds — outputs are NOT recalculated here.
+  diagnostics.push(...scanSuspiciousKeys(rootDir, model));
 
   // 10. C13: optional terraform validate (fail-fast: only if 0 base errors)
   if (options?.validateTf === true && diagnostics.length === 0) {
