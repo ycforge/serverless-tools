@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -234,6 +234,114 @@ describe('docker builder (US3, US5, SC-004, DQ-6)', () => {
     await withPath(bins.binDir, async () => {
       const artifact = await dockerBuilder.build(
         ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app' }, exec_timeout: 30 } }),
+      );
+      expect((artifact.value as DockerArtifactValue).image).toBe(`test.local/app@sha256:${SHA_256_A}`);
+    });
+  });
+});
+
+describe('docker builder no-push (spec 027)', () => {
+  const dirs: TempDir[] = [];
+
+  afterEach(() => {
+    for (const d of dirs) {
+      d.remove();
+    }
+    dirs.length = 0;
+  });
+
+  it('BLC_INVALID_CONFIG: no_push "true" (non-boolean) fails config, CLI never invoked (FR-006)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    const err = await withPath(bins.binDir, async () => {
+      return expectBLC(
+        dockerBuilder.build(
+          ctx(fixture.root, {
+            buildConfig: {
+              image: { repository: 'test.local/app', tag: 'v1', no_push: 'true' },
+              dockerfile: 'Dockerfile',
+            },
+          }),
+        ),
+        BLC_INVALID_CONFIG,
+      );
+    });
+    expect((err as Error & { field?: string }).field).toBe('image.no_push');
+    const args = existsSync(bins.logFile) ? readLogLines(bins.logFile) : [];
+    expect(args).toHaveLength(0);
+    expect(args).not.toContain('ARG push');
+  });
+
+  it('BLC_INVALID_CONFIG: no_push 1 (non-boolean) fails config (FR-006)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    const err = await withPath(bins.binDir, async () => {
+      return expectBLC(
+        dockerBuilder.build(
+          ctx(fixture.root, {
+            buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: 1 } },
+          }),
+        ),
+        BLC_INVALID_CONFIG,
+      );
+    });
+    expect((err as Error & { field?: string }).field).toBe('image.no_push');
+    const args = existsSync(bins.logFile) ? readLogLines(bins.logFile) : [];
+    expect(args).toHaveLength(0);
+  });
+
+  it('BLC_INVALID_CONFIG: no_push null (non-boolean) fails config (FR-006)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    const err = await withPath(bins.binDir, async () => {
+      return expectBLC(
+        dockerBuilder.build(
+          ctx(fixture.root, {
+            buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: null } },
+          }),
+        ),
+        BLC_INVALID_CONFIG,
+      );
+    });
+    expect((err as Error & { field?: string }).field).toBe('image.no_push');
+    const args = existsSync(bins.logFile) ? readLogLines(bins.logFile) : [];
+    expect(args).toHaveLength(0);
+  });
+
+  it('BLC_INVALID_CONFIG: no_push true without image.repository (FR-006)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    const err = await withPath(bins.binDir, async () => {
+      return expectBLC(
+        dockerBuilder.build(
+          ctx(fixture.root, {
+            buildConfig: { image: { no_push: true } },
+          }),
+        ),
+        BLC_INVALID_CONFIG,
+      );
+    });
+    expect(err.message).toContain('repository');
+  });
+
+  it('coexistence: no_push true + unknown top-level key ignored (FR-007)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { digest: SHA_256_A, localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const artifact = await dockerBuilder.build(
+        ctx(fixture.root, {
+          buildConfig: { image: { repository: 'test.local/app', no_push: true }, exec_timeout: 30 },
+        }),
       );
       expect((artifact.value as DockerArtifactValue).image).toBe(`test.local/app@sha256:${SHA_256_A}`);
     });

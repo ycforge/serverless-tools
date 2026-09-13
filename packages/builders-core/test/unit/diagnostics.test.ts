@@ -53,4 +53,45 @@ describe('diagnostics codes match contracts/builders-core.json #/errorCodes (Con
     ]);
     expect([...new Set(Object.keys(contract.errorCodes.properties))].sort()).toEqual([...exportSet].sort());
   });
+
+  it('builders-core.json dockerBuildConfig is additive: image.no_push added, BLC const frozen (spec 027)', () => {
+    const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8')) as {
+      definitions: {
+        dockerBuildConfig: {
+          properties: {
+            image: {
+              properties: Record<string, unknown>;
+              required: string[];
+              additionalProperties: boolean;
+            };
+            dockerfile?: unknown;
+          };
+          required: string[];
+        };
+      };
+      errorCodes: {
+        properties: {
+          BLC_IMAGE_DIGEST_UNAVAILABLE: { const: string; description: string };
+        };
+      };
+    };
+    const image = contract.definitions.dockerBuildConfig.properties.image;
+    expect(image.properties.no_push).toMatchObject({ type: 'boolean', default: false });
+    expect((image.properties.no_push as { description: string }).description).toMatch(/only-build/);
+    expect(image.properties.repository).toEqual({ type: 'string', minLength: 1 });
+    expect(image.properties.tag).toEqual({
+      type: 'string',
+      default: 'latest',
+      pattern: '^[^\\s][^\\s]*$',
+      description: 'Push tag; never used as the artifact image (only the digest form is).',
+    });
+    expect(image.additionalProperties).toBe(false);
+    expect(image.required).toEqual(['repository']);
+    expect(contract.definitions.dockerBuildConfig.required).toEqual(['image']);
+    expect(contract.definitions.dockerBuildConfig.properties.dockerfile).toEqual({ type: 'string', default: 'Dockerfile' });
+    const digestCode = contract.errorCodes.properties.BLC_IMAGE_DIGEST_UNAVAILABLE;
+    expect(digestCode.const).toBe('BLC_IMAGE_DIGEST_UNAVAILABLE');
+    expect(digestCode.description).toMatch(/no-push mode/);
+    expect(digestCode.description).toContain('{{.Id}}');
+  });
 });

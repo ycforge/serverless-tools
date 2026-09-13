@@ -7,6 +7,7 @@ import {
   type Builder,
   type BuildContext,
   type DockerArtifactValue,
+  type DockerBuildConfig,
   type FrontendArtifactValue,
   type FunctionArtifactValue,
 } from '../../src/types.js';
@@ -57,5 +58,40 @@ describe('builders-core type-level contract (FR-001/003/004)', () => {
     expectTypeOf<ArtifactType>().toEqualTypeOf<
       'ycforge:function' | 'ycforge:docker-image' | 'ycforge:frontend'
     >();
+  });
+});
+
+describe('DockerBuildConfig additive no_push, frozen value.image (spec 027)', () => {
+  it('image.no_push is optional: with and without it both assignable (FR-001/FR-008)', () => {
+    const withNoPush: DockerBuildConfig = { image: { repository: 'r', tag: 'v1', no_push: true } };
+    const withoutNoPush: DockerBuildConfig = { image: { repository: 'r' } };
+    expectTypeOf(withNoPush).toMatchTypeOf<DockerBuildConfig>();
+    expectTypeOf(withoutNoPush).toMatchTypeOf<DockerBuildConfig>();
+  });
+
+  it('image section is exactly { repository, tag?, no_push? } (additivity, SC-007)', () => {
+    expectTypeOf<DockerBuildConfig['image']>().toEqualTypeOf<
+      { readonly repository: string; readonly tag?: string; readonly no_push?: boolean } | undefined
+    >();
+  });
+
+  it('no_push is strictly boolean: string/number never match the image section (FR-006)', () => {
+    type DockerImageSection = NonNullable<DockerBuildConfig['image']>;
+    const badString: { readonly repository: string; readonly no_push: string } = {
+      repository: 'r',
+      no_push: 'true',
+    };
+    const badNumber: { readonly repository: string; readonly no_push: number } = {
+      repository: 'r',
+      no_push: 1,
+    };
+    // @ts-expect-error { no_push: string } must not be assignable to the image section (FR-006)
+    const _noString: DockerImageSection = badString;
+    // @ts-expect-error { no_push: number } must not be assignable to the image section (FR-006)
+    const _noNumber: DockerImageSection = badNumber;
+  });
+
+  it('DockerArtifactValue stays frozen as { readonly image: string } (SC-007/NG-1)', () => {
+    expectTypeOf<DockerArtifactValue>().toEqualTypeOf<{ readonly image: string }>();
   });
 });
