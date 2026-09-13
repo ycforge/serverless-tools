@@ -74,6 +74,7 @@ Specs создаются **перед реализацией соответст�
 |---|------|-----------------|--------|-------------|
 | 025 | pilot-e2e-enablement — значения артефактов через materialize (BIG-1), artifact-типы в builders-реестре (BIG-2), suspicious-keys в `ycsf check` (BIG-6) | §24, §26, §28, §36 | 🚧 | 013, 014, 016, 020, 021, 022 |
 | 026 | composer-builder — Builder-модуль `@ycforge/composer/builder` (`ycforge:api-gateway`) в конвейере `ycsf build`, единый источник истины по проектной модели (BIG-3, BIG-4) | §3, §10, §13–19 | 🚧 | 006, 007, 008, 009, 010, 025 |
+| 027 | docker-no-push — локальная сборка `ycforge:docker-image` без push (`image.no_push`, digest из локального daemon, инвариант never-a-mutable-tag) (BIG-5) | §37 | 🚧 | 013, 018, 025 |
 
 ## Правила
 
