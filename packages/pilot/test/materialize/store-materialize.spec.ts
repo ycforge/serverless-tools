@@ -27,6 +27,7 @@ function readInfra(root: string): Record<string, string> {
 
 function createStoreProject(): TempProject {
   const project = createTempProject({
+    'package.json': '{ "name": "store-fixture", "private": true }',
     '.ycsf/apps.yaml': `version: 1
 apps:
   user_service: { source_path: user_service, builder: ycforge:function }

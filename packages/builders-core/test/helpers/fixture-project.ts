@@ -83,7 +83,7 @@ export function dockerFixture(): TempDir {
  * Vite project fixture. The fake vite binary is placed at
  * `${root}/node_modules/.bin/vite` (the app owns its toolchain, D-RE-10).
  */
-export function viteFixture(options: { withFakeVite?: boolean } = {}): TempDir {
+export function viteFixture(_options: { withFakeVite?: boolean } = {}): TempDir {
   const dir = makeTempDir('bc-vite-');
   const files: Record<string, string> = {
     'package.json': JSON.stringify(
