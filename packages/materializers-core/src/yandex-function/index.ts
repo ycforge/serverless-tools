@@ -38,7 +38,11 @@ const materializer: Materializer = {
       type: 'yandex_function',
       name,
       configuration: {
+        // Configuration field order mirrors the terraform provider schema.
+        // `memory` is a provider-default constant — deterministic, no env input.
         runtime: 'nodejs22',
+        name,
+        memory: 128,
         entrypoint: entryPoint,
         user_hash: userHash,
         content: {

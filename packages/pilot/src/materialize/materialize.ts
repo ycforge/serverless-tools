@@ -47,6 +47,7 @@ export async function materializeAll(
   matches: ReadonlyMap<string, string>,
   outputBuilder: OutputBuilderWithCollection = createOutputBuilder(),
   artifacts?: AppIdArtifactMap,
+  projectRoot?: string,
 ): Promise<MaterializeAllResult> {
   const resources: DispatchedResource[] = [];
   const descriptors = new Map(
@@ -64,7 +65,7 @@ export async function materializeAll(
     const type = model.apps.get(appId)?.builder ?? 'unknown';
     const descriptor = descriptors.get(appId);
     const artifact: ArtifactDescriptor = descriptor ?? { id: appId, name: appId, type };
-    const context = createContext(outputBuilder);
+    const context = createContext(outputBuilder, projectRoot);
 
     try {
       // Per the C-layer contract `materialize` returns a single resource;

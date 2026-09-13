@@ -45,6 +45,13 @@ export type AppIdArtifactMap = ReadonlyMap<string, Artifact>;
 export interface DispatchOptions {
   readonly infraDir?: string;
   readonly artifacts?: AppIdArtifactMap;
+  /**
+   * spec 028 (T024): project root the pipeline operates on. Threaded down to
+   * every materializer via MaterializationContext.projectRoot so companion
+   * files land in <root>/infra/... instead of the process cwd. Optional and
+   * additive: absent for thin/non-pipeline callers ⇒ legacy cwd-relative I/O.
+   */
+  readonly projectRoot?: string;
 }
 
 /**

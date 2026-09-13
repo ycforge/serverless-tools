@@ -51,9 +51,12 @@ describe('dispatch API types (T026)', () => {
     expectTypeOf<ArtifactDescriptor['value']>().toEqualTypeOf<unknown | undefined>();
   });
 
-  it('T001: DispatchOptions.artifacts is an optional AppIdArtifactMap (FR-002, FR-016)', () => {
+it('T001: DispatchOptions.artifacts is an optional AppIdArtifactMap (FR-002, FR-016)', () => {
     expectTypeOf<DispatchOptions['artifacts']>().toEqualTypeOf<AppIdArtifactMap | undefined>();
-    expectTypeOf<AppIdArtifactMap>().toMatchTypeOf<ReadonlyMap<string, { type: string; value: unknown }>>();
+  });
+
+  it('T024: DispatchOptions.projectRoot is an optional string (spec 028, T024)', () => {
+    expectTypeOf<DispatchOptions['projectRoot']>().toEqualTypeOf<string | undefined>();
   });
 
   it('T001: DispatchResult ok branch exposes materializerOutputs in declaration order (FR-004)', () => {

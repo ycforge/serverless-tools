@@ -37,6 +37,8 @@ describe('yandex-function materializer (US1, T040)', () => {
     expect(result.name).toBe('user_service');
     expect(result.configuration).toEqual({
       runtime: 'nodejs22',
+      name: 'user_service',
+      memory: 128,
       entrypoint: 'index.handler',
       user_hash: archive.sha256,
       content: {
@@ -66,6 +68,20 @@ describe('yandex-function materializer (US1, T040)', () => {
     const r1 = (await materializer.materialize(artifact as never, ctx1)) as TerraformResource;
     const r2 = (await materializer.materialize(artifact as never, ctx2)) as TerraformResource;
     expect(r1).toEqual(r2);
+  });
+
+  it('T019: name/memory are deterministic, no UUID/timestamps; auto-output still declared (FR-012, SC-007)', async () => {
+    const ctx = createContext();
+    const r1 = (await materializer.materialize(artifact as never, ctx)) as TerraformResource;
+    const r2 = (await materializer.materialize(artifact as never, createContext())) as TerraformResource;
+    const c1 = r1.configuration as { name: string; memory: number };
+    const c2 = r2.configuration as { name: string; memory: number };
+    expect(c1.name).toBe('user_service');
+    expect(c1.memory).toBe(128);
+    expect(c1).toEqual(c2);
+    expect(ctx.output.declared.get('user_service_function_id')).toEqual({
+      value: 'yandex_function.user_service.id',
+    });
   });
 
   it('declares output function_id (AC3, FR-005)', async () => {
