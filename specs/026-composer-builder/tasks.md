@@ -138,11 +138,11 @@ description: "Task list for composer-builder — @ycforge/composer/builder, Buil
 
 **Purpose**: Сквозная проверка перед converge: типы, lint, tsup, полные suite'ы, границы git-diff.
 
-- [ ] T061 Typecheck — `pnpm --filter @ycforge/composer typecheck` (`tsc --noEmit`, strict) zero errors: новые `src/compile-core.ts`, `src/builder/**`, `test/builder/**`, `.test-d.ts` компилируются. **Ref**: SC-007, plan P5 Verification. **Depends**: T055
-- [ ] T062 Scoped lint — `pnpm exec eslint packages/composer/src packages/composer/test` zero NEW errors; 026-touched файлы чисты, legacy-baseline за границами 026 не трогается (паттерн 023 T144). **Depends**: T061
-- [ ] T063 Build — `pnpm --filter @ycforge/composer build` → `dist/index.{js,d.ts}`, `dist/cli/index.{js,d.ts}`, `dist/builder/index.{js,d.ts}` присутствуют; exports `"."`/`"./builder"` резолвятся; bin `ycsf-api` нетронут. **Depends**: T062
-- [ ] T064 Full regression — `pnpm exec vitest run` в `packages/composer` (all specs + integrations + type-tests) И `pnpm --filter @ycforge/pilot test` (pilot-side suite без новых failures; pilot не тронут). **Depends**: T063
-- [ ] T065 Git-status audit — `git diff dev...HEAD` покрывает только `packages/composer/**` + `specs/026-composer-builder/**` (+ `specs/README.md` roadmap); `packages/pilot`, `packages/materializers-core`, `packages/nest-bridge`, `packages/js-dev-tools` — не тронуты. **Depends**: T064
+- [x] T061 Typecheck — `pnpm --filter @ycforge/composer typecheck` (`tsc --noEmit`, strict) zero errors: новые `src/compile-core.ts`, `src/builder/**`, `test/builder/**`, `.test-d.ts` компилируются. **Ref**: SC-007, plan P5 Verification. **Depends**: T055
+- [x] T062 Scoped lint — `pnpm exec eslint packages/composer/src packages/composer/test` zero NEW errors; 026-touched файлы чисты, legacy-baseline за границами 026 не трогается (паттерн 023 T144). **Depends**: T061
+- [x] T063 Build — `pnpm --filter @ycforge/composer build` → `dist/index.{js,d.ts}`, `dist/cli/index.{js,d.ts}`, `dist/builder/index.{js,d.ts}` присутствуют; exports `"."`/`"./builder"` резолвятся; bin `ycsf-api` нетронут. **Depends**: T062
+- [x] T064 Full regression — `pnpm exec vitest run` в `packages/composer` (all specs + integrations + type-tests) И `pnpm --filter @ycforge/pilot test` (pilot-side suite без новых failures; pilot не тронут). **Depends**: T063
+- [x] T065 Git-status audit — `git diff dev...HEAD` покрывает только `packages/composer/**` + `specs/026-composer-builder/**` (+ `specs/README.md` roadmap); `packages/pilot`, `packages/materializers-core`, `packages/nest-bridge`, `packages/js-dev-tools` — не тронуты. **Depends**: T064
 
 **Checkpoint**: typecheck/lint/build/regression чистые; границы диффа соблюдены.
 
