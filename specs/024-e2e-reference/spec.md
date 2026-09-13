@@ -342,13 +342,13 @@ Reference-проект использует все четыре builder-ветк
 - **FR-004**: System MUST упаковывать `analytics` как NestJS-приложение с container-target (IDEA §37) без публикации image в registry (D-6).
 - **FR-005**: System MUST выполнять сборку `frontend` только из public build-time данных; build-env без секретов (§36, D-7).
 - **FR-006**: System MUST собирать `openapi` через Project B (`@ycforge/composer`) в safe mode (`SERVERLESS_TOOLS_OPENAPI_BUILD=1`, явный `openapi_entry`); `openapi` — единственная точка входа API Gateway.
-- **FR-007**: System MUST использовать для всех приложений ownership «apps = managed» без внешних `resources.yaml`-сущностей в v1 (Constitution VI, D-3).
+- **FR-007**: System MUST использовать для всех приложений ownership «apps = managed» без внешних `resources.yaml`-сущностей в v1 (Constitution VI, D-3). **Уточнение (amendment, решение владельца фичи от 2026-09-13)**: в C-конвейере logical-ссылки gateway направлены на **apps**, а не на `resources.yaml`-сущности: имя в `${resources.<type>.<app_id>.id}` — это `app_id` из `apps.yaml`; индекс резолвинга — C-модель проекта (map-form apps.yaml), `.ycsf/resources.yaml` в reference-проекте отсутствует. Проверка `PML_IDENTITY_COLLISION` остаётся правилом для сценариев параллельной декларации (B-dialect), в C-конвейере она не срабатывает, т.к. ничего не декларируется в resources.yaml.
 
 **Registry и покрытие стека**
 
 - **FR-008**: System MUST подключать builders только явным маппингом `.ycsf/builders.yaml` на `@ycforge/builders-core/*` (nestjs-function, docker, vite) и composer builder; без auto-discovery и локальных плагинов (Constitution V).
 - **FR-009**: System MUST подключать materializers только явным маппингом на `@ycforge/materializers-core/*` (yandex-function, yandex-serverless-container, yandex-storage-bucket, yandex-api-gateway; «materializers-yandex», spec 019).
-- **FR-010**: System MUST выражать связи gateway↔apps исключительно в logical-синтаксисе `${resources...}` (IDL/IDT, spec 009); в Project B-артефакте не допускается provider-specific выражений (IDEA §31).
+- **FR-010**: System MUST выражать связи gateway↔apps исключительно в logical-синтаксисе `${resources...}` (IDL/IDT, spec 009); в Project B-артефакте не допускается provider-specific выражений (IDEA §31). **Уточнение (amendment, решение владельца фичи от 2026-09-13)**: `<name>` в `${resources.<type>.<name>.id}` — это **app_id** из `apps.yaml` (топология «ссылки на apps, не на resources»); маппинг `${resources.functions.user_service.id}` → `${yandex_function.user_service.id}` выполняется materializer-ом по замороженной таблице D-4 из identity C-модели. Подтверждено эмпирически: composer builder собирает `resourceReferences` из финального артефакта без обращения к resources.yaml (`packages/composer/src/builder/index.ts:102` + `artifact.ts:collectResourceReferences`), контракт `ResourceReference` не различает managed/external (`packages/pilot/src/contracts/resource-reference.ts`).
 
 **Конвейер и entrypoint**
 
