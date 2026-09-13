@@ -39,7 +39,7 @@ describe('@ycforge/composer/builder published contract (spec 026, P3 / T031)', (
   });
 
   it('(c) the ./builder subpath resolves on the runtime module graph (publish-contract, FR-001)', async () => {
-    const mod = await import('@ycforge/composer/builder');
-    expectTypeOf<typeof mod.default>().toMatchTypeOf<{ build: (c: BuildContext) => Promise<Artifact> }>();
+    const _mod = await import('@ycforge/composer/builder');
+    expectTypeOf<typeof _mod.default>().toMatchTypeOf<{ build: (c: BuildContext) => Promise<Artifact> }>();
   });
 });
