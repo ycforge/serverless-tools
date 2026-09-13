@@ -1,0 +1,6 @@
+version: 1
+apps:
+  - id: openapi
+    name: openapi
+    builder: yandex-api-gateway
+    path: ../builder-openapi/apps/openapi

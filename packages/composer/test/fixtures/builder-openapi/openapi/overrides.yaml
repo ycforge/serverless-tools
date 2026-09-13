@@ -1,0 +1,12 @@
+version: 1
+rules:
+  - op: add
+    target:
+      kind: path
+      path: /v2/health
+    value:
+      get:
+        operationId: getHealth
+        responses:
+          '200':
+            description: ok

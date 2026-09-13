@@ -204,6 +204,7 @@ Reference-проект (spec 024) не может пройти полный ко
 - **Некорректная ссылка `${resources.bad .name.id}` / неизвестный домен / некорректное свойство** — fail-fast (`RESOURCE_REF_SYNTAX_INVALID` / `RESOURCE_REF_DOMAIN_UNKNOWN` / `RESOURCE_REF_PROPERTY_INVALID`).
 - **ENV-only режим (env.yaml с `env:` и mode env-only)** — сохранение семантики 009/010: ссылка заменяется значением из окружения; сборку это не ломает.
 - **Пустой `paths: {}`** — валидный artifact (пустой gateway), `specPath` пишется детерминированно.
+- **ENV-only placeholder `info.title`** — в env-only сборке placeholder заполняется `title = appId` (микро-расхождение с CLI-путем, где раньше title брался из имени app из apps.yaml); оба значения консистентно детерминированы, документ остаётся допустимым OpenAPI-артефактом (покрыто T054).
 - **Несколько gateway-apps в проекте** — вне Builder'а: C диспатчит per-app; Builder обрабатывает ровно один app на один вызов.
 - **restored из кэша (022)** — value сохраняется как `{ type, value }`, `specPath` absolute-path остаётся валидным при неизменном корне проекта; перемещение корня — та же граница, что и у остальных builders (документировано).
 - **Ссылки в не-bearer полях** — игнорируются для `resourceReferences` (009 FR-014/FR-019): сборка только по контрактным полям `REFERENCE_BEARER_FIELDS`.

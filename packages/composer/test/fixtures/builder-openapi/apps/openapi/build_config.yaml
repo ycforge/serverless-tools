@@ -1,4 +1,5 @@
 version: 1
+openapi_entry: ./openapi.json
 build_config:
   openapi_entry: ./openapi.json
 build_env: {}
