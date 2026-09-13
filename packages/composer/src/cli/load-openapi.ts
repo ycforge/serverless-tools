@@ -5,7 +5,6 @@ import { parseDocument, isMap, isAlias, type YAMLParseError } from 'yaml';
 import { extractOpenApi } from '../extract.js';
 import { isOpenApiDocument } from '../artifacts.js';
 import type { OpenApiDocument } from '../errors.js';
-import type { GatewayApp } from './types.js';
 import { InputError, IOError, CLIError } from './errors.js';
 
 export interface BuildConfig {
@@ -76,45 +75,44 @@ async function loadOpenApiArtifactFile(
   }
 }
 
-export async function loadOpenApiSource(
-  app: GatewayApp,
-  projectRoot: string,
-  envOnly: boolean,
-): Promise<OpenApiDocument> {
-  const appPath = resolve(projectRoot, app.path);
+export interface LoadOpenApiSourceDirectOptions {
+  appDir: string;
+  appName: string;
+  envOnly?: boolean;
+  openapiEntry?: string;
+}
 
+export async function loadOpenApiSourceDirect({
+  appDir,
+  appName,
+  envOnly = false,
+  openapiEntry,
+}: LoadOpenApiSourceDirectOptions): Promise<OpenApiDocument> {
   if (envOnly) {
     return {
       openapi: '3.1.0',
-      info: { title: app.name, version: '0.0.0' },
+      info: { title: appName, version: '0.0.0' },
       paths: {},
     } as OpenApiDocument;
   }
 
-  const buildConfig = await loadBuildConfig(appPath);
-  const openapiEntry = buildConfig.openapi_entry;
-
   if (openapiEntry !== undefined) {
-    const artifactDoc = await loadOpenApiArtifactFile(appPath, openapiEntry);
+    const artifactDoc = await loadOpenApiArtifactFile(appDir, openapiEntry);
     if (artifactDoc !== null) {
-      app.openapiEntry = openapiEntry;
       return artifactDoc;
     }
     try {
-      const doc = await extractOpenApi({ appRoot: appPath, openapiEntry });
-      app.openapiEntry = openapiEntry;
-      return doc;
+      return await extractOpenApi({ appRoot: appDir, openapiEntry });
     } catch (error) {
       if (error instanceof CLIError) {
         throw error;
       }
       throw new IOError(
-        `Failed to load OpenAPI from ${resolve(appPath, openapiEntry)}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to load OpenAPI from ${resolve(appDir, openapiEntry)}: ${error instanceof Error ? error.message : String(error)}`,
         'OPENAPI_LOAD_ERROR',
       );
     }
   }
 
-  const doc = await extractOpenApi({ appRoot: appPath });
-  return doc;
+  return extractOpenApi({ appRoot: appDir });
 }

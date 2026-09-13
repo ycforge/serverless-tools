@@ -155,13 +155,13 @@ function resolveScalar(
   return canonicalTemplate;
 }
 
-interface LeafPosition {
+export interface LeafPosition {
   parent: Record<string, unknown>;
   key: string;
 }
 
 /** Collects every leaf position matching `path`, where `'*'` matches any object key. */
-function collectLeafPositions(target: unknown, path: readonly (string | number)[]): LeafPosition[] {
+export function collectLeafPositions(target: unknown, path: readonly (string | number)[]): LeafPosition[] {
   if (path.length === 0) {
     return [];
   }

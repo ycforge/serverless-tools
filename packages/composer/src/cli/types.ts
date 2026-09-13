@@ -62,7 +62,6 @@ export interface GatewayApp {
   name: string;
   builder: 'yandex-api-gateway';
   path: string;
-  openapiEntry: string;
   authPath: string;
   overridesPath: string;
 }
