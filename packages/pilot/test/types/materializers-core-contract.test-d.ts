@@ -36,6 +36,21 @@ describe('materializers-core conformance to pilot contracts (spec 019, D-RE-5)',
     expectTypeOf<CoreMaterializationContext>().toEqualTypeOf<PilotMaterializationContext>();
   });
 
+  it('MaterializationContext.projectRoot is optional in BOTH structural copies (spec 028, T002)', () => {
+    // RED gate: either side missing the field fails the type-check here.
+    expectTypeOf<PilotMaterializationContext['projectRoot']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<CoreMaterializationContext['projectRoot']>().toEqualTypeOf<string | undefined>();
+  });
+
+  it('contexts without projectRoot stay valid in both directions (additive, D-2)', () => {
+    const barePilot: PilotMaterializationContext = { output: { declare: () => {} } };
+    expectTypeOf(barePilot).toMatchTypeOf<CoreMaterializationContext>();
+    const bareCore: CoreMaterializationContext = { output: { declare: () => {} } };
+    expectTypeOf(bareCore).toMatchTypeOf<PilotMaterializationContext>();
+    expect(barePilot).toBeDefined();
+    expect(bareCore).toBeDefined();
+  });
+
   it('TerraformResource is structurally identical in both directions (FR-008)', () => {
     expectTypeOf<PilotTerraformResource>().toEqualTypeOf<CoreTerraformResource>();
     expectTypeOf<CoreTerraformResource>().toEqualTypeOf<PilotTerraformResource>();

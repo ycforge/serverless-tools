@@ -16,6 +16,8 @@ export interface OutputBuilder {
 /** Context handed to every `supports`/`materialize` invocation. Contains only `output`. */
 export interface MaterializationContext {
   readonly output: OutputBuilder;
+  /** Optional project root of the pipeline run (spec 028, T006 — mirror of the pilot contract). */
+  readonly projectRoot?: string;
 }
 
 /** A generated Terraform `resource` block (spec 002 / spec 019 D-RE-5). */
