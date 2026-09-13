@@ -63,6 +63,7 @@ program
   .command('materialize')
   .description('Run materializers to generate Terraform .tf.json files')
   .option('--target <app>', 'Materialize only this app (by app ID from apps.yaml)')
+  .option('--artifacts <dir>', 'Read built artifacts from this store dir (default: <project>/.ycsf/artifacts)')
   .action(bindAction(materializeAction));
 
 program

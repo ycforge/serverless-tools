@@ -10,6 +10,12 @@ const materializer: Materializer = {
     return artifact.type === 'ycforge:api-gateway';
   },
   async materialize(artifact, context) {
+    if (artifact.value === undefined) {
+      throw materializerError(
+        YMT_INVALID_ARTIFACT_VALUE,
+        `built artifact value is missing for app '${artifact.name ?? 'unknown'}' — run \`ycsf build\` first or pass \`--artifacts <dir>\``,
+      );
+    }
     const value = artifact.value as ApiGatewayArtifactValue;
     const { specPath, resourceReferences = [] } = value;
 

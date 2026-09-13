@@ -130,4 +130,20 @@ describe('yandex-function materializer (US1, T040)', () => {
     expect(e.name).not.toBe('MaterializerError');
     expect(e.code).toBe('ENOENT');
   });
+
+  it('T016: descriptor without a built value → actionable YMT_INVALID_ARTIFACT_VALUE, not destructure TypeError', async () => {
+    const ctx = createContext();
+    const err = await materializer
+      .materialize({ type: 'ycforge:function', name: 'user_service' } as never, ctx)
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(err).not.toBeNull();
+    const e = err as Error & { code?: string };
+    expect(e.code).toBe(YMT_INVALID_ARTIFACT_VALUE);
+    expect(e.message).toContain('ycsf build');
+    expect(e.message).toContain('--artifacts');
+    expect(e.message).not.toContain('Cannot destructure');
+  });
 });

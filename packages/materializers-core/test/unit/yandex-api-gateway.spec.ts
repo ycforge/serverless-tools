@@ -155,4 +155,23 @@ describe('yandex-api-gateway materializer (US3, T081)', () => {
       ),
     ).rejects.toMatchObject({ code: YMT_INVALID_ARTIFACT_VALUE });
   });
+
+  it('T016: descriptor without a built value → actionable YMT_INVALID_ARTIFACT_VALUE, not destructure TypeError', async () => {
+    savedCwd = process.cwd();
+    tmpDir = mkdtempSync(join(tmpdir(), 'apigw-'));
+    process.chdir(tmpDir);
+
+    const err = await materializer
+      .materialize({ type: 'ycforge:api-gateway', name: 'openapi' } as never, createContext())
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(err).not.toBeNull();
+    const e = err as Error & { code?: string };
+    expect(e.code).toBe(YMT_INVALID_ARTIFACT_VALUE);
+    expect(e.message).toContain('ycsf build');
+    expect(e.message).toContain('--artifacts');
+    expect(e.message).not.toContain('Cannot destructure');
+  });
 });

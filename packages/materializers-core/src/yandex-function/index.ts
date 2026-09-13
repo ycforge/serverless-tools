@@ -9,6 +9,12 @@ const materializer: Materializer = {
     return artifact.type === 'ycforge:function';
   },
   async materialize(artifact, context) {
+    if (artifact.value === undefined) {
+      throw materializerError(
+        YMT_INVALID_ARTIFACT_VALUE,
+        `built artifact value is missing for app '${artifact.name ?? 'unknown'}' — run \`ycsf build\` first or pass \`--artifacts <dir>\``,
+      );
+    }
     const value = artifact.value as FunctionArtifactValue;
     const { archivePath, entryPoint } = value;
 
