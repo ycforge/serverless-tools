@@ -21,6 +21,8 @@ export interface FakeDockerOptions {
   readonly inspectSha?: string;
   /** verbatim stderr spilled on a failing `docker build`. */
   readonly buildStderr?: string;
+  /** 64-hex local image ID printed by the `{{.Id}}` inspect branch (no-push mode, spec 027). */
+  readonly localId?: string;
 }
 
 export interface FakeDockerBins {
@@ -39,6 +41,7 @@ export function fakeDocker(binDir: string, options: FakeDockerOptions = {}): Fak
   const pushExit = options.pushExit ?? 0;
   const inspectSha = options.inspectSha ?? '';
   const buildStderr = options.buildStderr ?? '';
+  const localId = options.localId ?? '';
 
   const script = `#!/usr/bin/env bash
 {
@@ -75,8 +78,14 @@ case "$cmd" in
     exit 0
     ;;
   image)
-    if [ -n "${inspectSha}" ]; then
-      echo "[test.local/app@${inspectSha}]"
+    if [ "$3" = "{{.Id}}" ]; then
+      if [ -n "${localId}" ]; then
+        printf 'sha256:%s\n' "${localId}"
+      fi
+    else
+      if [ -n "${inspectSha}" ]; then
+        echo "[test.local/app@${inspectSha}]"
+      fi
     fi
     exit 0
     ;;
@@ -133,7 +142,7 @@ export function fakeVite(binDir: string, options: FakeViteOptions = { captureEnv
   const failMessage = options.failMessage ?? 'fake vite exited with failure';
 
   const readEnv = captureEnv
-    .map((key) => `VAR_${key}="\${${key}:-\_unset_}"`)
+    .map((key) => `VAR_${key}="\${${key}:-_unset_}"`)
     .join('\n');
 
   const script = `#!/usr/bin/env bash

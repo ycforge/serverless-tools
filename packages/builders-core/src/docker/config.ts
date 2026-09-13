@@ -13,6 +13,7 @@ export interface ParsedDockerConfig {
   readonly repository: string;
   readonly tag: string;
   readonly dockerfile: string;
+  readonly noPush: boolean;
 }
 
 function invalid(field: string): never {
@@ -33,6 +34,10 @@ export function parseDockerConfig(raw: unknown): ParsedDockerConfig {
   }
   const imageRecord = image as Record<string, unknown>;
 
+  const rawNoPush = imageRecord.no_push;
+  const noPush = rawNoPush === undefined ? false : rawNoPush;
+  if (typeof noPush !== 'boolean') invalid('image.no_push');
+
   const repository = imageRecord.repository;
   if (!requireString(repository)) invalid('repository');
 
@@ -42,5 +47,5 @@ export function parseDockerConfig(raw: unknown): ParsedDockerConfig {
   const dockerfile = record.dockerfile === undefined ? 'Dockerfile' : record.dockerfile;
   if (!requireString(dockerfile)) invalid('dockerfile');
 
-  return { repository, tag, dockerfile };
+  return { repository, tag, dockerfile, noPush };
 }

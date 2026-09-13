@@ -77,7 +77,8 @@
           "type": "object",
           "properties": {
             "repository": { "type": "string", "minLength": 1 },
-            "tag": { "type": "string", "default": "latest", "pattern": "^[^\\s][^\\s]*$", "description": "Push tag; never used as the artifact image (only the digest form is)." }
+            "tag": { "type": "string", "default": "latest", "pattern": "^[^\\s][^\\s]*$", "description": "Push tag; never used as the artifact image (only the digest form is)." },
+            "no_push": { "type": "boolean", "default": false, "description": "true → only-build, digest из локального daemon (.Id), push не выполняется (spec 027)." }
           },
           "required": ["repository"],
           "additionalProperties": false
@@ -149,7 +150,7 @@
       "BLC_ENTRY_NOT_FOUND": { "const": "BLC_ENTRY_NOT_FOUND", "description": "entry file referenced by build_config does not exist (FR-007)." },
       "BLC_BUILD_FAILED": { "const": "BLC_BUILD_FAILED", "description": "Underlying build failed: esbuild error, docker CLI nonzero/unavailable, vite command failed, missing build output (FR-007/013/017)." },
       "BLC_ENV_NOT_RESOLVED": { "const": "BLC_ENV_NOT_RESOLVED", "description": "Residual {{$...}} in buildConfig/buildEnv — upstream interpolation contract violated (FR-019, D-3)." },
-      "BLC_IMAGE_DIGEST_UNAVAILABLE": { "const": "BLC_IMAGE_DIGEST_UNAVAILABLE", "description": "Push succeeded but digest not resolved from push output or docker inspect (FR-011)." },
+      "BLC_IMAGE_DIGEST_UNAVAILABLE": { "const": "BLC_IMAGE_DIGEST_UNAVAILABLE", "description": "Push succeeded but digest not resolved from push output or docker inspect (FR-011).; also thrown in no-push mode when the local digest cannot be resolved from `docker image inspect --format '{{.Id}}'` (build succeeded)" },
       "BLC_ARCHIVE_FAILED": { "const": "BLC_ARCHIVE_FAILED", "description": "Zip creation/write failed (US1/US6)." }
     },
     "required": [

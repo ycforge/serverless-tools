@@ -63,7 +63,11 @@ export interface NestjsFunctionBuildConfig {
 
 /** App-level `build_config` for builder `docker` (versionless, spec 011). */
 export interface DockerBuildConfig {
-  readonly image?: { readonly repository: string; readonly tag?: string }; // repository required
+  readonly image?: {
+    readonly repository: string; // required
+    readonly tag?: string; // default "latest"
+    readonly no_push?: boolean; // default false; only-build mode (spec 027)
+  };
   readonly dockerfile?: string; // default "Dockerfile"
 }
 
