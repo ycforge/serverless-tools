@@ -5,7 +5,6 @@ import {
   type Artifact,
   type ArtifactType,
   type Builder,
-  type BuildContext,
   type DockerArtifactValue,
   type DockerBuildConfig,
   type FrontendArtifactValue,

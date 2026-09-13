@@ -142,7 +142,7 @@ export function fakeVite(binDir: string, options: FakeViteOptions = { captureEnv
   const failMessage = options.failMessage ?? 'fake vite exited with failure';
 
   const readEnv = captureEnv
-    .map((key) => `VAR_${key}="\${${key}:-\_unset_}"`)
+    .map((key) => `VAR_${key}="\${${key}:-_unset_}"`)
     .join('\n');
 
   const script = `#!/usr/bin/env bash
