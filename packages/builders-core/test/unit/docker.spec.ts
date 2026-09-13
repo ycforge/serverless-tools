@@ -15,6 +15,7 @@ import { dockerFixture, makeTempDir, type TempDir } from '../helpers/fixture-pro
 import { fakeDocker, withPath } from '../helpers/fake-bins.js';
 
 const SHA_256_A = 'a'.repeat(64);
+const SHA_256_B = 'b'.repeat(64);
 
 function ctx(sourcePath: string, overrides: Partial<BuildContext> = {}): BuildContext {
   return {
@@ -345,5 +346,122 @@ describe('docker builder no-push (spec 027)', () => {
       );
       expect((artifact.value as DockerArtifactValue).image).toBe(`test.local/app@sha256:${SHA_256_A}`);
     });
+  });
+
+  it('SC-001/AC1: no_push true → local build artifact in immutable digest form', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const artifact = await dockerBuilder.build(
+        ctx(fixture.root, {
+          buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: true }, dockerfile: 'Dockerfile' },
+        }),
+      );
+      expect(artifact.type).toBe('ycforge:docker-image');
+      expect((artifact.value as DockerArtifactValue).image).toBe(`test.local/app@sha256:${SHA_256_A}`);
+      expect((artifact.value as DockerArtifactValue).image).toMatch(/@sha256:[a-f0-9]{64}$/);
+    });
+  });
+
+  it('SC-002/AC2: no-push build never invokes docker push (argv log)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      await dockerBuilder.build(
+        ctx(fixture.root, {
+          buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: true }, dockerfile: 'Dockerfile' },
+        }),
+      );
+    });
+    const args = readLogLines(bins.logFile);
+    expect(args).toContain('ARG build');
+    expect(args).toContain('ARG -f');
+    expect(args).toContain('ARG Dockerfile');
+    expect(args).toContain('ARG test.local/app:v1');
+    expect(args).toContain('ARG image');
+    expect(args).toContain('ARG {{.Id}}');
+    expect(args).toContain('ARG test.local/app:v1');
+    expect(args).not.toContain('ARG push');
+    expect(args).not.toContain('ARG {{index .RepoDigests 0}}');
+  });
+
+  it('SC-003/AC3: repeated identical builds → identical deterministic local digest', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const first = await dockerBuilder.build(
+        ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: true } } }),
+      );
+      const second = await dockerBuilder.build(
+        ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: true } } }),
+      );
+      expect((first.value as DockerArtifactValue).image).toBe((second.value as DockerArtifactValue).image);
+      expect((first.value as DockerArtifactValue).image).toBe(`test.local/app@sha256:${SHA_256_A}`);
+    });
+  });
+
+  it('US-2/AC2: no tag → local :latest addressable, value.image stays digest-only', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const artifact = await dockerBuilder.build(
+        ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app', no_push: true } } }),
+      );
+      const image = (artifact.value as DockerArtifactValue).image;
+      expect(image).toBe(`test.local/app@sha256:${SHA_256_A}`);
+      expect(image).not.toContain(':latest');
+      expect(image).not.toContain(':v1');
+    });
+    const args = readLogLines(bins.logFile);
+    expect(args).toContain('ARG test.local/app:latest');
+  });
+
+  it('US-2/AC1: value.image is exactly <repository>@sha256:<hex> across tag/repository variants', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    const cases: ReadonlyArray<{ readonly repository: string; readonly tag?: string }> = [
+      { repository: 'test.local/app', tag: 'v1' },
+      { repository: 'test.local/app' },
+      { repository: 'cr.yandex/crp/analytics/extra', tag: 'v2' },
+    ];
+    await withPath(bins.binDir, async () => {
+      for (const c of cases) {
+        const artifact = await dockerBuilder.build(
+          ctx(fixture.root, {
+            buildConfig: {
+              image: { repository: c.repository, ...(c.tag === undefined ? {} : { tag: c.tag }), no_push: true },
+            },
+          }),
+        );
+        const image = (artifact.value as DockerArtifactValue).image;
+        expect(image).toBe(`${c.repository}@sha256:${SHA_256_A}`);
+        expect(image).toMatch(/@sha256:[a-f0-9]{64}$/);
+        expect(image).not.toMatch(/:(latest|v1|v2)@sha256:/);
+      }
+    });
+  });
+
+  it('SC-005: without no_push the push path is unchanged (option never activates local path)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { digest: SHA_256_A, localId: SHA_256_B });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const artifact = await dockerBuilder.build(ctx(fixture.root));
+      expect((artifact.value as DockerArtifactValue).image).toBe(`test.local/app@sha256:${SHA_256_A}`);
+    });
+    const args = readLogLines(bins.logFile);
+    expect(args).toContain('ARG push');
+    expect(args).not.toContain('ARG {{.Id}}');
   });
 });

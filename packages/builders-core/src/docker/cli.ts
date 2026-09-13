@@ -17,6 +17,8 @@ export interface BuildAndPushOptions {
   readonly repository: string;
   readonly tag: string;
   readonly dockerfile: string;
+  /** Only-build mode (image.no_push, spec 027): resolve digest from the local daemon, never push. */
+  readonly noPush?: boolean;
 }
 
 interface CommandOutput {
@@ -68,6 +70,20 @@ export async function buildAndPush(options: BuildAndPushOptions): Promise<string
     throw builderError(
       BLC_BUILD_FAILED,
       `docker build failed: ${tailStderr(output.stderr)} (${BLC_BUILD_FAILED})`,
+    );
+  }
+
+  if (options.noPush === true) {
+    const inspect = await runDocker(['image', 'inspect', '--format', '{{.Id}}', ref], sourcePath);
+    if (inspect.code === 0) {
+      const fromInspect = inspect.stdout.match(/sha256:[0-9a-f]{64}/);
+      if (fromInspect !== null) {
+        return fromInspect[0];
+      }
+    }
+    throw builderError(
+      BLC_IMAGE_DIGEST_UNAVAILABLE,
+      `local daemon digest could not be resolved for '${ref}' (build succeeded, no-push mode) (${BLC_IMAGE_DIGEST_UNAVAILABLE})`,
     );
   }
 

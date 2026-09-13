@@ -18,6 +18,7 @@ const builder = {
       repository: config.repository,
       tag: config.tag,
       dockerfile: config.dockerfile,
+      noPush: config.noPush,
     });
     return { type: 'ycforge:docker-image', value: { image: `${config.repository}@${digest}` } };
   },
