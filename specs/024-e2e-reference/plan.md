@@ -48,6 +48,21 @@ Spec 024 добавляет **эталонный end-to-end проект `exampl
 
 **Gate Decision**: Все gates PASS с 6 задокументированными блокирующими правками (BIG-1..6), аддитивными к контрактам. Design proceeded to Phase 1: каноническая конфигурация и границы безопасного plan зафиксированы в разделах ниже; без реализации BIG в Phase A этап B физически не собирается.
 
+### Addendum (после merge 025/026/027)
+
+Все BIG-1..6 закрыты отдельными спецификациями, смёрджены в `dev` (время обновления «Reference layout»):
+
+| BIG | Спека | PR → `dev` | Что вошло |
+|-----|-------|------------|-----------|
+| BIG-1 (value-threading) | 025 pilot-e2e-enablement | #25 (`dda15aa`) | `ArtifactDescriptor.value`, `DispatchOptions.artifacts`, `materializerOutputs` |
+| BIG-2 (`ycforge:*`-ключи) | 025 pilot-e2e-enablement | #25 (`dda15aa`) | artifact-типы в builders-реестре |
+| BIG-3 (`composer/builder`) | 026 composer-builder | #26 (`8aef559`) | subpath `@ycforge/composer/builder` |
+| BIG-4 (диалект apps.yaml) | 026 composer-builder | #26 (`8aef559`) | builder потребляет C-модель map-form |
+| BIG-5 (docker без push) | 027 docker-no-push | #27 (`c7014ac`) | `image.no_push: true`, локальный digest, `BLC_*` fail-fast |
+| BIG-6 (suspicious-keys) | 025 pilot-e2e-enablement | #25 (`dda15aa`) | категория в `ycsf check` |
+
+BIG-6 закрыт до реализации 024: ссылка на «явный тест до правки pilot» в Constitution V выше устарела — категория уже в pilot. Эталонный проект использует закрытые gaps и фиксирует их golden-файлами. Примеры конфигов ниже уже приведены к закрытым BIG (app map-form B уже принимает; `ycsf check` выдаёт suspicious-предупреждения; docker-контейнер analytics собирается с `no_push: true`).
+
 ## Блокирующие интеграционные разрывы (BIG-1..BIG-6)
 
 Каждый разрыв: **Evidence** (проверено в источнике), **Impact** (что сломается в reference), **Required amendment** (формулировка follow-up правки). Все — аддитивные; правки оформляются как отдельные спецификации (номера не переиспользуемы) и НЕ входят в этот PR.
