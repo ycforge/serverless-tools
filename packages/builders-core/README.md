@@ -43,3 +43,32 @@ Limitations (intentional, see spec 027 A-2/NG-8):
 
 `no_push` defaults to `false`; the default behavior is unchanged: build → push →
 digest → artifact.
+
+### `image.mode` — docker dev-modes (spec 028)
+
+The `image` block accepts an optional dev-mode selector for environments where a
+local docker daemon is not available:
+
+```yaml
+build_config:
+  image:
+    mode: registry-ref   # | remote
+    ref: cr.yandex/crp/app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    host: unix:///var/run/docker.sock   # remote builds only
+  dockerfile: Dockerfile
+```
+
+- `mode: registry-ref` — **no docker CLI invocation at all**: the supplied
+  `image.ref` (immutable digest form, `/^[^@]+@sha256:[0-9a-f]{64}$/`) becomes the
+  artifact value verbatim. A mutable tag or `repository:tag`-style ref is rejected
+  with `BLC_INVALID_CONFIG` — the "never a mutable tag" invariant is preserved.
+- `mode: remote` — build (and push unless `no_push: true`) runs against the daemon
+  at `image.host` (`DOCKER_HOST` passthrough); the digest is read from that same
+  daemon.
+- **Unreachable daemon is never a silent fallback**: any default-/remote-mode build
+  that cannot reach the daemon fails with `BLC_DOCKER_UNREACHABLE` and an
+  actionable message (start the daemon, or switch to `mode: registry-ref` /
+  `mode: remote`).
+
+`mode` is absent by default → local-daemon build + push (spec 027 `no_push`
+semantics preserved in every mode).
