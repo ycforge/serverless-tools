@@ -2,10 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   BRG_DUPLICATE_KEY,
-  BRG_INVALID,
   BRG_KEY_COLLISION,
   BRG_LOAD_ERROR,
-  BRG_MISSING_FILE,
   BRG_NOT_A_PLUGIN,
   BRG_PACKAGE_NOT_FOUND,
   BRG_UNKNOWN_BUILDER,
