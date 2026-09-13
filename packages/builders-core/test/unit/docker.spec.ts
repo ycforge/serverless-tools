@@ -464,4 +464,69 @@ describe('docker builder no-push (spec 027)', () => {
     expect(args).toContain('ARG push');
     expect(args).not.toContain('ARG {{.Id}}');
   });
+
+  it('US-3/AC1: docker CLI unavailable (empty PATH) → BLC_BUILD_FAILED, no push (FR-005)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    const emptyDir = makeTempDir('bc-nodocker-');
+    dirs.push(emptyDir);
+    const prevPath = process.env.PATH;
+    try {
+      process.env.PATH = emptyDir.root;
+      const err = await expectBLC(
+        dockerBuilder.build(
+          ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: true } } }),
+        ),
+        BLC_BUILD_FAILED,
+      );
+      expect(err.message).toContain('docker CLI unavailable');
+    } finally {
+      process.env.PATH = prevPath;
+    }
+    const args = existsSync(bins.logFile) ? readLogLines(bins.logFile) : [];
+    expect(args).not.toContain('ARG push');
+  });
+
+  it('US-3/AC2: daemon down (buildExit=1 + socket stderr) → BLC_BUILD_FAILED with stderr tail, no push (FR-005)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), {
+      buildExit: 1,
+      buildStderr: 'Cannot connect to the Docker daemon. Is the docker daemon running?\n',
+    });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const err = await expectBLC(
+        dockerBuilder.build(
+          ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: true } } }),
+        ),
+        BLC_BUILD_FAILED,
+      );
+      expect(err.message).toContain('the Docker daemon');
+    });
+    const args = readLogLines(bins.logFile);
+    expect(args).not.toContain('ARG push');
+  });
+
+  it('US-3/AC3: build ok but no local digest → BLC_IMAGE_DIGEST_UNAVAILABLE, no artifact, no push (FR-004)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'));
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const err = await expectBLC(
+        dockerBuilder.build(
+          ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: true } } }),
+        ),
+        BLC_IMAGE_DIGEST_UNAVAILABLE,
+      );
+      expect(err.message).toMatch(/local daemon digest/);
+    });
+    const args = readLogLines(bins.logFile);
+    expect(args).toContain('ARG build');
+    expect(args).not.toContain('ARG push');
+    expect(args).not.toContain('ARG {{index .RepoDigests 0}}');
+  });
 });
