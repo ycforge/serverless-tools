@@ -175,12 +175,31 @@ apps:
     expect(dangling?.message).toContain('nonexistent');
   });
 
-  it('Sc5: app_id == functions resource_id → PML_IDENTITY_COLLISION with identity set (US-3 AC1)', () => {
+  it('Sc5: legacy builder (no artifact type) does NOT create an identity collision (T011 flip)', () => {
     project.write(
       '.ycsf/apps.yaml',
       `version: 1
 apps:
   legacy_authorizer: { source_path: legacy_authorizer, builder: nestjs-function }
+`,
+    );
+    project.write(
+      '.ycsf/resources.yaml',
+      `version: 1
+functions:
+  legacy_authorizer: {}
+`,
+    );
+    const result = loadProjectModel(project.root);
+    expect(result.kind).toBe('ok');
+  });
+
+  it('Sc5: artifact-type app app_id == domain resource_id → PML_IDENTITY_COLLISION with identity set (US-3 AC1)', () => {
+    project.write(
+      '.ycsf/apps.yaml',
+      `version: 1
+apps:
+  legacy_authorizer: { source_path: legacy_authorizer, builder: ycforge:function }
 `,
     );
     project.write(

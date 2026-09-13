@@ -1,5 +1,7 @@
 // spec 021 ycsf-cli — buildApps orchestrator (D-RE-1, D-RE-11, D-RE-12) + spec 022 cache.
 import type { BuildAppsOptions, BuildAppsResult, BuiltArtifact } from '../contracts/build.js';
+import type { AppIdentity } from '../contracts/resource-domain.js';
+import { artifactTypeToResourceDomain } from '../contracts/resource-domain.js';
 import type { Diagnostic } from '../contracts/check.js';
 import type { PluginLoadError, RegistryError } from '../contracts/registry.js';
 import { CLI_APP_NOT_FOUND, CLI_BUILD_FAILED, CLI_MISSING_PROJECT_DIR } from '../cli/errors.js';
@@ -205,6 +207,18 @@ export async function buildApps(
     currentManifest = { version: 1, entries: {} };
   }
 
+  // spec 028 (plan D-1 / T013): derive the app-identity list ONCE from the
+  // whole project model — Project B resolves sibling map-form apps by these.
+  // Apps whose builder maps to no resource domain derive no identity.
+  const appIdentities = [...projectModel.apps.values()]
+    .map((app) => {
+      if (artifactTypeToResourceDomain(app.builder) === undefined) {
+        return undefined;
+      }
+      return { appId: app.app_id, artifactType: app.builder };
+    })
+    .filter((identity): identity is AppIdentity => identity !== undefined);
+
   for (const appId of orderedAppIds) {
     const app = appsToBuild.get(appId)!;
     const effective = effectiveByApp.get(appId)!;
@@ -277,6 +291,7 @@ export async function buildApps(
         buildConfig: projectModel.build_configs.get(appId)?.build_config ?? {},
         buildEnv: resolvedEnv,
         outputDir,
+        ...(appIdentities.length > 0 ? { appIdentities } : {}),
       };
       let artifact;
       try {

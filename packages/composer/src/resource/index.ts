@@ -15,7 +15,8 @@ export type {
   ResourceDomain,
   ResourceIndex,
 } from './types.js';
-export { emptyResourceIndex, loadResourceIndex, parseResourceIndex } from './resource-index.js';
+export { emptyResourceIndex, loadResourceIndex, parseResourceIndex, buildIndex } from './resource-index.js';
+export { mergeResourceIndex } from './app-identities.js';
 export { parseEnvMapping, loadEnvMapping, emptyEnvMapping } from './env-mapping.js';
 export { resolveReferences, resolveReferencesInValue, validateResourceReference, collectLeafPositions } from './reference-resolver.js';
 export type { ResourceReferenceValidation, LeafPosition } from './reference-resolver.js';

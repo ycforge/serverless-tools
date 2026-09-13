@@ -68,6 +68,7 @@ export function deriveCompileSource(context: BuildContext): CompileSource {
     appName: appId,
     appDir,
     openapiEntry: resolveOpenapiEntry(context.buildConfig),
+    ...(context.appIdentities !== undefined ? { appIdentities: context.appIdentities } : {}),
   };
 }
 
