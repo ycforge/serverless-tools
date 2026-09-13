@@ -22,5 +22,5 @@ export type {
 
 export { catalog, type CatalogEntry } from './catalog.js';
 export type { EnvScanResult } from './env.js';
-export { BLC_ARCHIVE_FAILED, BLC_BUILD_FAILED, BLC_ENV_NOT_RESOLVED, BLC_ENTRY_NOT_FOUND, BLC_IMAGE_DIGEST_UNAVAILABLE, BLC_INVALID_CONFIG, BLC_MISSING_SOURCE } from './diagnostics.js';
+export { BLC_ARCHIVE_FAILED, BLC_BUILD_FAILED, BLC_DOCKER_UNREACHABLE, BLC_ENV_NOT_RESOLVED, BLC_ENTRY_NOT_FOUND, BLC_IMAGE_DIGEST_UNAVAILABLE, BLC_INVALID_CONFIG, BLC_MISSING_SOURCE } from './diagnostics.js';
 export type { BuilderError } from './diagnostics.js';

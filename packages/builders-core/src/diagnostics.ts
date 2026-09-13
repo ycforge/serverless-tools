@@ -17,6 +17,12 @@ export const BLC_BUILD_FAILED = 'BLC_BUILD_FAILED';
 export const BLC_ENV_NOT_RESOLVED = 'BLC_ENV_NOT_RESOLVED';
 export const BLC_IMAGE_DIGEST_UNAVAILABLE = 'BLC_IMAGE_DIGEST_UNAVAILABLE';
 export const BLC_ARCHIVE_FAILED = 'BLC_ARCHIVE_FAILED';
+/**
+ * spec 028: the docker daemon is unreachable (local or `remote`). Carries an
+ * actionable stairway (start the daemon / image.mode: registry-ref /
+ * image.mode: remote). Never a silent success nor a partial artifact (V).
+ */
+export const BLC_DOCKER_UNREACHABLE = 'BLC_DOCKER_UNREACHABLE';
 
 export interface BuilderErrorOptions {
   readonly builder?: string;

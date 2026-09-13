@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { BuildContext, DockerArtifactValue } from '../../src/types.js';
 import {
   BLC_BUILD_FAILED,
+  BLC_DOCKER_UNREACHABLE,
   BLC_ENV_NOT_RESOLVED,
   BLC_IMAGE_DIGEST_UNAVAILABLE,
   BLC_INVALID_CONFIG,
@@ -501,7 +502,7 @@ describe('docker builder no-push (spec 027)', () => {
     expect(args).not.toContain('ARG push');
   });
 
-  it('US-3/AC2: daemon down (buildExit=1 + socket stderr) → BLC_BUILD_FAILED with stderr tail, no push (FR-005)', async () => {
+  it('US-3/AC2: daemon down (buildExit=1 + socket stderr) → BLC_DOCKER_UNREACHABLE with stairway, no push (FR-005, spec 028)', async () => {
     const fixture = dockerFixture();
     dirs.push(fixture);
     const bins = fakeDocker(join(fixture.root, 'fake-bin'), {
@@ -514,9 +515,11 @@ describe('docker builder no-push (spec 027)', () => {
         dockerBuilder.build(
           ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app', tag: 'v1', no_push: true } } }),
         ),
-        BLC_BUILD_FAILED,
+        BLC_DOCKER_UNREACHABLE,
       );
       expect(err.message).toContain('the Docker daemon');
+      expect(err.message).toMatch(/registry-ref/);
+      expect(err.message).toMatch(/remote/);
     });
     const args = readLogLines(bins.logFile);
     expect(args).not.toContain('ARG push');
@@ -596,5 +599,244 @@ describe.skipIf(!probeDockerDaemon())('docker daemon no-push smoke (spec 027, ga
       }
       throw err;
     }
+  });
+});
+
+describe('docker dev-modes (spec 028): registry-ref', () => {
+  const dirs: TempDir[] = [];
+  const REF = `test.local/app@sha256:${SHA_256_A}`;
+
+  afterEach(() => {
+    for (const d of dirs) {
+      d.remove();
+    }
+    dirs.length = 0;
+  });
+
+  it('T028: valid image.ref → value.image is the ref verbatim, ZERO docker subprocess calls (no daemon, no creds)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { digest: SHA_256_B });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const artifact = await dockerBuilder.build(
+        ctx(fixture.root, { buildConfig: { image: { mode: 'registry-ref', ref: REF } } }),
+      );
+      expect(artifact.type).toBe('ycforge:docker-image');
+      expect((artifact.value as DockerArtifactValue).image).toBe(REF);
+    });
+    expect(existsSync(bins.logFile)).toBe(false);
+    expect(existsSync(bins.envLogFile)).toBe(false);
+  });
+
+  it('T028: registry-ref needs no sourcePath and no docker CLI (no build at all)', async () => {
+    const artifact = await dockerBuilder.build({
+      projectRoot: '.',
+      buildConfig: { image: { mode: 'registry-ref', ref: REF } },
+      buildEnv: {},
+      outputDir: join('.', 'out'),
+    } as BuildContext);
+    expect((artifact.value as DockerArtifactValue).image).toBe(REF);
+  });
+
+  it('T028: mutable-tag ref (repo:latest@sha256:…) → BLC_INVALID_CONFIG field image.ref (never a mutable tag)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const err = await expectBLC(
+      dockerBuilder.build(
+        ctx(fixture.root, {
+          buildConfig: { image: { mode: 'registry-ref', ref: `test.local/app:latest@sha256:${SHA_256_A}` } },
+        }),
+      ),
+      BLC_INVALID_CONFIG,
+    );
+    expect((err as { field?: string }).field).toBe('image.ref');
+  });
+
+  it('T028: bare mutable tag without digest (repo:latest) → BLC_INVALID_CONFIG', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    await expectBLC(
+      dockerBuilder.build(
+        ctx(fixture.root, { buildConfig: { image: { mode: 'registry-ref', ref: 'test.local/app:latest' } } }),
+      ),
+      BLC_INVALID_CONFIG,
+    );
+  });
+
+  it('T028: mutual exclusion — image.repository together with registry-ref → BLC_INVALID_CONFIG (D-3)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    await expectBLC(
+      dockerBuilder.build(
+        ctx(fixture.root, {
+          buildConfig: { image: { mode: 'registry-ref', ref: REF, repository: 'other/app' } },
+        }),
+      ),
+      BLC_INVALID_CONFIG,
+    );
+  });
+
+  it('T028: mutual exclusion — dockerfile together with registry-ref → BLC_INVALID_CONFIG (D-3)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    await expectBLC(
+      dockerBuilder.build(
+        ctx(fixture.root, { buildConfig: { dockerfile: 'AltDockerfile', image: { mode: 'registry-ref', ref: REF } } }),
+      ),
+      BLC_INVALID_CONFIG,
+    );
+  });
+
+  it('T028: no_push true + registry-ref is a valid no-op (027-compat, edge)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const artifact = await dockerBuilder.build(
+      ctx(fixture.root, { buildConfig: { image: { mode: 'registry-ref', ref: REF, no_push: true } } }),
+    );
+    expect((artifact.value as DockerArtifactValue).image).toBe(REF);
+  });
+});
+
+describe('docker dev-modes (spec 028): remote + default-unreachable', () => {
+  const dirs: TempDir[] = [];
+
+  afterEach(() => {
+    for (const d of dirs) {
+      d.remove();
+    }
+    dirs.length = 0;
+  });
+
+  it('T029: image.host is required in remote mode → BLC_INVALID_CONFIG without it', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    await expectBLC(
+      dockerBuilder.build(
+        ctx(fixture.root, { buildConfig: { image: { repository: 'test.local/app', tag: 'v1', mode: 'remote' } } }),
+      ),
+      BLC_INVALID_CONFIG,
+    );
+  });
+
+  it('T029: remote build+push carry DOCKER_HOST in env; digest from {{.Id}} on the same daemon', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { digest: SHA_256_A, localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const artifact = await dockerBuilder.build(
+        ctx(fixture.root, {
+          buildConfig: { image: { repository: 'test.local/app', tag: 'v1', mode: 'remote', host: 'tcp://remote:2375' } },
+        }),
+      );
+      expect((artifact.value as DockerArtifactValue).image).toBe(`test.local/app@sha256:${SHA_256_A}`);
+    });
+    const args = readLogLines(bins.logFile);
+    expect(args).toContain('ARG build');
+    expect(args).toContain('ARG push');
+    expect(args).toContain('ARG image');
+    expect(args).toContain('ARG {{.Id}}');
+    const env = readLogLines(bins.envLogFile);
+    expect(env).toContain('DOCKER_HOST=tcp://remote:2375');
+  });
+
+  it('T029: remote no_push → only-build on the remote daemon (DOCKER_HOST, no push)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const artifact = await dockerBuilder.build(
+        ctx(fixture.root, {
+          buildConfig: {
+            image: { repository: 'test.local/app', tag: 'v1', mode: 'remote', host: 'tcp://remote:2375', no_push: true },
+          },
+        }),
+      );
+      expect((artifact.value as DockerArtifactValue).image).toBe(`test.local/app@sha256:${SHA_256_A}`);
+    });
+    const args = readLogLines(bins.logFile);
+    expect(args).toContain('ARG build');
+    expect(args).toContain('ARG image');
+    expect(args).toContain('ARG {{.Id}}');
+    expect(args).not.toContain('ARG push');
+    const env = readLogLines(bins.envLogFile);
+    expect(env).toContain('DOCKER_HOST=tcp://remote:2375');
+  });
+
+  it('T029: remote connect/auth failure → BLC_DOCKER_UNREACHABLE with host in message (remote-scope)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), {
+      buildExit: 1,
+      buildStderr: 'error during connect: Could not connect to the docker daemon\n',
+    });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const err = await expectBLC(
+        dockerBuilder.build(
+          ctx(fixture.root, {
+            buildConfig: { image: { repository: 'test.local/app', mode: 'remote', host: 'tcp://remote:2375' } },
+          }),
+        ),
+        BLC_DOCKER_UNREACHABLE,
+      );
+      expect(err.message).toContain('tcp://remote:2375');
+      expect(err.message).toMatch(/registry-ref/);
+    });
+  });
+
+  it('T029: default mode daemon-down → BLC_DOCKER_UNREACHABLE with actionable stairway, no push, no partial artifact', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), {
+      buildExit: 1,
+      buildStderr: 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the daemon running?\n',
+    });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const err = await expectBLC(dockerBuilder.build(ctx(fixture.root)), BLC_DOCKER_UNREACHABLE);
+      expect(err.message).toMatch(/registry-ref/);
+      expect(err.message).toMatch(/remote/);
+    });
+    const args = readLogLines(bins.logFile);
+    expect(args).toContain('ARG build');
+    expect(args).not.toContain('ARG push');
+  });
+
+  it('T029: other build failures keep BLC_BUILD_FAILED + stderr tail (classification isolated)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), {
+      buildExit: 1,
+      buildStderr: 'The build failed for an unrelated reason: x\n',
+    });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const err = await expectBLC(dockerBuilder.build(ctx(fixture.root)), BLC_BUILD_FAILED);
+      expect(err.message).toContain('unrelated reason');
+    });
+  });
+
+  it('T029: 027-compat value.image table — every mode yields digest-only form, never a mutable tag', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { digest: SHA_256_A, localId: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const cases: ReadonlyArray<unknown> = [
+        { image: { repository: 'test.local/app', tag: 'v1' } },
+        { image: { repository: 'test.local/app', tag: 'v1', no_push: true } },
+        { image: { repository: 'test.local/app', mode: 'remote', host: 'tcp://r:2375' } },
+        { image: { mode: 'registry-ref', ref: `test.local/app@sha256:${SHA_256_A}` } },
+      ];
+      for (const buildConfig of cases) {
+        const artifact = await dockerBuilder.build(ctx(fixture.root, { buildConfig }));
+        const image = (artifact.value as DockerArtifactValue).image;
+        expect(image).toMatch(/@sha256:[a-f0-9]{64}$/);
+        expect(image).not.toMatch(/:(latest|v1)@/);
+      }
+    });
   });
 });
