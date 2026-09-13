@@ -58,7 +58,7 @@ export async function materializeAll(
     const materializerId = matches.get(appId);
     if (materializerId === undefined) continue;
 
-    const entry = registry.records.get(materializerId);
+    const entry = registry.records.get(`materializer:${materializerId}`);
     const materializer = entry === undefined ? null : getMaterializer(entry.module);
     if (materializer === null) continue;
 

@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { BRG_MISSING_FILE, type RegistryError } from '../../src/contracts/index.js';
+import { BRG_MISSING_FILE, BRG_PACKAGE_NOT_FOUND, type RegistryError } from '../../src/contracts/index.js';
 import { loadRegistry } from '../../src/registry/index.js';
+import { loadPlugins } from '../../src/registry/load.js';
 
 // T036–T039: loadRegistry unit tests (all USs, FR-001/005/014/015)
 
@@ -44,9 +45,9 @@ materializers:
       expect(result.kind).toBe('ok');
       if (result.kind !== 'ok') return;
       expect(result.registry.records.size).toBe(3);
-      expect(result.registry.records.get('builder-a')?.kind).toBe('builder');
-      expect(result.registry.records.get('builder-b')?.kind).toBe('builder');
-      expect(result.registry.records.get('mat-a')?.kind).toBe('materializer');
+      expect(result.registry.records.get('builder:builder-a')?.kind).toBe('builder');
+      expect(result.registry.records.get('builder:builder-b')?.kind).toBe('builder');
+      expect(result.registry.records.get('materializer:mat-a')?.kind).toBe('materializer');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -110,10 +111,67 @@ builders:
       const result = await loadRegistry(root);
       expect(result.kind).toBe('ok');
       if (result.kind !== 'ok') return;
-      expect(result.registry.records.has('ycforge')).toBe(true);
-      expect(result.registry.records.get('ycforge')?.kind).toBe('builder');
+      expect(result.registry.records.has('builder:ycforge')).toBe(true);
+      expect(result.registry.records.get('builder:ycforge')?.kind).toBe('builder');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('loadPlugins bare-specifier dispatch (spec 028, T033)', () => {
+  it('bare specifier + resolveFrom → resolved through the consumer graph → imported', async () => {
+    const root = tmpRoot();
+    try {
+      writeFileSync(join(root, 'mq.mjs'), 'export default { supports: () => false, materialize: async () => null };\n', 'utf8');
+      const result = await loadPlugins(
+        new Map([['mq', { id: 'mq', packageName: '@scenario/mq', kind: 'materializer' }]]),
+        {
+          resolveFrom: (specifier) => {
+            expect(specifier).toBe('@scenario/mq');
+            return join(root, 'mq.mjs');
+          },
+        },
+      );
+      expect(result.errors).toEqual([]);
+      expect(result.entries.size).toBe(1);
+      expect(result.entries.get('materializer:mq')?.kind).toBe('materializer');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('relative/absolute specifier stays plain import — resolveFrom never consulted (FR-020)', async () => {
+    const result = await loadPlugins(
+      new Map([['rel', { id: 'rel', packageName: join(FIXTURES_DIR, 'builder-default.mjs'), kind: 'builder' }]]),
+      {
+        resolveFrom: () => {
+          throw new Error('resolveFrom must NOT be called for relative/absolute paths');
+        },
+      },
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.entries.get('builder:rel')?.kind).toBe('builder');
+  });
+
+  it('resolveFrom exception → BRG_PACKAGE_NOT_FOUND with actionable consumer-graph message (FR-018)', async () => {
+    const result = await loadPlugins(
+      new Map([['x', { id: 'x', packageName: '@nonexistent/x', kind: 'builder' }]]),
+      {
+        resolveFrom: () => {
+          throw new TypeError('MODULE_NOT_FOUND');
+        },
+      },
+    );
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]?.code).toBe(BRG_PACKAGE_NOT_FOUND);
+    expect(result.errors[0]?.message).toMatch(/consumer project/);
+  });
+
+  it('normalizePluginLoadError semantics preserved: bare-specifier import failure → BRG_LOAD_ERROR', async () => {
+    const result = await loadPlugins(
+      new Map([['bad', { id: 'bad', packageName: join(FIXTURES_DIR, 'load-error.mjs'), kind: 'builder' }]]),
+    );
+    expect(result.errors).toHaveLength(1);
   });
 });

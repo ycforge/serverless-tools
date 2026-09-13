@@ -187,7 +187,7 @@ export async function buildApps(
     const sortedEnv: Record<string, string> = {};
     for (const k of Object.keys(buildEnv).sort()) sortedEnv[k] = buildEnv[k]!;
     const buildEnvHash = hashString(canonicalJson(sortedEnv));
-    const version = resolveBuilderVersion(registry as unknown as { records: Map<string, { packageName?: string }> }, app.builder);
+    const version = resolveBuilderVersion(registry as unknown as { records: Map<string, { packageName?: string }> }, `builder:${app.builder}`);
     const builderStr = version ? `${app.builder}@${version}` : app.builder;
     const own = computeOwnFingerprint({ filesHash, buildConfig, buildEnv: sortedEnv, builder: builderStr });
     ownByApp.set(appId, { own, filesHash, buildConfigHash, buildEnvHash, builderStr });
@@ -287,7 +287,7 @@ export async function buildApps(
     if (!result.hit) {
       // For noCache case we still need to skip cache lookup and build
       options?.onAppProgress?.(appId);
-      const entry = registry.records.get(app.builder);
+      const entry = registry.records.get(`builder:${app.builder}`);
       if (!entry) continue;
       const builder = getBuilder(entry.module);
       if (!builder) {
