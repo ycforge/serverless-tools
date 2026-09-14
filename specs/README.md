@@ -81,3 +81,16 @@ Specs создаются **перед реализацией соответст�
 - Нумерация specs не переиспользуется; новая фича — следующий свободный номер.
 - Колонка Scope — точка входа в IDEA.md, а не замена чтения; при расхождении spec и IDEA.md обновляется IDEA.md (specs первичны, constitution важнее обоих).
 - Issues в GitHub создаются на этапе `/speckit.tasks` → `/speckit.taskstoissues` для фичи в работе, а не для запланированных specs.
+
+## Волна 6 — follow-ups, зарегистрированные convergence-ом 024 (pure-package, 024 не трогает packages)
+
+Зарегистрированы по findings-ам `/speckit-converge` спеки 024 (T034–T037, T044); объем фиксов — только `packages/*`, 024-эталон остаётся неизменным.
+
+| # | Spec | Scope (IDEA.md) | Статус | Зависимости |
+|---|------|-----------------|--------|-------------|
+| 029 | pilot-dir-alignment — `ycsf check` обязан валидировать те же сгенерированные `.tf.json`, что пишет materialize (`.ycsf/` vs `infra/`, D9); снэпшот-механизм 024 T033 после этого устаревает | §28, §30 | ⬜ | 020, 021 |
+| 030 | docker-context-resolution — build-context `sourcePath` резолвится от projectRoot, а не от `cwd=sourcePath` (D10) | §36 | ⬜ | 018, 021 |
+| 031 | materialize-standalone-values — standalone `ycsf materialize` восстанавливает значения артефактов из кэша (D1/D2) | §22–24, §39 | ⬜ | 021, 022 |
+| 032 | materializer-provider-shapes — materializer'ы эмитят формы по схеме terraform provider (image блок vs строка, `memory`/`cores`/`name`), D12 | §22, §27 | ⬜ | 019 |
+| 033 | registry-workspace-resolution — `loadRegistry` резолвит builders относительно project root (monorepo-подписи `../../../composer/dist/builder/index.js`), FR-008 | §21 | ⬜ | 013 |
+| 034 | composer-path-level-refs — path-level `x-yc-apigateway-integration`-ссылки composer'a (gateway→apps кроме единственного carrier'а `x-yc-apigateway-authorizer.function_id`, требующего resources.yaml), D-11 | §23, §27 | ⬜ | 016 |

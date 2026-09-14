@@ -12,7 +12,7 @@ Spec 024 добавляет **эталонный end-to-end проект `exampl
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5.9 / Node 22+ (ESM, `"type": "module"`, `engines.node >= 22`). Пример — `package.json` типа `@ycforge-example/reference-project`, не публикуется (`private`), подключается через `pnpm-workspace.yaml` (`examples/**`). Git — English, docs/examples — Russian.
+**Language/Version**: TypeScript 5.9 / Node 22+ (ESM, `"type": "module"`, `engines.node >= 22`). Пример — `package.json` типа `@ycforge/reference-project` (FR-001; plan-вариант `@ycforge-example/…` — минорный флаг, spec wins), не публикуется (`private`), подключается через `pnpm-workspace.yaml` (`examples/*`). Git — English, docs/examples — Russian.
 
 **Primary Dependencies**: `@ycforge/pilot` (bin `ycsf`, export `./contracts`), `@ycforge/builders-core` (subpath-экспорты `./nestjs-function`, `./docker`, `./vite`), `@ycforge/materializers-core` (subpath-экспорты `./yandex-function`, `./yandex-serverless-container`, `./yandex-storage-bucket`, `./yandex-api-gateway`), `@ycforge/composer` (нужен новый аддитивный export `./builder` — BIG-3), `yaml`, `vitest`, `typescript`. runtime-бины: `terraform` (>= 1.5, в среде 1.15.8), `docker` (опционально, среда `darwin/arm64` без running daemon), `node` 22, `pnpm`.
 
@@ -40,7 +40,7 @@ Spec 024 добавляет **эталонный end-to-end проект `exampl
 | II. Spec-First, Test-First | ✅ PASS | Каждый FR-001..024 и US → ≥1 тест; golden-файлы фиксируются до/во время реализации (RED через отсутствующий/ожидаемый `.tf.json`, GREEN после сборки). Исключение Constitution II (thin orchestration → characterization-тесты постфактум) применяется ТОЛЬКО к terraform-границам без сети: `terraform validate`/`plan` вывод фиксируется characterization-тестом, а не unit-моком. |
 | III. Contracts Versioned | ✅ PASS (additive only) | Публичные контракты `@ycforge/pilot/contracts` и `materializers-core` не ломаются: все правки BIG-1..6 — аддитивные (расширение ключа реестра, новое поле `value` в descriptor, новый subpath export, новая опция `no_push`). Любой breaking fix — отдельная мажорная спецификация с миграцией (по конституции), в 024 не входит. |
 | IV. Terraform Stays Terraform | ✅ PASS | Никакого кастомного provisioning: поставить план — значит вызвать `terraform`. Все сгенерированные файлы — стандартный `tf.json`. `.terraform.lock.hcl` — коммитится, state — нет. |
-| V. Explicit Over Magic | ✅ PASS (с gap) | Эмпирическое доказательство границ (раздел «Pipeline») фиксируется в README и тестами, ничего молча не допускается. Выявленный пробел — отсутствие в текущем `ycsf check` категории suspicious-ключей (BIG-6): эталонный проект закрывает его явным тестом (до правки pilot), а не молчаливым пропуском. |
+| V. Explicit Over Magic | ✅ PASS | Эмпирическое доказательство границ (раздел «Pipeline») фиксируется в README и тестами, ничего молча не допускается. Бывший пробел — отсутствие категории suspicious-ключей (BIG-6) — закрыт spec 025: категория уже в `ycsf check`; эталонный проект дополнительно держит собственный secret-scan-тест (FR-023), не полагаясь только на cat-слой pilot. |
 | VI. Ownership: apps=managed | ✅ PASS | Собственность C на `.ycsf/*.yaml` и `infra/*.ycsf.tf.json` — как в спецификациях 011-016; user-owned `infra/main.tf` читается Terraform-ом, но никогда C. |
 | Monorepo Tooling | ✅ PASS | Новый entry в `examples/**` (workspace уже включает `examples/third-party-contracts-plugin`); пакеты подключаются `workspace:*`, бины — из devDeps эталонного проекта. |
 
@@ -119,7 +119,7 @@ specs/024-e2e-reference/
 
 ```text
 examples/reference-project/
-├── package.json                  # @ycforge-example/reference-project, private, scripts: plan/check/test
+├── package.json                  # @ycforge/reference-project (FR-001), private, scripts: plan/check/test
 ├── README.md                     # Russian: назначение, границы (без push/apply/секретов), пошаговый запуск
 ├── .env.example                  # документирует ОПЦИОНАЛЬНЫЕ YC_TOKEN/SERVICE_ACCOUNT_KEY_FILE (не .env!)
 ├── tsconfig.json                 # strict, только для тестов эталона
@@ -196,17 +196,19 @@ builders:
   ycforge:frontend: "@ycforge/builders-core/vite"
   ycforge:api-gateway: "@ycforge/composer/builder"   # BIG-3
 materializers:
-  ycforge:function: "@ycforge/materializers-core/yandex-function"
-  ycforge:docker-image: "@ycforge/materializers-core/yandex-serverless-container"
-  ycforge:frontend: "@ycforge/materializers-core/yandex-storage-bucket"
-  ycforge:api-gateway: "@ycforge/materializers-core/yandex-api-gateway"
+  yandex-function: "@ycforge/materializers-core/yandex-function"
+  yandex-serverless-container: "@ycforge/materializers-core/yandex-serverless-container"
+  yandex-storage-bucket: "@ycforge/materializers-core/yandex-storage-bucket"
+  yandex-api-gateway: "@ycforge/materializers-core/yandex-api-gateway"
 ```
 
 `.ycsf/outputs.yaml` (IDL-адресуемы только `functions.*`/`gateways.*` — см. `extensions/idl.ts`; containers/buckets НЕ адресуемы — задокументировано):
 ```yaml
+# Ключи НЕ пересекаются с auto-outputs materializers (`<app>_function_id`/`_container_id`/
+# `_bucket_id`/`_gateway_id`, spec 025): коллизия → OUT_DUPLICATE_NAME (outputs/build.ts:89).
 version: 1
 outputs:
-  user_service_function_id:
+  user_service_id:
     value: functions.user_service
     description: "Yandex Function id (user service)"
   gateway_id:

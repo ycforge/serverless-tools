@@ -2,6 +2,7 @@ packages:
   - 'packages/*'
   - 'examples/*'
 allowBuilds:
+  '@nestjs/core': false
   '@scarf/scarf': false
   '@swc/core': false
   esbuild: true

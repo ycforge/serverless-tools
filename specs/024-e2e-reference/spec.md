@@ -8,7 +8,7 @@
 - **Created**: 2026-09-12
 - **Status**: 🚧 In Progress
 - **Input**: roadmap row `024 | e2e-reference — reference-проект (user_service + orders + frontend + openapi), build → terraform plan | §30, §41 | ⬜ | все волны 1–3` (исправлено: `orders` → `analytics`, см. D-1)
-- **Dependencies**: 001, 002, 003–022 (фундамент + все волны 1–3), 023 (js-dev-tools — локальная разработка user_service/analytics)
+- **Dependencies**: 001–023 (фундамент, все волны 1–3, js-dev-tools — локальная разработка user_service/analytics), 025–027 (e2e-enablement: значения артефактов через materialize, composer builder `@ycforge/composer/builder`, docker no-push) — согласовано с roadmap, строка 024
 - **IDEA.md sections**: §30 (B + C + Terraform pipeline), §36 (Frontend), §37 (Serverless Containers), §38 (Local development), §39 (Incremental builds), §41 (Общая architecture)
 - **Packages/examples**: `examples/reference-project` (`@ycforge/reference-project`) — пакет reference-проекта в workspace; используется `@ycforge/nestjs-connector` (A), `@ycforge/composer` (B), `@ycforge/pilot` (C), `@ycforge/builders-core/*`, `@ycforge/materializers-core/*`
 
@@ -55,7 +55,7 @@ Reference-проект содержит **ровно четыре** прилож
 | **frontend** | статическое приложение (vite), собирается **только из public build-time данных** (Constitution; §36) | vite builder; public-only окружение сборки | vite | yandex-storage-bucket |
 | **openapi** | единая точка входа API Gateway — **композиция Project B** (совмещённые API user_service + analytics), безопасный режим | Project B safe mode, logical resource references, gateway-materializer | composer builder | yandex-api-gateway |
 
-Каждый из **четырёх core-builders** (nestjs-function, docker, vite) и **четырёх core-materializers** (function, serverless-container, api-gateway, storage-bucket; «materializers-yandex», spec 019) задействован в reference-проекте — это критерий полноты покрытия (SC-002). Непосредственное использование пакета `@ycforge/builders-core/*`/`@ycforge/materializers-core/*` через явный маппинг `.ycsf/builders.yaml` (Constitution V, specs 013/014) — единственный способ подключения; локально-определённых плагинов в v1 нет (D-3).
+Каждый из **четырёх core-builders** (nestjs-function, docker, vite) и **четырёх core-materializers** (function, serverless-container, api-gateway, storage-bucket; «materializers-yandex», spec 019) задействован в reference-проекте — это критерий полноты покрытия (SC-002). Непосредственное использование пакетов `@ycforge/builders-core/*`/`@ycforge/materializers-core/*` (и composer builder из `@ycforge/composer/builder`, spec 026) через явный маппинг `.ycsf/builders.yaml` (Constitution V, specs 013/014) — единственный способ подключения; локально-определённых плагинов в v1 нет (D-3).
 
 ### S-3 — Один командный entrypoint: конвейер check → build → materialize → terraform init → validate → plan
 
@@ -155,7 +155,7 @@ Reference-проект обязан проходить сквозную пров
 
 **Решение**: План обязан содержать ровно четыре managed-ресурса с **стабильными** Terraform addresses: `yandex_function.user_service`, `yandex_serverless_container.analytics`, `yandex_storage_bucket.frontend`, `yandex_api_gateway.openapi`, связанные logical-reference цепочкой `${resources...}` (spec 009) от openapi к user_service/analytics и через `extensions.yaml`-патчи (spec 015). Точная топология (какие links, какие extensions-поля) фиксируется на этапе `/speckit.plan`.
 
-**Рациональность**: Адреса вида `functions.user_service → yandex_function.user_service` стабильны по дизайну (spec 034/IDEA §34, `moved.yaml`). «Четыре ресурса + связка» — измеримый и однозначный результат плана без реальных ID облака; он же — хард-ассерт CI без креденшалов (структурная корректность, S-5).
+**Рациональность**: Адреса вида `functions.user_service → yandex_function.user_service` стабильны по дизайну (spec 017, `moved.yaml`; IDEA §34). «Четыре ресурса + связка» — измеримый и однозначный результат плана без реальных ID облака; он же — хард-ассерт CI без креденшалов (структурная корректность, S-5).
 
 ### D-5 — Без-креденшальный `plan`: ограниченная семантика границы (provider-dependent)
 
@@ -346,7 +346,7 @@ Reference-проект использует все четыре builder-ветк
 
 **Registry и покрытие стека**
 
-- **FR-008**: System MUST подключать builders только явным маппингом `.ycsf/builders.yaml` на `@ycforge/builders-core/*` (nestjs-function, docker, vite) и composer builder; без auto-discovery и локальных плагинов (Constitution V).
+- **FR-008**: System MUST подключать builders только явным маппингом `.ycsf/builders.yaml` на `@ycforge/builders-core/*` (nestjs-function, docker, vite) и composer builder (`@ycforge/composer/builder` — spec 026); без auto-discovery и локальных плагинов (Constitution V).
 - **FR-009**: System MUST подключать materializers только явным маппингом на `@ycforge/materializers-core/*` (yandex-function, yandex-serverless-container, yandex-storage-bucket, yandex-api-gateway; «materializers-yandex», spec 019).
 - **FR-010**: System MUST выражать связи gateway↔apps исключительно в logical-синтаксисе `${resources...}` (IDL/IDT, spec 009); в Project B-артефакте не допускается provider-specific выражений (IDEA §31). **Уточнение (amendment, решение владельца фичи от 2026-09-13)**: `<name>` в `${resources.<type>.<name>.id}` — это **app_id** из `apps.yaml` (топология «ссылки на apps, не на resources»); маппинг `${resources.functions.user_service.id}` → `${yandex_function.user_service.id}` выполняется materializer-ом по замороженной таблице D-4 из identity C-модели. Подтверждено эмпирически: composer builder собирает `resourceReferences` из финального артефакта без обращения к resources.yaml (`packages/composer/src/builder/index.ts:102` + `artifact.ts:collectResourceReferences`), контракт `ResourceReference` не различает managed/external (`packages/pilot/src/contracts/resource-reference.ts`).
 
@@ -440,6 +440,9 @@ Reference-проект использует все четыре builder-ветк
 | 021 ycsf-cli | build/materialize/plan стадии CLI; entrypoint-композиция | ✅ |
 | 022 incremental-builds | content-addressed кэш артефактов (US-2 AC3, US-6) | ✅ |
 | 023 local-dev-server | `@ycforge/js-dev-tools/server` — локальная разработка user_service/analytics (US-7) | ✅ |
+| 025 pilot-e2e-enablement | значения артефактов через materialize (BIG-1), artifact-типы в builders-реестре (BIG-2), suspicious-keys категория `ycsf check` (BIG-6) | ✅ |
+| 026 composer-builder | Builder-модуль `@ycforge/composer/builder` (`ycforge:api-gateway`) в конвейере `ycsf build` (FR-006, FR-008, US-5) | ✅ |
+| 027 docker-no-push | локальная сборка `ycforge:docker-image` без push (`image.no_push`, digest из локального daemon) — контейнер analytics без registry (FR-004, FR-024, D-6) | ✅ |
 | Terraform CLI + yandex-cloud provider | единственный deployment engine; `init`/`validate`/`plan` | external |
 
 Без 001–023 reference-проект не собирается: это **сквозной демонстратор законченного стека**, а не новая функциональность контрактов. Spec 024 не меняет ни один контракт пакетов (Constitution III); изменение поведения пакетов, выявленное при сборке reference-проекта, оформляется отдельными follow-up-спеками.

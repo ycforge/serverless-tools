@@ -1,0 +1,127 @@
+import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseDocument } from 'yaml';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+function yaml(file: string): Record<string, unknown> {
+  const doc = parseDocument(readFileSync(join(ROOT, file), 'utf8'));
+  if (doc.errors.length) throw new Error(`${file}: ${doc.errors[0].message}`);
+  return (doc.toJS() ?? {}) as Record<string, unknown>;
+}
+function buildCfg(app: string): Record<string, any> {
+  return yaml(join(app, 'build_config.yaml')).build_config as Record<string, any>;
+}
+
+describe('ycsf-модель эталона', () => {
+  it('все .ycsf/*.yaml и build_config.yaml несут version: 1', () => {
+    for (const f of readdirSync(join(ROOT, '.ycsf')).filter((f) => f.endsWith('.yaml'))) {
+      expect(yaml(join('.ycsf', f)).version).toBe(1);
+    }
+    for (const app of ['user_service', 'analytics', 'frontend', 'openapi']) {
+      const cfg = parseDocument(readFileSync(join(ROOT, app, 'build_config.yaml'), 'utf8')).toJS() as any;
+      expect(cfg.version).toBe(1);
+      expect(cfg.build_config).toBeTruthy();
+    }
+  });
+
+  it('apps.yaml: ровно 4 канонических приложения, openapi зависит от трёх', () => {
+    const apps = (yaml('.ycsf/apps.yaml').apps ?? {}) as Record<string, any>;
+    expect(Object.keys(apps).sort()).toEqual(['analytics', 'frontend', 'openapi', 'user_service']);
+    expect(apps.user_service.builder).toBe('ycforge:function');
+    expect(apps.analytics.builder).toBe('ycforge:docker-image');
+    expect(apps.frontend.builder).toBe('ycforge:frontend');
+    expect(apps.openapi.builder).toBe('ycforge:api-gateway');
+    for (const app of ['user_service', 'analytics', 'frontend']) {
+      expect(apps[app].depends_on).toEqual([]);
+    }
+    expect(apps.openapi.depends_on).toEqual(['analytics', 'frontend', 'user_service']);
+    expect(apps.openapi.source_path).toBe('apps/openapi');
+  });
+
+  it('builders.yaml разделяет builder-ключи (ycforge:*) и materializer-ключи (yandex-*)', () => {
+    const builders = yaml('.ycsf/builders.yaml');
+    const b = builders.builders as Record<string, string>;
+    const m = builders.materializers as Record<string, string>;
+    for (const key of Object.keys(b)) {
+      expect(key).toMatch(/^ycforge:/);
+      // api-gateway: относительный путь к модулю composer-сборщика (D3/BRG);
+      // остальные builder-ы и все materializer-ы — реестровые импорты @ycforge/*.
+      const value = b[key];
+      if (key === 'ycforge:api-gateway') {
+        expect(value).toMatch(/^\.\.\/\.\.\/\.\.\/composer\/dist\/builder\/index\.js$/);
+      } else {
+        expect(value).toMatch(/^@ycforge\//);
+      }
+    }
+    for (const key of Object.keys(m)) {
+      expect(key).toMatch(/^yandex-/);
+      expect(m[key]).toMatch(/^@ycforge\//);
+    }
+    expect(Object.keys(b).sort()).toEqual([
+      'ycforge:api-gateway',
+      'ycforge:docker-image',
+      'ycforge:frontend',
+      'ycforge:function',
+    ]);
+  });
+
+  it('nested build_config: внешние модули NestJS, docker no_push, vite command, openapi entry', () => {
+    const us = buildCfg('user_service');
+    expect(us.entry).toBe('src/main.ts');
+    expect(us.runtime).toBe('nodejs22');
+    expect(us.out_filename).toBe('function.zip');
+    expect(us.external).toContain('@nestjs/websockets');
+    expect(us.external).toContain('@nestjs/microservices');
+    expect(us.external).toContain('@grpc/grpc-js');
+    expect(us.external).toContain('ioredis');
+
+    const an = buildCfg('analytics');
+    expect(an.image.repository).toBe('cr.yandex/ycforge/analytics');
+    expect(an.image.no_push).toBe(true);
+    expect(an.dockerfile).toBe('Dockerfile');
+
+    const fe = yaml('frontend/build_config.yaml');
+    expect((fe.build_config as any).out_dir).toBe('dist');
+    expect((fe.build_config as any).command).toContain('vite build');
+    expect(Object.keys(fe.build_env ?? {}).sort()).toEqual(['VITE_API_BASE', 'VITE_ENV']);
+
+    const oa = buildCfg('openapi');
+    expect(oa.openapi_entry).toBe('openapi.yaml');
+    for (const app of ['user_service', 'analytics', 'frontend', 'openapi']) {
+      expect(yaml(`${app}/build_config.yaml`).build_env ?? {}).not.toContain('TOKEN');
+    }
+  });
+
+  it('extensions/outputs используют 3-сегментный IDL-грамматику (D6)', () => {
+    const ext = (yaml('.ycsf/extensions.yaml').extensions ?? []) as any[];
+    for (const e of ext) {
+      expect(String(e.target)).toMatch(/^(functions|containers|gateways|buckets)\.[a-z_]+$/);
+    }
+    const outs = (yaml('.ycsf/outputs.yaml').outputs ?? {}) as Record<string, any>;
+    expect(Object.keys(outs).sort()).toEqual(['gateway_id', 'user_service_id']);
+    for (const o of Object.values(outs)) {
+      expect(o.value).toMatch(/^(functions|containers|gateways|buckets)\.[a-z_]+\.[a-z0-9_]+$/);
+    }
+  });
+
+  it('нет секретных литералов и {{$ENV}} в конфигах', () => {
+    const files = [
+      '.ycsf/apps.yaml',
+      '.ycsf/builders.yaml',
+      '.ycsf/extensions.yaml',
+      '.ycsf/outputs.yaml',
+      'user_service/build_config.yaml',
+      'analytics/build_config.yaml',
+      'frontend/build_config.yaml',
+      'openapi/build_config.yaml',
+    ];
+    for (const f of files) {
+      const text = readFileSync(join(ROOT, f), 'utf8');
+      expect(text).not.toMatch(/\{\{\$ENV\}\}/);
+    }
+    expect(readFileSync(join(ROOT, '.ycsf/extensions.yaml'), 'utf8')).toContain('connectivity_type');
+  });
+});

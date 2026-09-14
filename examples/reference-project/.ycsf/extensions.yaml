@@ -1,0 +1,9 @@
+version: 1
+extensions:
+  - target: functions.user_service
+    patch:
+      memory: 128
+      execution_timeout: 5
+  - target: gateways.openapi
+    patch:
+      connectivity_type: PRIVATE

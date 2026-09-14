@@ -1,0 +1,7 @@
+version: 1
+build_config:
+  image:
+    repository: cr.yandex/ycforge/analytics
+    no_push: true
+  dockerfile: Dockerfile
+build_env: {}

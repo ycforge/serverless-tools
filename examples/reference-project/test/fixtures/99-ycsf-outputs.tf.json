@@ -1,0 +1,24 @@
+{
+  "output": {
+    "analytics_container_id": {
+      "value": "${yandex_serverless_container.analytics.id}"
+    },
+    "frontend_bucket_id": {
+      "value": "${yandex_storage_bucket.frontend.id}"
+    },
+    "gateway_id": {
+      "description": "API Gateway id (front entry)",
+      "value": "${yandex_api_gateway.openapi.id}"
+    },
+    "openapi_gateway_id": {
+      "value": "${yandex_api_gateway.openapi.id}"
+    },
+    "user_service_function_id": {
+      "value": "${yandex_function.user_service.id}"
+    },
+    "user_service_id": {
+      "description": "Yandex Function id (user service)",
+      "value": "${yandex_function.user_service.id}"
+    }
+  }
+}

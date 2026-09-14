@@ -1,0 +1,26 @@
+openapi: 3.0.0
+info:
+  title: Reference API Gateway
+  version: 1.0.0
+  description: Composed entry point over the user_service and analytics reference APIs.
+paths:
+  /users:
+    get:
+      summary: List users (user_service API)
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: mock
+        content:
+          application/json: '{"users":[]}'
+  /analytics/report:
+    get:
+      summary: Analytics report (analytics API)
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: mock
+        content:
+          application/json: '{"report":{"status":"ok"}}'
