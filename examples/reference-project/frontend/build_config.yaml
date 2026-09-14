@@ -1,0 +1,8 @@
+version: 1
+build_config:
+  out_dir: dist
+  root: .
+  command: ../../node_modules/.bin/vite build
+build_env:
+  VITE_ENV: public-only-banner
+  VITE_API_BASE: /api

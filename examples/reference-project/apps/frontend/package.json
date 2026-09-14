@@ -1,0 +1,9 @@
+{
+  "name": "@ycforge/reference-frontend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

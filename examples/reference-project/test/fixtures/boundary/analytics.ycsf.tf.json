@@ -1,0 +1,16 @@
+{
+  "resource": {
+    "yandex_serverless_container": {
+      "analytics": {
+        "cores": 1,
+        "image": [
+          {
+            "url": "cr.yandex/ycforge/analytics@sha256:c16dea4fac51b380fee77eef61fc6344dfde1b306629bb02b4f1b3dbad8ce7f0"
+          }
+        ],
+        "memory": 64,
+        "name": "analytics"
+      }
+    }
+  }
+}

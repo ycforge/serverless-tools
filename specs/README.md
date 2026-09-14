@@ -66,19 +66,32 @@ Specs создаются **перед реализацией соответст�
 | # | Spec | Scope | Статус | Зависимости |
 |---|------|-------|--------|-------------|
 | 023 | local-dev-server — `@ycforge/js-dev-tools/server`, payload 2.0 эмуляция | §38 | ✅ | 001 |
-| 024 | e2e-reference — reference-проект (user_service + orders + frontend + openapi), build → terraform plan | §30, §41 | ⬜ | все волны 1–3, 025, 026, 027 |
+| 024 | e2e-reference — reference-проект (user_service + analytics + frontend + openapi), build → terraform plan | §30, §41 | 🚧 | 001–023, 025, 026, 027, 028 |
 
 ## Волна 5 — e2e enablement
 
 | # | Spec | Scope (IDEA.md) | Статус | Зависимости |
 |---|------|-----------------|--------|-------------|
-| 025 | pilot-e2e-enablement — значения артефактов через materialize (BIG-1), artifact-типы в builders-реестре (BIG-2), suspicious-keys в `ycsf check` (BIG-6) | §24, §26, §28, §36 | 🚧 | 013, 014, 016, 020, 021, 022 |
-| 026 | composer-builder — Builder-модуль `@ycforge/composer/builder` (`ycforge:api-gateway`) в конвейере `ycsf build`, единый источник истины по проектной модели (BIG-3, BIG-4) | §3, §10, §13–19 | 🚧 | 006, 007, 008, 009, 010, 025 |
-| 027 | docker-no-push — локальная сборка `ycforge:docker-image` без push (`image.no_push`, digest из локального daemon, инвариант never-a-mutable-tag) (BIG-5) | §37 | 🚧 | 013, 018, 025 |
-| 028 | e2e-final-enablement — пять фиксов тулчейна по research.md 024 (composer refs против app-модели; standalone materialize; required YC attrs + companion path; docker dev-modes registry-ref/remote; pilot registry consumer-graph + key namespaces) | §3, §10, §13–19, §21–24, §26, §30, §37 | 🚧 | 024…, 025, 026, 027 |
+| 025 | pilot-e2e-enablement — значения артефактов через materialize (BIG-1), artifact-типы в builders-реестре (BIG-2), suspicious-keys в `ycsf check` (BIG-6) | §24, §26, §28, §36 | ✅ | 013, 014, 016, 020, 021, 022 |
+| 026 | composer-builder — Builder-модуль `@ycforge/composer/builder` (`ycforge:api-gateway`) в конвейере `ycsf build`, единый источник истины по проектной модели (BIG-3, BIG-4) | §3, §10, §13–19 | ✅ | 006, 007, 008, 009, 010, 025 |
+| 027 | docker-no-push — локальная сборка `ycforge:docker-image` без push (`image.no_push`, digest из локального daemon, инвариант never-a-mutable-tag) (BIG-5) | §37 | ✅ | 013, 018, 025 |
+| 028 | e2e-final-enablement — пять фиксов тулчейна по research.md 024 (composer refs против app-модели; standalone materialize; required YC attrs + companion path; docker dev-modes registry-ref/remote; pilot registry consumer-graph + key namespaces) | §3, §10, §13–19, §21–24, §26, §30, §37 | ✅ | 024…, 025, 026, 027 |
 
 ## Правила
 
 - Нумерация specs не переиспользуется; новая фича — следующий свободный номер.
 - Колонка Scope — точка входа в IDEA.md, а не замена чтения; при расхождении spec и IDEA.md обновляется IDEA.md (specs первичны, constitution важнее обоих).
 - Issues в GitHub создаются на этапе `/speckit.tasks` → `/speckit.taskstoissues` для фичи в работе, а не для запланированных specs.
+
+## Волна 6 — follow-ups, зарегистрированные convergence-ом 024 (pure-package, 024 не трогает packages)
+
+Зарегистрированы по findings-ам `/speckit-converge` спеки 024 (T034–T037, T044); объем фиксов — только `packages/*`, 024-эталон остаётся неизменным. **031–034 закрыты 028** (e2e-final-enablement, вл. 5): fix-ы Fix-1/Fix-2/Fix-3/Fix-5 — см. строки ниже.
+
+| # | Spec | Scope (IDEA.md) | Статус | Зависимости |
+|---|------|-----------------|--------|-------------|
+| 029 | pilot-dir-alignment — `ycsf check` обязан валидировать те же сгенерированные `.tf.json`, что пишет materialize (`.ycsf/` vs `infra/`, D9); снэпшот-механизм 024 T033 после этого устаревает | §28, §30 | ⬜ | 020, 021 |
+| 030 | docker-context-resolution — build-context `sourcePath` резолвится от projectRoot, а не от `cwd=sourcePath` (D10) | §36 | ⬜ | 018, 021 |
+| 031 | materialize-standalone-values — **закрыто в 028 (Fix-2)**: `ycsf build` пишет `.ycsf/artifacts/<appId>/artifact.json`, `ycsf materialize` читает store/`--artifacts` | §22–24, §39 | ✅ | 021, 028 |
+| 032 | materializer-provider-shapes — **закрыто в 028 (Fix-3)**: `yandex_function` += `name`/`memory`, `yandex_api_gateway` += `name`, companion → `<rootDir>/infra/generated/` | §22, §27 | ✅ | 019, 028 |
+| 033 | registry-workspace-resolution — **закрыто в 028 (Fix-5)**: consumer-graph резолюция из корня проекта, pnpm-aware subpath exports | §21 | ✅ | 013, 028 |
+| 034 | composer-path-level-refs — **закрыто в 028 (Fix-1)**: ресурсный индекс объединяет app-identities C-модели, `${resources.<domain>.<app_id>.<property>}` валиден без resources.yaml | §23, §27 | ✅ | 016, 028 |
