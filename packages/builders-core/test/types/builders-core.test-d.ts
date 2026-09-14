@@ -68,9 +68,16 @@ describe('DockerBuildConfig additive no_push, frozen value.image (spec 027)', ()
     expectTypeOf(withoutNoPush).toMatchTypeOf<DockerBuildConfig>();
   });
 
-  it('image section is exactly { repository, tag?, no_push? } (additivity, SC-007)', () => {
+  it('image section is { repository?, tag?, no_push?, mode?, ref?, host? } (spec 028 dev-modes, SC-007)', () => {
     expectTypeOf<DockerBuildConfig['image']>().toEqualTypeOf<
-      { readonly repository: string; readonly tag?: string; readonly no_push?: boolean } | undefined
+      {
+        readonly repository?: string;
+        readonly tag?: string;
+        readonly no_push?: boolean;
+        readonly mode?: 'registry-ref' | 'remote';
+        readonly ref?: string;
+        readonly host?: string;
+      } | undefined
     >();
   });
 
@@ -91,6 +98,36 @@ describe('DockerBuildConfig additive no_push, frozen value.image (spec 027)', ()
   });
 
   it('DockerArtifactValue stays frozen as { readonly image: string } (SC-007/NG-1)', () => {
+    expectTypeOf<DockerArtifactValue>().toEqualTypeOf<{ readonly image: string }>();
+  });
+});
+
+describe('docker dev-modes (spec 028)', () => {
+  it('T025: registry-ref config is assignable with ref as the only image input', () => {
+    const refOnly: DockerBuildConfig = {
+      image: {
+        mode: 'registry-ref',
+        ref: 'cr.yandex/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+    };
+    expectTypeOf(refOnly).toMatchTypeOf<DockerBuildConfig>();
+  });
+
+  it('T025: remote config with host is assignable', () => {
+    const remote: DockerBuildConfig = { image: { repository: 'r', mode: 'remote', host: 'tcp://daemon:2375' } };
+    expectTypeOf(remote).toMatchTypeOf<DockerBuildConfig>();
+  });
+
+  it('T025: mode is a strict 2-literal union (registry-ref | remote) — others not assignable (V)', () => {
+    type Mode = NonNullable<NonNullable<DockerBuildConfig['image']>['mode']>;
+    expectTypeOf<Mode>().toEqualTypeOf<'registry-ref' | 'remote'>();
+    // @ts-expect-error 'build' is not a docker image mode (strict enum, V)
+    const _bad: Mode = 'build';
+    // @ts-expect-error 'default' is not a mode — default is the ABSENCE of mode (T030)
+    const _badDefault: Mode = 'default';
+  });
+
+  it('T025: DockerArtifactValue stays frozen { readonly image: string } (SC-007/NG-7)', () => {
     expectTypeOf<DockerArtifactValue>().toEqualTypeOf<{ readonly image: string }>();
   });
 });

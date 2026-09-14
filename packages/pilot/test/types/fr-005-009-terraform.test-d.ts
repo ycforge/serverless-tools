@@ -34,9 +34,13 @@ export function fr005SupportsIsSyncBoolean(): boolean {
 }
 
 describe('Materializer contract (FR-005..FR-007)', () => {
-  it('FR-006: MaterializationContext is exactly { output: OutputBuilder }', () => {
-    expectTypeOf<keyof MaterializationContext>().toEqualTypeOf<'output'>();
+  it('FR-006: MaterializationContext is exactly { output, projectRoot? }', () => {
+    expectTypeOf<keyof MaterializationContext>().toEqualTypeOf<'output' | 'projectRoot'>();
     expectTypeOf(context.output).toEqualTypeOf<OutputBuilder>();
+    // spec 028 (plan D-2): projectRoot is additive/optional — a materializer
+    // written against the older shape keeps its compatibility, and a pipeline
+    // without a project root (legacy standalone) is still expressible.
+    expectTypeOf(context.projectRoot).toEqualTypeOf<string | undefined>();
   });
 
   it('FR-007: OutputBuilder.declare(name, { value, description? }): void', () => {

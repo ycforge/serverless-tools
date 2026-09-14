@@ -2,6 +2,7 @@
 import type { Command } from 'commander';
 import { loadProjectModel } from '../model/loader.js';
 import { loadRegistry } from '../registry/index.js';
+import { readStoreDescriptors, readStoreDescriptorsFrom } from '../build/store.js';
 import { runMaterializeGeneration } from './pipeline.js';
 import { CLIError, CLI_BUILD_FAILED, CLI_MISSING_PROJECT_DIR, CLI_APP_NOT_FOUND } from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
@@ -11,6 +12,7 @@ export async function materializeAction(cmd: Command): Promise<void> {
   const rootDir = String(opts.projectDir ?? process.cwd());
   const json = Boolean(opts.json);
   const target = opts.target as string | undefined;
+  const artifactsDir = opts.artifacts as string | undefined;
 
   const diagnostics: CLIDiagnostic[] = [];
   let exitCode: 0 | 1 | 2 = 0;
@@ -108,7 +110,11 @@ export async function materializeAction(cmd: Command): Promise<void> {
     // (pipeline order, spec line 50; FR-011/FR-012, shared with plan/apply).
     const genOpts: { json?: boolean; target?: string } = { json };
     if (target !== undefined) genOpts.target = target;
-    const { files, extensionsApplied } = await runMaterializeGeneration(rootDir, model, registry, genOpts);
+    // spec 028 (plan D-2 / T018): standalone materialize reads the artifact
+    // store from .ycsf/artifacts (or --artifacts <dir>); re-running builders is
+    // not required.
+    const store = artifactsDir !== undefined ? await readStoreDescriptorsFrom(artifactsDir) : await readStoreDescriptors(rootDir);
+    const { files, extensionsApplied } = await runMaterializeGeneration(rootDir, model, registry, genOpts, store);
 
     const infraDir = `${rootDir}/infra`;
     for (const file of files) {

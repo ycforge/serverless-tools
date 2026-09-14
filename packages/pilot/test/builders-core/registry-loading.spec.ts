@@ -2,7 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadProjectModel } from '../../src/index.js';
 import { loadRegistry, validateBuilders } from '../../src/registry/index.js';
-import { createTempProject, removeTempProject, type TempProject } from '../helpers/temp-project.js';
+import {
+  createTempProject,
+  linkConsumerNodeModule,
+  removeTempProject,
+  resolveWorkspacePackageRoot,
+  type TempProject,
+} from '../helpers/temp-project.js';
+
+const BUILDERS_CORE = resolveWorkspacePackageRoot('@ycforge/builders-core');
 
 const BUILDERS_YAML = `version: 1
 builders:
@@ -23,6 +31,9 @@ describe('registry loads @ycforge/builders-core subpaths (US4 / SC-002)', () => 
 
   beforeEach(() => {
     project = createTempProject();
+    // spec 028 (T032): bare @ycforge/* specifiers resolve from the consumer
+    // project graph — lay a hermetic symlink into the temp project.
+    linkConsumerNodeModule(project, '@ycforge/builders-core', BUILDERS_CORE);
   });
 
   afterEach(() => {
@@ -36,7 +47,7 @@ describe('registry loads @ycforge/builders-core subpaths (US4 / SC-002)', () => 
     if (result.kind !== 'ok') return;
     expect(result.registry.records.size).toBe(3);
     for (const id of ['nestjs-function', 'docker', 'vite']) {
-      expect(result.registry.records.get(id)?.kind).toBe('builder');
+      expect(result.registry.records.get(`builder:${id}`)?.kind).toBe('builder');
     }
   });
 
@@ -46,7 +57,7 @@ describe('registry loads @ycforge/builders-core subpaths (US4 / SC-002)', () => 
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     for (const id of ['nestjs-function', 'docker', 'vite']) {
-      const ns = result.registry.records.get(id)?.module as { default?: { build?: unknown } };
+      const ns = result.registry.records.get(`builder:${id}`)?.module as { default?: { build?: unknown } };
       expect(ns?.default).toBeTypeOf('object');
       expect(typeof ns?.default?.build).toBe('function');
     }

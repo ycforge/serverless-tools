@@ -77,6 +77,13 @@ export type RegistryError = ProjectModelDiagnostic | PluginLoadError;
 export const BRG_MISSING_FILE = 'BRG_MISSING_FILE';
 export const BRG_VERSION = 'BRG_VERSION';
 export const BRG_DUPLICATE_KEY = 'BRG_DUPLICATE_KEY';
+/**
+ * Superseded by spec 028 (FR-019, plan D-8): `builders:`/`materializers:` are
+ * separate key namespaces and a raw key may appear in both; the registry
+ * qualifies records as `<kind>:<key>`. The const REMAINS frozen and exported —
+ * it is simply no longer emitted. Do not delete or rename.
+ * @deprecated Cross-section collisions are no longer reported (spec 028).
+ */
 export const BRG_KEY_COLLISION = 'BRG_KEY_COLLISION';
 export const BRG_INVALID = 'BRG_INVALID';
 export const BRG_PACKAGE_NOT_FOUND = 'BRG_PACKAGE_NOT_FOUND';

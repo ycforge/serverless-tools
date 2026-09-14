@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { BLC_ARCHIVE_FAILED } from '../../src/diagnostics.js';
 import { crc32, zipEntries } from '../../src/zip/writer.js';
 import { collectDir } from '../../src/zip/collect.js';
-import { makeTempDir, unzipEntry, unzipList, unzipTest, type TempDir } from '../helpers/fixture-project.js';
+import { makeTempDir, unzipEntry, unzipList, unzipTest } from '../helpers/fixture-project.js';
 
 // DQ-1: deterministic zip writer — STORE/deflate, CRC-32, DOS time/date = 0,
 // sorted entries, no directory entries.

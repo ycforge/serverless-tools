@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { computeFilesHash, hashString } from '../../src/cache/fingerprint.js';
+import { computeFilesHash } from '../../src/cache/fingerprint.js';
 describe('filesHash excludes', () => {
   it('git, node_modules, cache, artifacts, infra excluded', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'ex-'));

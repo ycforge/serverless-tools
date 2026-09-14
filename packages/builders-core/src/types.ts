@@ -64,9 +64,28 @@ export interface NestjsFunctionBuildConfig {
 /** App-level `build_config` for builder `docker` (versionless, spec 011). */
 export interface DockerBuildConfig {
   readonly image?: {
-    readonly repository: string; // required
+    /**
+     * Registry that receives the built image. Required in the default
+     * (build+push) and `remote` modes; ABSENT in `registry-ref` mode (the ref
+     * embeds the repository, mutual exclusion enforced at runtime, spec 028).
+     */
+    readonly repository?: string;
     readonly tag?: string; // default "latest"
     readonly no_push?: boolean; // default false; only-build mode (spec 027)
+    /**
+     * spec 028 dev-modes. `registry-ref` → skip the docker CLI entirely and
+     * emit the configured immutable ref verbatim; `remote` → build/push
+     * against the daemon at `host` (DOCKER_HOST). Absent → local daemon build
+     * + push (today's behavior, spec 027).
+     */
+    readonly mode?: 'registry-ref' | 'remote';
+    /**
+     * `registry-ref`: immutable digest form `<repository>@sha256:<hex64>`.
+     * Strict — a mutable tag (…:latest@sha256:…) is rejected (FR-011).
+     */
+    readonly ref?: string;
+    /** `remote`: the remote daemon endpoint (DOCKER_HOST). */
+    readonly host?: string;
   };
   readonly dockerfile?: string; // default "Dockerfile"
 }

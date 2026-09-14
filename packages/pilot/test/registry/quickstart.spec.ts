@@ -2,10 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   BRG_DUPLICATE_KEY,
-  BRG_INVALID,
   BRG_KEY_COLLISION,
   BRG_LOAD_ERROR,
-  BRG_MISSING_FILE,
   BRG_NOT_A_PLUGIN,
   BRG_PACKAGE_NOT_FOUND,
   BRG_UNKNOWN_BUILDER,
@@ -13,7 +11,12 @@ import {
 } from '../../src/contracts/index.js';
 import { loadProjectModel } from '../../src/index.js';
 import { loadRegistry, validateBuilders } from '../../src/registry/index.js';
-import { createTempProject, removeTempProject, type TempProject } from '../helpers/temp-project.js';
+import {
+  createTempProject,
+  linkConsumerNodeModule,
+  removeTempProject,
+  type TempProject,
+} from '../helpers/temp-project.js';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -62,9 +65,9 @@ materializers:
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.registry.records.size).toBe(3);
-    expect(result.registry.records.get('nestjs-function')?.kind).toBe('builder');
-    expect(result.registry.records.get('docker')?.kind).toBe('builder');
-    expect(result.registry.records.get('yandex-function')?.kind).toBe('materializer');
+    expect(result.registry.records.get('builder:nestjs-function')?.kind).toBe('builder');
+    expect(result.registry.records.get('builder:docker')?.kind).toBe('builder');
+    expect(result.registry.records.get('materializer:yandex-function')?.kind).toBe('materializer');
   });
 
   it('Sc2: missing version → invalid BRG_VERSION, no dynamic import (US-1 AC2)', async () => {
@@ -74,7 +77,7 @@ materializers:
     expect(invalid.errors.some((e) => 'code' in e && e.code === BRG_VERSION)).toBe(true);
   });
 
-  it('Sc3: builders↔materializers key collision → BRG_KEY_COLLISION before any import (US-2, FR-003)', async () => {
+  it('Sc3: builders↔materializers key collision is VALID (spec 028, FR-019; supersedes 025 FR-010 BRG_KEY_COLLISION, plan D-8)', async () => {
     writeBuilders(
       project,
       `version: 1
@@ -84,9 +87,23 @@ materializers:
   my-plugin: "pkg-b"
 `,
     );
-    const result = await loadRegistry(project.root);
-    const invalid = expectInvalidLoad(result);
-    expect(invalid.errors.some((e) => 'code' in e && e.code === BRG_KEY_COLLISION)).toBe(true);
+    // The sections are separate key namespaces — each loads independently,
+    // qualified as <kind>:<key>. BRG_KEY_COLLISION is frozen but never emitted
+    // (builders below use fixtures so loading does not touch the network).
+    const result = await loadRegistry(
+      project.root,
+      // no-op resolveFrom override is impossible through the public surface;
+      // rely on fixture-based loaders below.
+    );
+    if (result.kind === 'invalid') {
+      // pkg-a/pkg-b are bare specifiers absent from the consumer graph → they
+      // fail to RESOLVE (BRG_PACKAGE_NOT_FOUND) — the point here is that the
+      // failure is NOT a key-collision; assert the code explicitly.
+      expect(result.errors.some((e) => 'code' in e && e.code === BRG_KEY_COLLISION)).toBe(false);
+      expect(result.errors.some((e) => 'code' in e && e.code === BRG_PACKAGE_NOT_FOUND)).toBe(true);
+      return;
+    }
+    throw new Error('expected either resolve-failure (bare specifiers) or ok-load — not a key collision');
   });
 
   it('Sc4: duplicate builder key → BRG_DUPLICATE_KEY (US-2 AC2, FR-003)', async () => {
@@ -122,7 +139,7 @@ materializers:
     const result = await loadRegistry(project.root);
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
-    expect(result.registry.records.get('both')?.kind).toBe('builder');
+    expect(result.registry.records.get('builder:both')?.kind).toBe('builder');
   });
 
   it('Sc9: partial load collects both BRG_PACKAGE_NOT_FOUND and BRG_LOAD_ERROR (FR-015)', async () => {
@@ -259,7 +276,7 @@ apps:
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.registry.records.size).toBe(1);
-    expect(result.registry.records.get('yandex-function')?.kind).toBe('materializer');
+    expect(result.registry.records.get('materializer:yandex-function')?.kind).toBe('materializer');
   });
 
   it('edge (Sc14-boundary): yandex-api-gateway (B-as-plugin) → BRG_PACKAGE_NOT_FOUND, no special case', async () => {
@@ -289,5 +306,56 @@ materializers:
     const elapsed = Date.now() - start;
     expect(result.kind).toBe('ok');
     expect(elapsed).toBeLessThan(5000);
+  });
+});
+
+describe('registry consumer-graph resolution (spec 028, T032)', () => {
+  let project: TempProject;
+
+  beforeEach(() => {
+    project = createTempProject();
+    // hermetic: no network — the scenario package is a fixture dir symlinked
+    // into the temp project's node_modules (pnpm-style consumer layout).
+    const scenario = fileURLToPath(new URL('./fixtures/consumer-graph/', import.meta.url));
+    linkConsumerNodeModule(project, '@ycsf-scenario/materializers', scenario);
+  });
+
+  afterEach(() => {
+    removeTempProject(project);
+  });
+
+  it('T032: bare subpath specifier resolves through the consumer graph (exports-aware), qualified record', async () => {
+    writeBuilders(project, `version: 1\nmaterializers:\n  mq: "@ycsf-scenario/materializers/mq"\n`);
+    const result = await loadRegistry(project.root);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const rec = result.registry.records.get('materializer:mq');
+    expect(rec?.kind).toBe('materializer');
+    expect(rec?.packageName).toBe('@ycsf-scenario/materializers/mq');
+  });
+
+  it('T032: cross-section same raw key with BOTH consumers present → two qualified records (FR-019)', async () => {
+    writeBuilders(
+      project,
+      `version: 1
+builders:
+  shared: "@ycsf-scenario/materializers/builder"
+materializers:
+  shared: "@ycsf-scenario/materializers/mq"
+`,
+    );
+    const result = await loadRegistry(project.root);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.registry.records.get('builder:shared')?.kind).toBe('builder');
+    expect(result.registry.records.get('materializer:shared')?.kind).toBe('materializer');
+  });
+
+  it('T032: unresolvable bare specifier (declared nowhere) → BRG_PACKAGE_NOT_FOUND with actionable consumer message', async () => {
+    writeBuilders(project, `version: 1\nbuilders:\n  nope: "@ycsf-scenario/not-installed/sub"\n`);
+    const result = await loadRegistry(project.root);
+    const invalid = expectInvalidLoad(result);
+    expect(invalid.errors.some((e) => 'code' in e && e.code === BRG_PACKAGE_NOT_FOUND)).toBe(true);
+    expect(invalid.errors.some((e) => 'code' in e && /consumer project/i.test(String((e as { message?: string }).message ?? '')))).toBe(true);
   });
 });

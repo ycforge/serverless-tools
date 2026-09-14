@@ -68,7 +68,7 @@ function findIdentityCollision(
   return undefined;
 }
 
-function buildIndex(
+export function buildIndex(
   entries: Map<ResourceDomain, Map<string, Set<string>>>,
 ): ResourceIndex {
   const domains = new Set<ResourceDomain>();

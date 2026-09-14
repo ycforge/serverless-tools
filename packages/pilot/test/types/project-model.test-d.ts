@@ -28,13 +28,13 @@ import type {
 // than `expectTypeOf(X)` — TS inference widens an imported const reference
 // passed by value, but the generic form keeps the literal type.
 
-declare const app: App;
-declare const resource: Resource;
-declare const buildConfig: BuildConfig;
-declare const envRequirement: EnvRequirement;
-declare const graph: DependsOnGraph;
-declare const model: ProjectModel;
-declare const loadResult: ProjectModelLoadResult;
+declare const _app: App;
+declare const _resource: Resource;
+declare const _buildConfig: BuildConfig;
+declare const _envRequirement: EnvRequirement;
+declare const _graph: DependsOnGraph;
+declare const _model: ProjectModel;
+declare const _loadResult: ProjectModelLoadResult;
 
 describe('project-model public types (spec 011)', () => {
   it('App has stable shape: app_id/source_path/builder/depends_on', () => {
@@ -83,7 +83,7 @@ describe('project-model public types (spec 011)', () => {
   });
 
   it('ProjectModelLoadResult is never a thrown error: ok | invalid', () => {
-    expectTypeOf(loadResult).toEqualTypeOf<
+    expectTypeOf(_loadResult).toEqualTypeOf<
       | { kind: 'ok'; model: ProjectModel }
       | { kind: 'invalid'; errors: readonly ProjectModelError[] }
     >();
@@ -119,12 +119,12 @@ describe('project-model public types (spec 011)', () => {
     expectTypeOf(isVersion).returns.toEqualTypeOf<boolean>();
     // isVersion is a type guard to literal 1:
     const accept: (v: 1) => void = () => {};
-    let version: number = 0;
+    const version: number = 0;
     if (isVersion(version)) {
       accept(version);
     }
     // isEnvRef narrows the string to a string (pure predicate):
-    let maybe: string = '{{$X}}';
+    const maybe: string = '{{$X}}';
     if (isEnvRef(maybe)) {
       acceptVersionRef(maybe);
     }

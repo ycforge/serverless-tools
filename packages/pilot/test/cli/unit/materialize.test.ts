@@ -16,6 +16,10 @@ vi.mock('../../../src/extensions/index.js', () => ({
 vi.mock('../../../src/materialize/write.js', () => ({
   writeGeneratedTerraform: vi.fn(),
 }));
+vi.mock('../../../src/build/store.js', () => ({
+  readStoreDescriptors: vi.fn(),
+  readStoreDescriptorsFrom: vi.fn(),
+}));
 
 import { materializeAction } from '../../../src/cli/materialize.js';
 import { loadProjectModel } from '../../../src/model/loader.js';
@@ -23,6 +27,7 @@ import { loadRegistry } from '../../../src/registry/index.js';
 import { dispatch } from '../../../src/materialize/dispatch.js';
 import { loadExtensions } from '../../../src/extensions/index.js';
 import { writeGeneratedTerraform } from '../../../src/materialize/write.js';
+import { readStoreDescriptors, readStoreDescriptorsFrom } from '../../../src/build/store.js';
 import { ExitCode } from '../../../src/cli/errors.js';
 
 function fakeCmd(opts: Record<string, unknown> = {}) {
@@ -36,6 +41,8 @@ describe('ycsf materialize action (T060)', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     vi.mocked(writeGeneratedTerraform).mockResolvedValue();
+    vi.mocked(readStoreDescriptors).mockResolvedValue(new Map());
+    vi.mocked(readStoreDescriptorsFrom).mockResolvedValue(new Map());
     vi.mocked(loadExtensions).mockImplementation(() => { throw new Error('no ext'); });
   });
 

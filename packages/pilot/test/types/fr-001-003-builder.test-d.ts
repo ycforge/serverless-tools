@@ -1,6 +1,7 @@
 import { describe, expectTypeOf, it } from 'vitest';
 
 import type {
+  AppIdentity,
   Artifact,
   BuildContext,
   Builder,
@@ -26,7 +27,7 @@ describe('Builder contract (FR-001..FR-003)', () => {
 
   it('FR-002: BuildContext has exactly the specified fields (no C internals, FR-015)', () => {
     expectTypeOf<keyof BuildContext>().toEqualTypeOf<
-      'projectRoot' | 'sourcePath' | 'buildConfig' | 'buildEnv' | 'outputDir'
+      'projectRoot' | 'sourcePath' | 'buildConfig' | 'buildEnv' | 'outputDir' | 'appIdentities'
     >();
     expectTypeOf(context.projectRoot).toEqualTypeOf<string>();
     // US1 scenario 3: sourcePath is optional; a builder without it is valid.
@@ -34,6 +35,9 @@ describe('Builder contract (FR-001..FR-003)', () => {
     expectTypeOf(context.buildConfig).toEqualTypeOf<unknown>();
     expectTypeOf(context.buildEnv).toEqualTypeOf<Record<string, string>>();
     expectTypeOf(context.outputDir).toEqualTypeOf<string>();
+    // spec 028 (plan D-1): appIdentities is additive/optional — a builder
+    // without it (legacy CLI path) keeps compiling.
+    expectTypeOf(context.appIdentities).toEqualTypeOf<readonly AppIdentity[] | undefined>();
   });
 
   it('FR-003: Artifact<T> is a generic { type, value } pair', () => {

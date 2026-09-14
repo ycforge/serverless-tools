@@ -1,3 +1,4 @@
+import type { AppIdentity } from '@ycforge/pilot/contracts';
 import type { Provenance } from './cli/types.js';
 import { buildResourceIndex } from './cli/resource-index.js';
 import { loadBuildConfig, loadOpenApiSourceDirect } from './cli/load-openapi.js';
@@ -5,7 +6,7 @@ import { loadAuthConfig } from './cli/load-auth.js';
 import { applyAuth } from './compose/auth-apply.js';
 import { applyOverrides } from './compose/overrides/apply.js';
 import { mergeDocuments, sortRecordKeys } from './compose/merge.js';
-import { resolveReferences, REFERENCE_BEARER_FIELDS } from './resource/index.js';
+import { mergeResourceIndex, resolveReferences, REFERENCE_BEARER_FIELDS } from './resource/index.js';
 import { loadOverrides, resolveOverrideValues } from './cli/load-overrides.js';
 import type { GatewayDocument } from './compose/types.js';
 
@@ -15,6 +16,9 @@ export interface CompileSource {
   appDir: string;
   openapiEntry?: string;
   envOnly?: boolean;
+  /** Sibling map-form app identities (spec 028/R-1): derived by Project C,
+   * merged into the resource index before reference resolution (plan D-1). */
+  appIdentities?: readonly AppIdentity[];
 }
 
 export interface CompileResult {
@@ -61,7 +65,8 @@ async function compileCompositionInner(
   source: CompileSource,
   projectRoot: string,
 ): Promise<CompileResult> {
-  const { index, envMapping } = await buildResourceIndex(projectRoot);
+  const { index: externalIndex, envMapping } = await buildResourceIndex(projectRoot);
+  const index = mergeResourceIndex(externalIndex, source.appIdentities);
   const functions = [...(index.entries.get('functions')?.keys() ?? [])];
   const envOnly = source.envOnly ?? (envMapping.mode === 'env-only');
   const openapiEntry =

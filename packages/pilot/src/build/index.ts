@@ -1,5 +1,8 @@
 // spec 021 ycsf-cli — buildApps orchestrator (D-RE-1, D-RE-11, D-RE-12) + spec 022 cache.
 import type { BuildAppsOptions, BuildAppsResult, BuiltArtifact } from '../contracts/build.js';
+import type { Artifact } from '../contracts/builder.js';
+import type { AppIdentity } from '../contracts/resource-domain.js';
+import { artifactTypeToResourceDomain } from '../contracts/resource-domain.js';
 import type { Diagnostic } from '../contracts/check.js';
 import type { PluginLoadError, RegistryError } from '../contracts/registry.js';
 import { CLI_APP_NOT_FOUND, CLI_BUILD_FAILED, CLI_MISSING_PROJECT_DIR } from '../cli/errors.js';
@@ -11,6 +14,7 @@ import { canonicalJson, computeEffectiveFingerprint, computeFilesHash, computeOw
 import { getCacheDir, loadManifest, saveManifest } from '../cache/manifest.js';
 import { checkCache } from '../cache/index.js';
 import { restoreBlob, saveBlob } from '../cache/blobs.js';
+import { writeStoreDescriptor } from './store.js';
 import type { CacheCheckResult, CacheManifest } from '../contracts/cache.js';
 
 function toDiagnostic(err: RegistryError): Diagnostic {
@@ -18,6 +22,20 @@ function toDiagnostic(err: RegistryError): Diagnostic {
     return { code: err.code, message: err.message, file: '.ycsf/builders.yaml' };
   }
   return err;
+}
+
+// spec 028 (plan D-2 / T018): persist the store descriptor best-effort, like
+// cache blobs — build must not fail because a descriptor write was blocked.
+function writeStoreDescriptorBestEffort(outputDir: string, artifact: Artifact): void {
+  try {
+    writeStoreDescriptor(outputDir, artifact);
+  } catch {
+    try {
+      process.stderr.write(`! CACHE_WRITE_FAILED: failed to write artifact store descriptor for ${outputDir}\n`);
+    } catch {
+      // ignore stderr failures
+    }
+  }
 }
 
 function isPluginLoadError(err: RegistryError): err is PluginLoadError {
@@ -169,7 +187,7 @@ export async function buildApps(
     const sortedEnv: Record<string, string> = {};
     for (const k of Object.keys(buildEnv).sort()) sortedEnv[k] = buildEnv[k]!;
     const buildEnvHash = hashString(canonicalJson(sortedEnv));
-    const version = resolveBuilderVersion(registry as unknown as { records: Map<string, { packageName?: string }> }, app.builder);
+    const version = resolveBuilderVersion(registry as unknown as { records: Map<string, { packageName?: string }> }, `builder:${app.builder}`);
     const builderStr = version ? `${app.builder}@${version}` : app.builder;
     const own = computeOwnFingerprint({ filesHash, buildConfig, buildEnv: sortedEnv, builder: builderStr });
     ownByApp.set(appId, { own, filesHash, buildConfigHash, buildEnvHash, builderStr });
@@ -205,6 +223,18 @@ export async function buildApps(
     currentManifest = { version: 1, entries: {} };
   }
 
+  // spec 028 (plan D-1 / T013): derive the app-identity list ONCE from the
+  // whole project model — Project B resolves sibling map-form apps by these.
+  // Apps whose builder maps to no resource domain derive no identity.
+  const appIdentities = [...projectModel.apps.values()]
+    .map((app) => {
+      if (artifactTypeToResourceDomain(app.builder) === undefined) {
+        return undefined;
+      }
+      return { appId: app.app_id, artifactType: app.builder };
+    })
+    .filter((identity): identity is AppIdentity => identity !== undefined);
+
   for (const appId of orderedAppIds) {
     const app = appsToBuild.get(appId)!;
     const effective = effectiveByApp.get(appId)!;
@@ -227,9 +257,13 @@ export async function buildApps(
       });
       // blob missing case already handled inside checkCache; but if hit we must validate blob again
       if (result.hit) {
-        const restored = await restoreBlob(cacheDir, effective, `${rootDir}/.ycsf/artifacts/${appId}`);
+        const outputDir = `${rootDir}/.ycsf/artifacts/${appId}`;
+        const restored = await restoreBlob(cacheDir, effective, outputDir);
         if (restored) {
           artifacts.push({ appId, artifact: restored });
+          // spec 028 (plan D-2 / T018): exactly one store descriptor per app,
+          // also on the cache-hit path (restore re-writes it).
+          writeStoreDescriptorBestEffort(outputDir, restored);
           cacheResults.push(result);
           options?.onCacheProgress?.(result);
           continue;
@@ -253,7 +287,7 @@ export async function buildApps(
     if (!result.hit) {
       // For noCache case we still need to skip cache lookup and build
       options?.onAppProgress?.(appId);
-      const entry = registry.records.get(app.builder);
+      const entry = registry.records.get(`builder:${app.builder}`);
       if (!entry) continue;
       const builder = getBuilder(entry.module);
       if (!builder) {
@@ -277,6 +311,7 @@ export async function buildApps(
         buildConfig: projectModel.build_configs.get(appId)?.build_config ?? {},
         buildEnv: resolvedEnv,
         outputDir,
+        ...(appIdentities.length > 0 ? { appIdentities } : {}),
       };
       let artifact;
       try {
@@ -296,6 +331,10 @@ export async function buildApps(
       }
       const resolvedArtifact = artifact ?? ({ type: 'test:type', value: {} } as unknown as typeof artifact);
       artifacts.push({ appId, artifact: resolvedArtifact });
+      // spec 028 (plan D-2 / T018): persist exactly one store descriptor per
+      // app on the miss/noCache path so standalone `ycsf materialize` can
+      // re-materialize without re-running builders.
+      writeStoreDescriptorBestEffort(outputDir, resolvedArtifact);
       if (!noCache) {
         // save blob + manifest per app (FR-016)
         await saveBlob(cacheDir, effective, resolvedArtifact, outputDir);

@@ -11,7 +11,8 @@ export function validateBuilders(
   const availableBuilders = [...registry.records.keys()].sort().join(', ');
 
   for (const [appId, app] of projectModel.apps) {
-    if (!registry.records.has(app.builder)) {
+    // spec 028 (T035): records are kind-qualified keys `<kind>:<key>`.
+    if (!registry.records.has(`builder:${app.builder}`)) {
       errors.push(
         diag({
           code: BRG_UNKNOWN_BUILDER,

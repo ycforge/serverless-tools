@@ -46,9 +46,10 @@ function fakeProject(appIds: string[], builderId = 'nodejs-builder') {
 }
 
 function fakeRegistry(builderIds: string[]) {
+  // spec 028 (T035): records are kind-qualified `<kind>:<id>` (FR-019).
   return {
     records: new Map(
-      builderIds.map((id) => [id, { id, packageName: `pkg-${id}`, kind: 'builder' as const, module: { build: vi.fn() } }]),
+      builderIds.map((id) => [`builder:${id}`, { id, packageName: `pkg-${id}`, kind: 'builder' as const, module: { build: vi.fn() } }]),
     ),
   };
 }

@@ -70,18 +70,18 @@ functions:
   });
 });
 
-describe('checkIdentityCollision (US-3 AC1, FR-008, data-model.md Decision)', () => {
-  function appsWith(id: string): ReadonlyMap<string, App> {
+describe('checkIdentityCollision (US-3 AC1, FR-008, plan D-8 / T011)', () => {
+  function appsWith(id: string, builder = 'nestjs-function'): ReadonlyMap<string, App> {
     return new Map([
       [
         id,
-        { app_id: id, source_path: id, builder: 'nestjs-function', depends_on: [] },
+        { app_id: id, source_path: id, builder, depends_on: [] },
       ],
     ]);
   }
 
-  it('flags app_id === functions-domain resource_id with PML_IDENTITY_COLLISION', () => {
-    const apps = appsWith('legacy_authorizer');
+  it('flags app_id === functions-domain resource_id for an ARTIFACT-TYPE app (ycforge:function) with PML_IDENTITY_COLLISION', () => {
+    const apps = appsWith('legacy_authorizer', 'ycforge:function');
     const resources = new Map<string, ReadonlyMap<string, Resource>>([
       [
         'functions',
@@ -98,20 +98,39 @@ describe('checkIdentityCollision (US-3 AC1, FR-008, data-model.md Decision)', ()
     });
   });
 
-  it('flags functions.<app_id> colliding with a functions.<resource_id> (same identity)', () => {
-    const apps = appsWith('my_func');
+  it('extends identity collision beyond functions: containers / buckets / gateways match the app domain (T011)', () => {
+    const cases: Array<[string, string]> = [
+      ['containers', 'ycforge:docker-image'],
+      ['buckets', 'ycforge:frontend'],
+      ['gateways', 'ycforge:api-gateway'],
+    ];
+    for (const [domain, builder] of cases) {
+      const apps = appsWith('my_func', builder);
+      const resources = new Map<string, ReadonlyMap<string, Resource>>([
+        [
+          domain,
+          new Map([['my_func', { domain, resource_id: 'my_func', properties: {} }]]),
+        ],
+      ]);
+      const diagnostics = checkIdentityCollision(apps, resources);
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]?.code).toBe(PML_IDENTITY_COLLISION);
+      expect(diagnostics[0]?.identity).toBe(`${domain}.my_func`);
+    }
+  });
+
+  it('does NOT flag a LEGACY (non artifact-type) builder even when the app_id equals a functions resource_id (T011 flip)', () => {
+    const apps = appsWith('legacy_authorizer', 'nestjs-function');
     const resources = new Map<string, ReadonlyMap<string, Resource>>([
       [
         'functions',
-        new Map([['my_func', { domain: 'functions', resource_id: 'my_func', properties: {} }]]),
+        new Map([['legacy_authorizer', { domain: 'functions', resource_id: 'legacy_authorizer', properties: {} }]]),
       ],
     ]);
-    const diagnostics = checkIdentityCollision(apps, resources);
-    expect(diagnostics[0]?.code).toBe(PML_IDENTITY_COLLISION);
-    expect(diagnostics[0]?.identity).toBe('functions.my_func');
+    expect(checkIdentityCollision(apps, resources)).toEqual([]);
   });
 
-  it('does NOT flag a same-named resource in a non-functions domain (queues)', () => {
+  it('does NOT flag a same-named resource in a non-matching domain (queues)', () => {
     const apps = appsWith('events');
     const resources = new Map<string, ReadonlyMap<string, Resource>>([
       [

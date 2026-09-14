@@ -1,0 +1,11 @@
+{
+  "name": "@ycsf-scenario/materializers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.mjs",
+    "./mq": "./mq.mjs",
+    "./builder": "./builder.mjs"
+  }
+}

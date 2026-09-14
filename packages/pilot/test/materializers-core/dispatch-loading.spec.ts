@@ -10,7 +10,16 @@ import yandexStorageBucket from '@ycforge/materializers-core/yandex-storage-buck
 import { loadProjectModel } from '../../src/index.js';
 import { selectArtifacts } from '../../src/materialize/select.js';
 import { loadRegistry } from '../../src/registry/index.js';
-import { createTempProject, removeTempProject, type TempProject } from '../helpers/temp-project.js';
+import {
+  createTempProject,
+  linkConsumerNodeModule,
+  removeTempProject,
+  resolveWorkspacePackageRoot,
+  type TempProject,
+} from '../helpers/temp-project.js';
+
+const MATERIALIZERS_CORES = resolveWorkspacePackageRoot('@ycforge/materializers-core');
+
 
 // SC-002 / Sc6: the @ycforge/materializers-core subpath specifiers resolve as
 // materializer registry entries and dispatch phase-1 selection matches every
@@ -49,6 +58,9 @@ describe('registry loads @ycforge/materializers-core subpaths, dispatch selects 
 
   beforeEach(() => {
     project = createTempProject();
+    // spec 028 (T032/T033): bare @ycforge/* specifiers resolve from the
+    // consumer project graph — lay a hermetic symlink into the temp project.
+    linkConsumerNodeModule(project, '@ycforge/materializers-core', MATERIALIZERS_CORES);
   });
 
   afterEach(() => {
@@ -62,7 +74,7 @@ describe('registry loads @ycforge/materializers-core subpaths, dispatch selects 
     if (result.kind !== 'ok') return;
     expect(result.registry.records.size).toBe(5);
     for (const id of MATERIALIZER_IDS) {
-      const record = result.registry.records.get(id);
+      const record = result.registry.records.get(`materializer:${id}`);
       expect(record?.kind).toBe('materializer');
       expect(record?.packageName).toBe(`@ycforge/materializers-core/${id}`);
     }

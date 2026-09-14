@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -10,8 +10,11 @@ import type { OutputBuilderWithCollection } from '../../src/helpers/output-build
 import type { MaterializationContext, TerraformResource } from '../../src/types.js';
 import { makeSpecContent, makeSpecFile } from '../helpers/fixtures.js';
 
-function createContext(): MaterializationContext & { output: OutputBuilderWithCollection } {
-  return { output: createOutputBuilder() };
+function createContext(projectRoot?: string): MaterializationContext & { output: OutputBuilderWithCollection } {
+  return {
+    output: createOutputBuilder(),
+    ...(projectRoot !== undefined ? { projectRoot } : {}),
+  };
 }
 
 describe('yandex-api-gateway materializer (US3, T081)', () => {
@@ -37,7 +40,7 @@ describe('yandex-api-gateway materializer (US3, T081)', () => {
 
     const specPath = makeSpecFile(makeSpecContent());
     const refs = [{ logical: 'functions.user_service', terraformType: 'yandex_function' }];
-    const ctx = createContext();
+    const ctx = createContext(tmpDir);
 
     const result = (await materializer.materialize(
       { type: 'ycforge:api-gateway', name: 'openapi', value: { specPath, resourceReferences: refs } } as never,
@@ -48,13 +51,30 @@ describe('yandex-api-gateway materializer (US3, T081)', () => {
     expect(result.type).toBe('yandex_api_gateway');
     expect(result.name).toBe('openapi');
     expect(result.configuration).toEqual({
+      name: 'openapi',
       spec: 'file("${path.module}/generated/openapi-openapi.yaml")',
     });
 
-    const companionPath = join(tmpDir, 'generated', 'openapi-openapi.yaml');
+    const companionPath = join(tmpDir, 'infra', 'generated', 'openapi-openapi.yaml');
     const content = readFileSync(companionPath, 'utf8');
     expect(content).toContain('${yandex_function.user_service.id}');
     expect(content).not.toContain('${resources.functions.user_service.id}');
+  });
+
+  it('T020: legacy fallback WITHOUT projectRoot writes companion to <cwd>/generated (documented)', async () => {
+    savedCwd = process.cwd();
+    tmpDir = mkdtempSync(join(tmpdir(), 'apigw-'));
+    process.chdir(tmpDir);
+
+    const specPath = makeSpecFile(makeSpecContent());
+    const ctx = createContext();
+
+    await materializer.materialize(
+      { type: 'ycforge:api-gateway', name: 'openapi', value: { specPath, resourceReferences: [] } } as never,
+      ctx,
+    );
+
+    expect(existsSync(join(tmpDir, 'generated', 'openapi-openapi.yaml'))).toBe(true);
   });
 
   it('empty resourceReferences copies spec as-is (AC2, FR-017)', async () => {
@@ -64,14 +84,14 @@ describe('yandex-api-gateway materializer (US3, T081)', () => {
 
     const specContent = 'openapi: "3.0.0"\ninfo:\n  title: test\npaths: {}\n';
     const specPath = makeSpecFile(specContent);
-    const ctx = createContext();
+    const ctx = createContext(tmpDir);
 
     await materializer.materialize(
       { type: 'ycforge:api-gateway', name: 'openapi', value: { specPath, resourceReferences: [] } } as never,
       ctx,
     );
 
-    const companionPath = join(tmpDir, 'generated', 'openapi-openapi.yaml');
+    const companionPath = join(tmpDir, 'infra', 'generated', 'openapi-openapi.yaml');
     const content = readFileSync(companionPath, 'utf8');
     expect(content).toBe(specContent);
   });
@@ -154,5 +174,24 @@ describe('yandex-api-gateway materializer (US3, T081)', () => {
         createContext(),
       ),
     ).rejects.toMatchObject({ code: YMT_INVALID_ARTIFACT_VALUE });
+  });
+
+  it('T016: descriptor without a built value → actionable YMT_INVALID_ARTIFACT_VALUE, not destructure TypeError', async () => {
+    savedCwd = process.cwd();
+    tmpDir = mkdtempSync(join(tmpdir(), 'apigw-'));
+    process.chdir(tmpDir);
+
+    const err = await materializer
+      .materialize({ type: 'ycforge:api-gateway', name: 'openapi' } as never, createContext())
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(err).not.toBeNull();
+    const e = err as Error & { code?: string };
+    expect(e.code).toBe(YMT_INVALID_ARTIFACT_VALUE);
+    expect(e.message).toContain('ycsf build');
+    expect(e.message).toContain('--artifacts');
+    expect(e.message).not.toContain('Cannot destructure');
   });
 });

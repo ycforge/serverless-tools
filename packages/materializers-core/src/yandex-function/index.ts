@@ -9,6 +9,12 @@ const materializer: Materializer = {
     return artifact.type === 'ycforge:function';
   },
   async materialize(artifact, context) {
+    if (artifact.value === undefined) {
+      throw materializerError(
+        YMT_INVALID_ARTIFACT_VALUE,
+        `built artifact value is missing for app '${artifact.name ?? 'unknown'}' — run \`ycsf build\` first or pass \`--artifacts <dir>\``,
+      );
+    }
     const value = artifact.value as FunctionArtifactValue;
     const { archivePath, entryPoint } = value;
 
@@ -32,7 +38,11 @@ const materializer: Materializer = {
       type: 'yandex_function',
       name,
       configuration: {
+        // Configuration field order mirrors the terraform provider schema.
+        // `memory` is a provider-default constant — deterministic, no env input.
         runtime: 'nodejs22',
+        name,
+        memory: 128,
         entrypoint: entryPoint,
         user_hash: userHash,
         content: {
