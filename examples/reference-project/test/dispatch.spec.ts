@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +17,7 @@ const artifactsReady =
 // Hermetic registry: materializers imported by stable package subpath
 // (T044 boundary: `.ycsf/builders.yaml` monorepo-relative composer row is a CLI
 // concern; the dispatch surface itself resolves by package subpath).
+// spec 028 (Fix-5): registry keys are `<kind>:<id>` namespaced.
 async function buildRegistry(): Promise<PluginRegistry> {
   const materializers = {
     'yandex-function': await import('@ycforge/materializers-core/yandex-function'),
@@ -26,8 +27,8 @@ async function buildRegistry(): Promise<PluginRegistry> {
   };
   const records = new Map(
     Object.entries(materializers).map(([id, module]) => [
-      id,
-      { id, packageName: id, kind: 'materializer', module },
+      `materializer:${id}`,
+      { id, packageName: id, kind: 'materializer' as const, module },
     ]),
   );
   return { records } as unknown as PluginRegistry;
@@ -71,6 +72,7 @@ describe
           'yandex_function.user_service',
           'yandex_serverless_container.analytics',
           'yandex_storage_bucket.frontend',
+          'yandex_storage_object.frontend_artifact_json',
           'yandex_storage_object.frontend_assets_index_CII8GTtS_js',
           'yandex_storage_object.frontend_index_html',
         ]);

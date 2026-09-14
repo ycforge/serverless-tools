@@ -1,8 +1,8 @@
 # Builder keys are artifact types (ycforge:*); materializer keys are semantic
-# (yandex-*). The api-gateway builder resolves to the composer builder module;
-# the committed entry is the registry import specifier, substituted during the
-# monorepo build (relative to packages/pilot/dist/cli/) because pilot does not
-# depend on @ycforge/composer (see README «Известные ограничения»).
+# (yandex-*). The api-gateway builder resolves to the composer builder module by
+# relative path (see note below): CreateRequire.resolve cannot handle ESM-only
+# exports (`./builder` has `import`+`types`, no `require` condition). The
+# monorepo path is stable in the reference-project tree layout.
 version: 1
 builders:
   ycforge:function: "@ycforge/builders-core/nestjs-function"

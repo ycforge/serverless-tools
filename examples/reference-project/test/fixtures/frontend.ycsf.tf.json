@@ -7,6 +7,11 @@
       }
     },
     "yandex_storage_object": {
+      "frontend_artifact_json": {
+        "bucket": "yandex_storage_bucket.frontend.id",
+        "key": "artifact.json",
+        "source": "<ROOT>/.ycsf/artifacts/frontend/artifact.json"
+      },
       "frontend_assets_index_CII8GTtS_js": {
         "bucket": "yandex_storage_bucket.frontend.id",
         "key": "assets/index-CII8GTtS.js",

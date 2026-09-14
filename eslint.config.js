@@ -10,6 +10,8 @@ export default tseslint.config(
       'coverage/**',
       '.pnpm-store/**',
       '**/*.tsbuildinfo',
+      '**/.ycsf/artifacts/**',
+      '**/.ycsf/cache/**',
     ],
   },
   js.configs.recommended,

@@ -15,6 +15,45 @@ const ANALYTICS_IMAGE =
   'cr.yandex/ycforge/analytics@sha256:c16dea4fac51b380fee77eef61fc6344dfde1b306629bb02b4f1b3dbad8ce7f0';
 const FRONTEND_JS = 'index-CII8GTtS.js';
 
+interface TfResourceDoc {
+  resource: Record<string, Record<string, Record<string, unknown>>>;
+}
+interface FunctionResource {
+  runtime: string;
+  entrypoint: string;
+  user_hash: string;
+  content: { zip_filename: string };
+}
+interface ContainerResource {
+  image: string;
+  name: string;
+}
+interface BucketResource {
+  bucket: string;
+  acl: string;
+}
+interface StorageObjectResource {
+  bucket: string;
+  key: string;
+  source: string;
+}
+interface SpecResource {
+  spec: string;
+}
+interface PlainPath {
+  get: { 'x-yc-apigateway-integration': { type: string } };
+}
+interface OpenApiCompanion {
+  openapi: string;
+  info: { title: string };
+  paths: Record<string, PlainPath>;
+  components: Record<string, unknown>;
+}
+interface OutputResource {
+  value: string;
+  description?: string;
+}
+
 function read(name: string): unknown {
   return JSON.parse(readFileSync(join(FIXTURES, name), 'utf8'));
 }
@@ -45,8 +84,8 @@ describe('golden fixtures', () => {
   });
 
   it('user_service: nodejs22, hash-константа, относительный zip_filename', () => {
-    const doc = read('user_service.ycsf.tf.json') as any;
-    const fn = doc.resource.yandex_function.user_service;
+    const doc = read('user_service.ycsf.tf.json') as TfResourceDoc;
+    const fn = doc.resource.yandex_function.user_service as unknown as FunctionResource;
     expect(fn.runtime).toBe('nodejs22');
     expect(fn.entrypoint).toBe('main.handler');
     expect(fn.user_hash).toBe(FUNCTION_HASH);
@@ -56,40 +95,47 @@ describe('golden fixtures', () => {
   });
 
   it('analytics: image и name зафиксированы (золотая форма materializer-а)', () => {
-    const doc = read('analytics.ycsf.tf.json') as any;
-    const c = doc.resource.yandex_serverless_container.analytics;
+    const doc = read('analytics.ycsf.tf.json') as TfResourceDoc;
+    const c = doc.resource.yandex_serverless_container.analytics as unknown as ContainerResource;
     expect(c.image).toBe(ANALYTICS_IMAGE);
     expect(c.name).toBe('analytics');
   });
 
   it('frontend: bucket + ровно 2 объекта с корректными именами и key', () => {
-    const doc = read('frontend.ycsf.tf.json') as any;
-    const b = doc.resource.yandex_storage_bucket.frontend;
+    const doc = read('frontend.ycsf.tf.json') as TfResourceDoc;
+    const b = doc.resource.yandex_storage_bucket.frontend as unknown as BucketResource;
     expect(b.bucket).toBe('frontend');
     expect(b.acl).toBe('public-read');
-    const objects = doc.resource.yandex_storage_object;
+    const objects = doc.resource.yandex_storage_object as unknown as Record<
+      string,
+      StorageObjectResource
+    >;
     expect(Object.keys(objects).sort()).toEqual([
+      'frontend_artifact_json',
       'frontend_assets_index_CII8GTtS_js',
       'frontend_index_html',
     ]);
-    for (const o of Object.values(objects) as any[]) {
+    for (const o of Object.values(objects)) {
       expect(o.bucket).toBe('yandex_storage_bucket.frontend.id');
-      expect(o.source).toMatch(/^<ROOT>\/\.ycsf\/artifacts\/frontend\/.+\.(html|js)$/);
+      expect(o.source).toMatch(/^<ROOT>\/\.ycsf\/artifacts\/frontend\/.+\.(json|html|js)$/);
     }
     expect(objects.frontend_index_html.key).toBe('index.html');
     expect(objects.frontend_assets_index_CII8GTtS_js.key).toBe(`assets/${FRONTEND_JS}`);
   });
 
   it('openapi: spec-шаблон + companion (mock, securitySchemes пустой, без рефов)', () => {
-    const doc = read('openapi.ycsf.tf.json') as any;
-    expect(doc.resource.yandex_api_gateway.openapi.spec).toBe(
+    const doc = read('openapi.ycsf.tf.json') as TfResourceDoc;
+    const gateway = doc.resource.yandex_api_gateway.openapi as unknown as SpecResource;
+    expect(gateway.spec).toBe(
       'file("${path.module}/generated/openapi-openapi.yaml")',
     );
-    const companion = JSON.parse(readFileSync(join(FIXTURES, 'openapi-openapi.yaml'), 'utf8'));
+    const companion = JSON.parse(
+      readFileSync(join(FIXTURES, 'openapi-openapi.yaml'), 'utf8'),
+    ) as OpenApiCompanion;
     expect(companion.openapi).toBe('3.0.0');
     expect(companion.info.title).toBe('Reference API Gateway');
     expect(Object.keys(companion.paths).sort()).toEqual(['/analytics/report', '/users']);
-    for (const p of Object.values(companion.paths) as any[]) {
+    for (const p of Object.values(companion.paths)) {
       expect(p.get['x-yc-apigateway-integration'].type).toBe('mock');
     }
     expect(companion.components.securitySchemes).toEqual({});
@@ -97,7 +143,7 @@ describe('golden fixtures', () => {
   });
 
   it('99-ycsf-outputs: 6 выходов, сортировка ключей, user-описания', () => {
-    const doc = read('99-ycsf-outputs.tf.json') as any;
+    const doc = read('99-ycsf-outputs.tf.json') as TfResourceDoc & { output: Record<string, OutputResource> };
     const keys = Object.keys(doc.output);
     expect(keys).toEqual([
       'analytics_container_id',

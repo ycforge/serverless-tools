@@ -2,6 +2,7 @@
   "resource": {
     "yandex_api_gateway": {
       "openapi": {
+        "name": "openapi",
         "spec": "file(\"${path.module}/generated/openapi-openapi.yaml\")"
       }
     }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync, writeFileSync, mkdtempSync, rmSync, cpSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdtempSync, rmSync, cpSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -37,7 +37,7 @@ describe.skipIf(!existsSync(CLI))('ycsf check — границы', () => {
       writeFileSync(
         join(dirty, 'frontend/build_config.yaml'),
         '\n  VITE_TOKEN: injected-secret\n',
-        { flag: 'a' } as any,
+        { flag: 'a' } as Parameters<typeof writeFileSync>[2],
       );
       const { code, out } = runCheck(dirty);
       expect(code).toBe(1);

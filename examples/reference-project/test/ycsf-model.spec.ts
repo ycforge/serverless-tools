@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve, extname } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from 'yaml';
 
@@ -11,8 +11,17 @@ function yaml(file: string): Record<string, unknown> {
   if (doc.errors.length) throw new Error(`${file}: ${doc.errors[0].message}`);
   return (doc.toJS() ?? {}) as Record<string, unknown>;
 }
-function buildCfg(app: string): Record<string, any> {
-  return yaml(join(app, 'build_config.yaml')).build_config as Record<string, any>;
+function buildCfg(app: string): Record<string, unknown> {
+  return yaml(join(app, 'build_config.yaml')).build_config as Record<string, unknown>;
+}
+interface AppEntry {
+  builder?: string;
+  depends_on?: string[];
+  source_path?: string;
+}
+interface BuildConfig {
+  version: number;
+  build_config?: unknown;
 }
 
 describe('ycsf-модель эталона', () => {
@@ -21,14 +30,16 @@ describe('ycsf-модель эталона', () => {
       expect(yaml(join('.ycsf', f)).version).toBe(1);
     }
     for (const app of ['user_service', 'analytics', 'frontend', 'openapi']) {
-      const cfg = parseDocument(readFileSync(join(ROOT, app, 'build_config.yaml'), 'utf8')).toJS() as any;
+      const cfg = parseDocument(
+        readFileSync(join(ROOT, app, 'build_config.yaml'), 'utf8'),
+      ).toJS() as unknown as BuildConfig;
       expect(cfg.version).toBe(1);
       expect(cfg.build_config).toBeTruthy();
     }
   });
 
   it('apps.yaml: ровно 4 канонических приложения, openapi зависит от трёх', () => {
-    const apps = (yaml('.ycsf/apps.yaml').apps ?? {}) as Record<string, any>;
+    const apps = (yaml('.ycsf/apps.yaml').apps ?? {}) as Record<string, AppEntry>;
     expect(Object.keys(apps).sort()).toEqual(['analytics', 'frontend', 'openapi', 'user_service']);
     expect(apps.user_service.builder).toBe('ycforge:function');
     expect(apps.analytics.builder).toBe('ycforge:docker-image');
@@ -79,13 +90,14 @@ describe('ycsf-модель эталона', () => {
     expect(us.external).toContain('ioredis');
 
     const an = buildCfg('analytics');
-    expect(an.image.repository).toBe('cr.yandex/ycforge/analytics');
-    expect(an.image.no_push).toBe(true);
-    expect(an.dockerfile).toBe('Dockerfile');
+    expect(an.image.mode).toBe('registry-ref');
+    expect(an.image.ref).toMatch(/^cr\.yandex\/ycforge\/analytics@sha256:[0-9a-f]{64}$/);
+    expect(an.dockerfile).toBeUndefined();
 
     const fe = yaml('frontend/build_config.yaml');
-    expect((fe.build_config as any).out_dir).toBe('dist');
-    expect((fe.build_config as any).command).toContain('vite build');
+    const feCfg = fe.build_config as Record<string, unknown>;
+    expect(feCfg.out_dir).toBe('dist');
+    expect(feCfg.command).toContain('vite build');
     expect(Object.keys(fe.build_env ?? {}).sort()).toEqual(['VITE_API_BASE', 'VITE_ENV']);
 
     const oa = buildCfg('openapi');
@@ -96,11 +108,11 @@ describe('ycsf-модель эталона', () => {
   });
 
   it('extensions/outputs используют 3-сегментный IDL-грамматику (D6)', () => {
-    const ext = (yaml('.ycsf/extensions.yaml').extensions ?? []) as any[];
+    const ext = (yaml('.ycsf/extensions.yaml').extensions ?? []) as Array<{ target: string }>;
     for (const e of ext) {
       expect(String(e.target)).toMatch(/^(functions|containers|gateways|buckets)\.[a-z_]+$/);
     }
-    const outs = (yaml('.ycsf/outputs.yaml').outputs ?? {}) as Record<string, any>;
+    const outs = (yaml('.ycsf/outputs.yaml').outputs ?? {}) as Record<string, { value: string }>;
     expect(Object.keys(outs).sort()).toEqual(['gateway_id', 'user_service_id']);
     for (const o of Object.values(outs)) {
       expect(o.value).toMatch(/^(functions|containers|gateways|buckets)\.[a-z_]+\.[a-z0-9_]+$/);

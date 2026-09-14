@@ -6,6 +6,8 @@
           "zip_filename": "../.ycsf/artifacts/user_service/function.zip"
         },
         "entrypoint": "main.handler",
+        "memory": 128,
+        "name": "user_service",
         "runtime": "nodejs22",
         "user_hash": "5e2dbc98b7d6351b613ade1944fab5228d59709a1989674cbfd55ff9cb00b493"
       }
