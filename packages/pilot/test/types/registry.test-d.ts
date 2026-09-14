@@ -25,12 +25,12 @@ import { loadRegistry, validateBuilders } from '../../src/index.js';
 // T040: Type-level contract tests for spec 013 public contracts.
 // Must break compilation on shape changes.
 
-declare const pluginEntry: PluginEntry;
-declare const pluginLoadError: PluginLoadError;
-declare const registry: PluginRegistry;
-declare const loadResult: PluginRegistryLoadResult;
-declare const validationResult: BuilderRegistryValidationResult;
-declare const registryError: RegistryError;
+declare const _pluginEntry: PluginEntry;
+declare const _pluginLoadError: PluginLoadError;
+declare const _registry: PluginRegistry;
+declare const _loadResult: PluginRegistryLoadResult;
+declare const _validationResult: BuilderRegistryValidationResult;
+declare const _registryError: RegistryError;
 
 describe('registry public types (spec 013)', () => {
   it('PluginKind is builder | materializer', () => {
@@ -56,14 +56,14 @@ describe('registry public types (spec 013)', () => {
   });
 
   it('PluginRegistryLoadResult is ok | invalid discriminated union', () => {
-    expectTypeOf(loadResult).toEqualTypeOf<
+    expectTypeOf(_loadResult).toEqualTypeOf<
       | { kind: 'ok'; registry: PluginRegistry }
       | { kind: 'invalid'; errors: readonly RegistryError[] }
     >();
   });
 
   it('BuilderRegistryValidationResult is ok | invalid with ProjectModelDiagnostic[]', () => {
-    expectTypeOf(validationResult).toEqualTypeOf<
+    expectTypeOf(_validationResult).toEqualTypeOf<
       | { kind: 'ok' }
       | { kind: 'invalid'; errors: readonly ProjectModelDiagnostic[] }
     >();

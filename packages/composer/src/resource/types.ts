@@ -72,4 +72,18 @@ export const REFERENCE_BEARER_FIELDS: readonly ReferenceBearerField[] = [
     domain: 'functions',
     property: 'id',
   },
+  {
+    // spec 028, T010/T012 (plan D-1): serverless-container integration —
+    // sibling map-form app identities referenced as `${resources.containers.*.id}`
+    path: ['paths', '*', '*', 'x-yc-apigateway-integration', 'serverless-containers', 'container_id'],
+    domain: 'containers',
+    property: 'id',
+  },
+  {
+    // spec 028, T010/T012 (plan D-1): object-storage integration —
+    // sibling map-form app identities referenced as `${resources.buckets.*.name}`
+    path: ['paths', '*', '*', 'x-yc-apigateway-integration', 'object-storage', 'bucket'],
+    domain: 'buckets',
+    property: 'name',
+  },
 ];

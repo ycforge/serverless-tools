@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import type { Builder, BuildContext } from '../../src/contracts/index.js';
+import type { AppIdentity, Builder, BuildContext } from '../../src/contracts/index.js';
 import { isArtifactType } from '../../src/contracts/index.js';
 import type { BuildContext as BcBuildContext } from '@ycforge/builders-core';
 import nestjsFunctionBuilder from '@ycforge/builders-core/nestjs-function';
@@ -35,5 +35,38 @@ describe('builders-core conformance to pilot contracts (spec 002/018)', () => {
     expect(isArtifactType('ycforge:function')).toBe(true);
     expect(isArtifactType('ycforge:docker-image')).toBe(true);
     expect(isArtifactType('ycforge:frontend')).toBe(true);
+  });
+});
+
+describe('BuildContext.appIdentities is additive in both directions (spec 028, D-1)', () => {
+  const identities: readonly AppIdentity[] = [
+    { appId: 'user_service', artifactType: 'ycforge:function' },
+    { appId: 'analytics', artifactType: 'ycforge:docker-image' },
+  ];
+
+  it('a pilot BuildContext carrying appIdentities is assignable to the builders-core shape (loose, D-1)', () => {
+    const withIds: BuildContext = {
+      projectRoot: '.',
+      sourcePath: './user_service',
+      buildConfig: { entry: 'src/main.ts' },
+      buildEnv: {},
+      outputDir: 'out',
+      appIdentities: identities,
+    };
+    expectTypeOf(withIds).toMatchTypeOf<BcBuildContext>();
+    expect(withIds.appIdentities?.[0]?.appId).toBe('user_service');
+  });
+
+  it('the builders-core shape stays assignable BACK to the pilot BuildContext (no field required)', () => {
+    const bcCtx: BcBuildContext = {
+      projectRoot: '.',
+      sourcePath: './user_service',
+      buildConfig: { entry: 'src/main.ts' },
+      buildEnv: {},
+      outputDir: 'out',
+    };
+    expectTypeOf(bcCtx).toMatchTypeOf<BuildContext>();
+    const back: BuildContext = bcCtx;
+    expect(back.appIdentities).toBeUndefined();
   });
 });

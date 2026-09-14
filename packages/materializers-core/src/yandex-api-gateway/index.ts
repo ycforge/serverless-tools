@@ -10,6 +10,12 @@ const materializer: Materializer = {
     return artifact.type === 'ycforge:api-gateway';
   },
   async materialize(artifact, context) {
+    if (artifact.value === undefined) {
+      throw materializerError(
+        YMT_INVALID_ARTIFACT_VALUE,
+        `built artifact value is missing for app '${artifact.name ?? 'unknown'}' — run \`ycsf build\` first or pass \`--artifacts <dir>\``,
+      );
+    }
     const value = artifact.value as ApiGatewayArtifactValue;
     const { specPath, resourceReferences = [] } = value;
 
@@ -25,7 +31,14 @@ const materializer: Materializer = {
     }
     const name = artifact.name;
 
-    const companionDir = resolve(process.cwd(), 'generated');
+    // spec 028 (T020/T023): the OpenAPI companion is written next to the
+    // infrastructure, root-relative, when the pipeline hands projectRoot down
+    // (terraform cwd = `infra` → `${path.module}` = `infra`, so the reference
+    // resolves). Without it we keep the legacy cwd-relative behavior.
+    const companionDir =
+      context.projectRoot !== undefined
+        ? resolve(context.projectRoot, 'infra', 'generated')
+        : resolve(process.cwd(), 'generated');
     mkdirSync(companionDir, { recursive: true });
     const companionPath = resolve(companionDir, `${name}-openapi.yaml`);
     writeFileSync(companionPath, resolved, 'utf8');
@@ -35,6 +48,7 @@ const materializer: Materializer = {
       type: 'yandex_api_gateway',
       name,
       configuration: {
+        name,
         spec: `file("\${path.module}/generated/${name}-openapi.yaml")`,
       },
     };

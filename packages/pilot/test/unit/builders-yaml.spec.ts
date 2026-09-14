@@ -50,7 +50,11 @@ builders:
     expect(result.errors[0]?.message).toMatch(/unsupported version '2'.*supported: 1/i);
   });
 
-  it('T013: cross-section key collision → BRG_KEY_COLLISION (FR-003, US-2 AC1)', () => {
+  it('T013: cross-section key present in builders AND materializers is VALID (spec 028, FR-019 relaxation; supersedes 025 FR-010 BRG_KEY_COLLISION, plan D-8)', () => {
+    // spec 028 (T004/T008): sections `builders:`/`materializers:` are separate
+    // key namespaces — a raw key may appear in both (the registry qualifies
+    // records as `<kind>:<key>`). BRG_KEY_COLLISION is frozen but no longer
+    // emitted between sections.
     const yaml = `version: 1
 builders:
   my-plugin: "pkg-a"
@@ -58,11 +62,12 @@ materializers:
   my-plugin: "pkg-b"
 `;
     const result = parseBuildersYaml(yaml, '.ycsf/builders.yaml');
-    expect(result.kind).toBe('invalid');
-    if (result.kind !== 'invalid') return;
-    const collision = result.errors.find((e) => e.code === BRG_KEY_COLLISION);
-    expect(collision).toBeDefined();
-    expect(collision?.message).toMatch(/my-plugin.*builders and materializers/i);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.data.builders).toEqual({ 'my-plugin': 'pkg-a' });
+    expect(result.data.materializers).toEqual({ 'my-plugin': 'pkg-b' });
+    // BRG_KEY_COLLISION stays exported (frozen const, superseded) — never dropped
+    expect(BRG_KEY_COLLISION).toBe('BRG_KEY_COLLISION');
   });
 
   it('T014: duplicate builder key → BRG_DUPLICATE_KEY (FR-003, US-2 AC2)', () => {

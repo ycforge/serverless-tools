@@ -5,6 +5,7 @@ import {
   type ProjectModelDiagnostic,
   type Resource,
 } from '../contracts/index.js';
+import { artifactTypeToResourceDomain } from '../contracts/index.js';
 
 import { diag } from './errors.js';
 import { isRecord } from './types.js';
@@ -67,29 +68,36 @@ export function extractResources(data: unknown, file: string): ResourcesResult {
 }
 
 /**
- * apps ↔ resources identity collision (plan Q1 decision, data-model.md):
- * a `functions`-domain `resource_id` matching an `app_id` is the same logical
- * identity under the `functions.<id>` artifact family — rejected fail-fast
- * (Constitution V + VI, FR-008 / US-3).
+ * apps ↔ resources identity collision (plan Q1 decision, data-model.md;
+ * spec 028 T011): an app whose artifact-type builder maps to a resource
+ * domain (`ycforge:function` → functions, `ycforge:docker-image` → containers,
+ * `ycforge:frontend` → buckets, `ycforge:api-gateway` → gateways) is the same
+ * logical identity as a `resources.yaml` entry under that exact domain with
+ * the same id — rejected fail-fast (Constitution V + VI, FR-008 / US-3).
+ * Legacy builders (no artifact type) derive NO identity and never collide
+ * (plan D-8).
  */
 export function checkIdentityCollision(
   apps: ReadonlyMap<string, App>,
   resources: ReadonlyMap<string, ReadonlyMap<string, Resource>>,
 ): readonly ProjectModelDiagnostic[] {
-  const functionsDomain = resources.get('functions');
-  if (!functionsDomain) {
-    return [];
-  }
   const diagnostics: ProjectModelDiagnostic[] = [];
-  for (const resourceId of functionsDomain.keys()) {
-    if (!apps.has(resourceId)) continue;
-    const identity = `functions.${resourceId}`;
+  for (const [appId, app] of apps) {
+    const domain = artifactTypeToResourceDomain(app.builder);
+    if (domain === undefined) {
+      continue;
+    }
+    const names = resources.get(domain);
+    if (names === undefined || !names.has(appId)) {
+      continue;
+    }
+    const identity = `${domain}.${appId}`;
     diagnostics.push(
       diag({
         code: PML_IDENTITY_COLLISION,
         message: `identity '${identity}' exists in both apps.yaml and resources.yaml`,
         file: '.ycsf/apps.yaml',
-        app: resourceId,
+        app: appId,
         identity,
       }),
     );

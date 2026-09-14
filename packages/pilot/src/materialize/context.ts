@@ -49,7 +49,18 @@ export function createOutputBuilder(): OutputBuilderWithCollection {
 /**
  * One dispatch call = one shared OutputBuilder (per data-model: "context per
  * dispatch call"), handed to every `materialize` invocation as `{ output }`.
+ *
+ * `projectRoot` (spec 028, T024) lets materializers write companion artifacts
+ * into `<root>/infra/...` instead of the process cwd — the pipeline hands the
+ * project root down through dispatch options. Absent for thin/dispatch-less
+ * callers (e.g. `select`-level materialization) ⇒ legacy cwd-relative behavior.
  */
-export function createContext(builder: OutputBuilderWithCollection): MaterializationContext {
-  return { output: builder };
+export function createContext(
+  builder: OutputBuilderWithCollection,
+  projectRoot?: string,
+): MaterializationContext {
+  return {
+    output: builder,
+    ...(projectRoot !== undefined ? { projectRoot } : {}),
+  };
 }

@@ -1,0 +1,49 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "builder-map-form",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/v1/hello": {
+      "get": {
+        "operationId": "getHello",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/v1/analytics": {
+      "get": {
+        "operationId": "getAnalytics",
+        "x-yc-apigateway-integration": {
+          "serverless-containers": {
+            "container_id": "${resources.containers.analytics.id}"
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/v1/assets": {
+      "get": {
+        "operationId": "getAssets",
+        "x-yc-apigateway-integration": {
+          "object-storage": {
+            "bucket": "${resources.buckets.frontend.name}"
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    }
+  }
+}

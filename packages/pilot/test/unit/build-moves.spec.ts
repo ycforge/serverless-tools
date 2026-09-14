@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   MOV_DUPLICATE,
   MOV_TYPE_CHANGE,
-  type BuildMovesResult,
   type TerraformMoved,
 } from '../../src/contracts/index.js';
 import { buildMovedFile, buildMoves } from '../../src/index.js';

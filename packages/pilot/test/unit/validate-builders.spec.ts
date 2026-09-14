@@ -6,7 +6,8 @@ import { validateBuilders } from '../../src/registry/validate.js';
 // T031–T035: validateBuilders unit tests (US-5, FR-013)
 
 function makeRegistry(...ids: string[]): PluginRegistry {
-  const records = new Map(ids.map((id) => [id, { id, packageName: `pkg-${id}`, kind: 'builder' as const, module: {} }]));
+  // spec 028 (T035): records are kind-qualified `<kind>:<id>` (FR-019).
+  const records = new Map(ids.map((id) => [`builder:${id}`, { id, packageName: `pkg-${id}`, kind: 'builder' as const, module: {} }]));
   return { records };
 }
 

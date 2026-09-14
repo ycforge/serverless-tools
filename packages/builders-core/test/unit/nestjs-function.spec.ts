@@ -76,7 +76,6 @@ describe('nestjs-function builder (US1, US5, SC-001/003/006)', () => {
       .value as FunctionArtifactValue;
     const bundle = unzipEntry(artifact.archivePath, 'main.js').toString('utf8');
     const mod: { exports: Record<string, unknown> } = { exports: {} };
-    // eslint-disable-next-line no-new-func
     new Function('module', 'exports', 'require', bundle)(mod, mod.exports, require);
     expect(typeof mod.exports.handler).toBe('function');
     expect(bundle).not.toMatch(/require\(\s*['"][a-z]/);

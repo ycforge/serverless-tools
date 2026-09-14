@@ -3,7 +3,6 @@ import { parseDocument } from 'yaml';
 import {
   BRG_DUPLICATE_KEY,
   BRG_INVALID,
-  BRG_KEY_COLLISION,
   BRG_VERSION,
   isArtifactType,
 } from '../contracts/index.js';
@@ -116,14 +115,12 @@ export function parseBuildersYaml(text: string, file: string): ParseBuildersYaml
     materializers[key] = value;
   }
 
-  // Cross-section key collision
-  for (const key of Object.keys(builders)) {
-    if (key in materializers) {
-      errors.push(
-        diag({ code: BRG_KEY_COLLISION, message: `duplicate key '${key}' in builders and materializers`, file }),
-      );
-    }
-  }
+  // spec 028 (FR-019, plan D-8): `builders:` and `materializers:` are separate
+  // key namespaces. A raw key may legitimately appear in BOTH sections — the
+  // registry qualifies its records as `<kind>:<key>`. The former cross-section
+  // `BRG_KEY_COLLISION` loop (025 FR-010) is REMOVED; the const stays exported
+  // (frozen, superseded). Within-section duplicates are still rejected via
+  // `uniqueKeys: true` (BRG_DUPLICATE_KEY, FR-019).
 
   if (errors.length > 0) {
     return { kind: 'invalid', errors };

@@ -1,3 +1,5 @@
+import type { AppIdentity } from './resource-domain.js';
+
 /**
  * Builder contract (FR-001..FR-004, IDEA §7).
  *
@@ -16,6 +18,10 @@
  * - `buildConfig` — app-level build configuration; opaque to C.
  * - `buildEnv` — resolved build-time environment variables.
  * - `outputDir` — directory the builder writes build output into.
+ * - `appIdentities` — app-derived resource identities (spec 028, plan D-1).
+ *   Additive/optional: Project C provides it when deriving from map-form
+ *   `apps.yaml` artifact-type builder keys; Project B uses it to extend its
+ *   resource index without parsing `apps.yaml` itself (026 FR-005).
  */
 export interface BuildContext {
   readonly projectRoot: string;
@@ -23,6 +29,7 @@ export interface BuildContext {
   readonly buildConfig: unknown;
   readonly buildEnv: Record<string, string>;
   readonly outputDir: string;
+  readonly appIdentities?: readonly AppIdentity[];
 }
 
 /**

@@ -41,9 +41,17 @@ export async function dispatch(
     return { kind: 'invalid', errors: selection.errors };
   }
 
-  // Phase 2 — materialize, abort-on-first (FR-006).
+  // Phase 2 — materialize, abort-on-first (FR-006). projectRoot (spec 028,
+  // T024) is additive in DispatchOptions and threaded into every context.
   const outputBuilder = createOutputBuilder();
-  const materialization = await materializeAll(projectModel, registry, selection.matches, outputBuilder, artifacts);
+  const materialization = await materializeAll(
+    projectModel,
+    registry,
+    selection.matches,
+    outputBuilder,
+    artifacts,
+    options.projectRoot,
+  );
   if (materialization.kind === 'failed') {
     return { kind: 'invalid', errors: [materialization.error] };
   }

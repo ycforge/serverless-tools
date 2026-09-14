@@ -49,7 +49,12 @@ export async function runMaterializeGeneration(
   const target = opts?.target;
 
   stderr('Materializing artifacts...', json);
-  const dispatchOptions: DispatchOptions = artifacts !== undefined ? { artifacts } : {};
+  // spec 028 (T024): the pipeline hands its rootDir down so materializers emit
+  // companion files into <root>/infra/generated instead of the process cwd.
+  const dispatchOptions: DispatchOptions = {
+    ...(artifacts !== undefined ? { artifacts } : {}),
+    projectRoot: rootDir,
+  };
   const dispatchResult = await dispatch(projectModel, registry, dispatchOptions);
   if (dispatchResult.kind === 'invalid') {
     const first = dispatchResult.errors[0];

@@ -208,9 +208,11 @@ export function materializerEntry(fx: MaterializerFixture): PluginEntry {
 
 /** Build a registry with insertion-order-preserving records. */
 export function makeRegistry(entries: readonly PluginEntry[]): PluginRegistry {
+  // spec 028 (T035): records are kind-qualified `<kind>:<id>` (FR-019) —
+  // dispatch/validate look up `materializer:<id>` / `builder:<id>`.
   const records = new Map<string, PluginEntry>();
   for (const entry of entries) {
-    records.set(entry.id, entry);
+    records.set(`${entry.kind}:${entry.id}`, entry);
   }
   return { records: Object.freeze(records) as ReadonlyMap<string, PluginEntry> };
 }

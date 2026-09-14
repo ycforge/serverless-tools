@@ -89,7 +89,7 @@ describe('runBuildAndMaterialize pipeline (T036)', () => {
     const registry = { records: new Map() } as never;
     await runMaterializeGeneration('/root', model, registry, undefined, artifacts);
 
-    expect(dispatch).toHaveBeenCalledWith(model, registry, { artifacts });
+    expect(dispatch).toHaveBeenCalledWith(model, registry, { artifacts, projectRoot: '/root' });
     expect(buildOutputs).toHaveBeenCalledWith(expect.objectContaining({ materializerOutputs: outputs }));
   });
 
@@ -121,6 +121,7 @@ describe('runBuildAndMaterialize pipeline (T036)', () => {
           ['analytics', { type: 'ycforge:docker-image', value: { image: 'registry.example.com/analytics' } }],
           ['user_service', { type: 'ycforge:function', value: { archivePath: 'dist/user_service.zip', entryPoint: 'index.handler' } }],
         ]),
+        projectRoot: '/root',
       },
     );
   });

@@ -78,10 +78,17 @@
           "properties": {
             "repository": { "type": "string", "minLength": 1 },
             "tag": { "type": "string", "default": "latest", "pattern": "^[^\\s][^\\s]*$", "description": "Push tag; never used as the artifact image (only the digest form is)." },
-            "no_push": { "type": "boolean", "default": false, "description": "true → only-build, digest из локального daemon (.Id), push не выполняется (spec 027)." }
+            "no_push": { "type": "boolean", "default": false, "description": "true → only-build, digest из локального daemon (.Id), push не выполняется (spec 027)." },
+            "mode": { "type": "string", "enum": ["registry-ref", "remote"], "description": "spec 028 dev-modes: registry-ref → emit the configured immutable ref verbatim (no docker CLI); remote → build/push against image.host (DOCKER_HOST); отсутствие mode = локальный daemon build+push (027)." },
+            "ref": { "type": "string", "pattern": "^[^@]+@sha256:[0-9a-f]{64}$", "description": "registry-ref: immutable digest form <repository>@sha256:<hex64>; never a mutable tag (FR-011) — runtime additionally rejects <repo>:<tag>@sha256:… forms." },
+            "host": { "type": "string", "description": "remote: endpoint возврата daemon (DOCKER_HOST passthrough)." }
           },
-          "required": ["repository"],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Either image.repository (default/remote build tag) or image.ref (registry-ref, existing digest) is required — mutual exclusion enforced by the runtime parser.",
+          "oneOf": [
+            { "required": ["repository"] },
+            { "required": ["ref"] }
+          ]
         },
         "dockerfile": { "type": "string", "default": "Dockerfile" }
       },
@@ -151,7 +158,8 @@
       "BLC_BUILD_FAILED": { "const": "BLC_BUILD_FAILED", "description": "Underlying build failed: esbuild error, docker CLI nonzero/unavailable, vite command failed, missing build output (FR-007/013/017)." },
       "BLC_ENV_NOT_RESOLVED": { "const": "BLC_ENV_NOT_RESOLVED", "description": "Residual {{$...}} in buildConfig/buildEnv — upstream interpolation contract violated (FR-019, D-3)." },
       "BLC_IMAGE_DIGEST_UNAVAILABLE": { "const": "BLC_IMAGE_DIGEST_UNAVAILABLE", "description": "Push succeeded but digest not resolved from push output or docker inspect (FR-011).; also thrown in no-push mode when the local digest cannot be resolved from `docker image inspect --format '{{.Id}}'` (build succeeded)" },
-      "BLC_ARCHIVE_FAILED": { "const": "BLC_ARCHIVE_FAILED", "description": "Zip creation/write failed (US1/US6)." }
+      "BLC_ARCHIVE_FAILED": { "const": "BLC_ARCHIVE_FAILED", "description": "Zip creation/write failed (US1/US6)." },
+      "BLC_DOCKER_UNREACHABLE": { "const": "BLC_DOCKER_UNREACHABLE", "description": "Docker daemon unreachable (local или image.host remote, spec 028): stderr содержит маркеры Cannot connect to the Docker daemon / error during connect / failed to connect to the docker API. Массage несёт actionable stairway: запустить daemon | image.mode: registry-ref | image.mode: remote. Никогда не warn-and-continue (V)." }
     },
     "required": [
       "BLC_INVALID_CONFIG",
@@ -160,7 +168,8 @@
       "BLC_BUILD_FAILED",
       "BLC_ENV_NOT_RESOLVED",
       "BLC_IMAGE_DIGEST_UNAVAILABLE",
-      "BLC_ARCHIVE_FAILED"
+      "BLC_ARCHIVE_FAILED",
+      "BLC_DOCKER_UNREACHABLE"
     ],
     "additionalProperties": false
   }

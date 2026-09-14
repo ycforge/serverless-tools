@@ -87,6 +87,8 @@ describe('e2e real materializers-core (spec 025, Phase 6)', () => {
         resource: {
           yandex_function: {
             user_service: {
+              name: string;
+              memory: number;
               entrypoint: string;
               user_hash: string;
               content: { zip_filename: string };
@@ -97,6 +99,9 @@ describe('e2e real materializers-core (spec 025, Phase 6)', () => {
       expect(parsed.resource.yandex_function.user_service.content.zip_filename).toBe('dist/user_service.zip');
       expect(parsed.resource.yandex_function.user_service.entrypoint).toBe('handler');
       expect(parsed.resource.yandex_function.user_service.user_hash).toBe(project.expectedHash);
+      // spec 028 T021: required attrs emitted (FR-010).
+      expect(parsed.resource.yandex_function.user_service.name).toBe('user_service');
+      expect(parsed.resource.yandex_function.user_service.memory).toBe(128);
 
       expect(result.materializerOutputs.get('user_service_function_id')).toEqual({
         value: 'yandex_function.user_service.id',
@@ -179,6 +184,9 @@ apps:
     process.chdir(project.root);
     try {
       const result = await dispatch(model, registry, {
+        // spec 028 T024: dispatch hands the project root down so companion
+        // files land in <root>/infra/generated instead of cwd.
+        projectRoot: project.root,
         artifacts: new Map([
           ['user_service', { type: 'ycforge:function', value: { archivePath: 'dist/user_service.zip', entryPoint: 'handler' } }],
           ['analytics', { type: 'ycforge:docker-image', value: { image: 'cr.yandex/crp8/repo/analytics:latest' } }],
@@ -229,8 +237,21 @@ apps:
       expect(result.materializerOutputs.get('frontend_bucket_id')?.value).toBe('yandex_storage_bucket.frontend.id');
       expect(result.materializerOutputs.get('openapi_gateway_id')?.value).toBe('yandex_api_gateway.openapi.id');
 
-      // NG-3 cwd-dependent companion — pinned from pilot side.
-      expect(existsSync(join(project.root, 'generated', 'openapi-openapi.yaml'))).toBe(true);
+      // spec 028 T021: function/gateway required attrs in the merged config.
+      const userFile = result.generatedFiles.find((f) => f.filename === 'user_service.ycsf.tf.json');
+      const userParsed = JSON.parse(userFile?.content ?? '{}') as {
+        resource: { yandex_function: { user_service: { name: string; memory: number } } };
+      };
+      expect(userParsed.resource.yandex_function.user_service.name).toBe('user_service');
+      expect(userParsed.resource.yandex_function.user_service.memory).toBe(128);
+      const openapiFile = result.generatedFiles.find((f) => f.filename === 'openapi.ycsf.tf.json');
+      const openapiParsed = JSON.parse(openapiFile?.content ?? '{}') as {
+        resource: { yandex_api_gateway: { openapi: { name: string } } };
+      };
+      expect(openapiParsed.resource.yandex_api_gateway.openapi.name).toBe('openapi');
+
+      // NG-3 companion pinned from pilot side — root-relative now (T024).
+      expect(existsSync(join(project.root, 'infra', 'generated', 'openapi-openapi.yaml'))).toBe(true);
 
       // Descriptor carried `value` into supports for every shape.
       const byId = new Map(seen.map((d) => [d.id, d.value as Record<string, unknown> | undefined]));

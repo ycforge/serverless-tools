@@ -23,7 +23,7 @@ describe('loadPlugins', () => {
     const result = await loadPlugins(entries);
     expect(result.errors).toHaveLength(0);
     expect(result.entries.size).toBe(1);
-    const entry = result.entries.get('builder-a');
+    const entry = result.entries.get('builder:builder-a');
     expect(entry).toBeDefined();
     expect(entry?.kind).toBe('builder');
     expect(entry?.id).toBe('builder-a');
@@ -36,7 +36,7 @@ describe('loadPlugins', () => {
     const entries = new Map([['builder-n', { id: 'builder-n', packageName: path, kind: 'builder' as const }]]);
     const result = await loadPlugins(entries);
     expect(result.errors).toHaveLength(0);
-    expect(result.entries.get('builder-n')?.kind).toBe('builder');
+    expect(result.entries.get('builder:builder-n')?.kind).toBe('builder');
   });
 
   it('T025: valid materializer fixture (default export, supports+materialize) → kind: materializer (FR-008)', async () => {
@@ -44,7 +44,7 @@ describe('loadPlugins', () => {
     const entries = new Map([['mat-a', { id: 'mat-a', packageName: path, kind: 'materializer' as const }]]);
     const result = await loadPlugins(entries);
     expect(result.errors).toHaveLength(0);
-    expect(result.entries.get('mat-a')?.kind).toBe('materializer');
+    expect(result.entries.get('materializer:mat-a')?.kind).toBe('materializer');
   });
 
   it('T026: not-a-plugin fixture → BRG_NOT_A_PLUGIN (FR-010, US-4 AC1)', async () => {
@@ -82,7 +82,7 @@ describe('loadPlugins', () => {
     const entries = new Map([['both', { id: 'both', packageName: path, kind: 'builder' as const }]]);
     const result = await loadPlugins(entries);
     expect(result.errors).toHaveLength(0);
-    expect(result.entries.get('both')?.kind).toBe('builder');
+    expect(result.entries.get('builder:both')?.kind).toBe('builder');
   });
 
   it('T030: partial load — 3 entries, 1 valid + 1 not-found + 1 load-error → both errors collected (FR-015)', async () => {
@@ -96,7 +96,7 @@ describe('loadPlugins', () => {
     const result = await loadPlugins(entries);
     // valid entry still loaded
     expect(result.entries.size).toBe(1);
-    expect(result.entries.get('good')).toBeDefined();
+    expect(result.entries.get('builder:good')).toBeDefined();
     // both errors collected
     expect(result.errors).toHaveLength(2);
     const codes = result.errors.map((e) => e.code);

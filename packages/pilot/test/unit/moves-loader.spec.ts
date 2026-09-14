@@ -6,7 +6,7 @@ import { MOV_INVALID, MOV_VERSION } from '../../src/contracts/index.js';
 import { loadMoves } from '../../src/index.js';
 import type { TempProject } from '../helpers/temp-project.js';
 import { createTempProject, removeTempProject } from '../helpers/temp-project.js';
-import { canonicalMovesYaml, movesYaml, writeMovedYaml } from '../helpers/moves-fixtures.js';
+import { canonicalMovesYaml, writeMovedYaml } from '../helpers/moves-fixtures.js';
 
 let project: TempProject | undefined;
 
