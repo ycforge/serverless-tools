@@ -113,7 +113,7 @@ export async function buildApps(
   const resolvedEnvs = new Map<string, Record<string, string>>();
   for (const [appId, buildConfig] of projectModel.build_configs) {
     if (!appsToBuild.has(appId)) continue;
-    const result = prepareBuildEnv(appId, buildConfig);
+    const result = prepareBuildEnv(appId, buildConfig, undefined, appsToBuild.get(appId)!.source_path);
     if (result.kind === 'invalid') {
       envDiagnostics.push(...result.errors);
     } else {

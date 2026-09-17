@@ -33,7 +33,7 @@ export interface Resource {
 }
 
 /**
- * Content of `<app>/build_config.yaml`. `build_config` is opaque to C (the
+ * Content of `<source_path>/build_config.yaml`. `build_config` is opaque to C (the
  * builder validates its internals, FR-011); `build_env` maps ENV_NAME to a
  * literal string or `null` (take from process env).
  */

@@ -20,7 +20,7 @@ function writeYcsf(root: string, filename: string, yaml: string): void {
 }
 
 function scanIn(root: string, appIds: string[] = ['user_service']): ReturnType<typeof scanSuspiciousKeys> {
-  const apps = new Map(appIds.map((id) => [id, id]));
+  const apps = new Map(appIds.map((id) => [id, { source_path: `apps/${id}` }]));
   return scanSuspiciousKeys(root, { apps });
 }
 
@@ -160,19 +160,19 @@ db_password: v2
     const root = tmpRoot();
     try {
       writeYcsf(root, '.ycsf/apps.yaml', 'version: 1\n  bad indent: [\n');
-      writeYcsf(root, 'user_service/build_config.yaml', 'version: 1\n  broken\n');
+      writeYcsf(root, 'apps/user_service/build_config.yaml', 'version: 1\n  broken\n');
       expect(scanIn(root)).toHaveLength(0);
     } finally {
       flush(root);
     }
   });
 
-  it('per-app build_config.yaml scanned: build_config.DB_TOKEN flagged with file+field', () => {
+  it('per-app build_config.yaml scanned at source_path: build_config.DB_TOKEN flagged with file+field', () => {
     const root = tmpRoot();
     try {
       writeYcsf(
         root,
-        'user_service/build_config.yaml',
+        'apps/user_service/build_config.yaml',
         `version: 1
 build_config:
   DB_TOKEN: [tok]
@@ -181,7 +181,7 @@ build_env: {}
       );
       const diagnostics = scanIn(root);
       expect(diagnostics).toHaveLength(1);
-      expect(diagnostics[0]?.file).toBe('user_service/build_config.yaml');
+      expect(diagnostics[0]?.file).toBe('apps/user_service/build_config.yaml');
       expect(diagnostics[0]?.field).toBe('build_config.DB_TOKEN');
       expect(diagnostics[0]?.reason).toBe('suffix-match:token');
     } finally {

@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 /**
  * Deterministic in-test temp project for the spec 011 integration/unit files.
- * A project is a root dir populated with `.ycsf/*.yaml` + `<app>/build_config.yaml`
+ * A project is a root dir populated with `.ycsf/*.yaml` + `<source_path>/build_config.yaml`
  * files; the root is removed by the caller (see `removeTempProject`).
  */
 export interface TempProject {

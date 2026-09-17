@@ -257,7 +257,7 @@ C учитывает `depends_on` при планировании build graph.
 Каждый app имеет собственный:
 
 ```text
-<app>/build_config.yaml
+<source_path>/build_config.yaml
 ```
 
 C автоматически загружает его.
@@ -2152,7 +2152,7 @@ Terraform остаётся источником истины для infrastructu
 
 16. **Все builders получают `projectRoot` и сами работают со своим project scope.**
 
-17. **App-specific configuration находится рядом с app в `build_config.yaml`.**
+17. **App-specific configuration находится в `source_path` app-а в `build_config.yaml`.**
 
 18. **`{{$ENV}}` — единый serverless-tools build-time ENV interpolation syntax.**
 

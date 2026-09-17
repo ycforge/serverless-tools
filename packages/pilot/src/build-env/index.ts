@@ -29,10 +29,11 @@ export function prepareBuildEnv(
   appId: string,
   buildConfig: BuildConfig,
   envSnapshot?: Readonly<Record<string, string | undefined>>,
+  sourcePath?: string,
 ): BuildEnvResolutionResult {
   const env: Readonly<Record<string, string | undefined>> =
     envSnapshot !== undefined ? envSnapshot : { ...process.env };
-  const file = `${appId}/build_config.yaml`;
+  const file = `${sourcePath ?? appId}/build_config.yaml`;
   const context: InterpolateContext = { appId, file };
 
   const configResult = interpolateBuildConfig(buildConfig.build_config, context, env);

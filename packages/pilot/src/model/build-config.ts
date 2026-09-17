@@ -12,7 +12,7 @@ import { parseYaml } from './parse.js';
 import { isRecord } from './types.js';
 
 /**
- * `<app>/build_config.yaml` → BuildConfig (US-1 AC3, FR-003/FR-011).
+ * `<source_path>/build_config.yaml` → BuildConfig (US-1 AC3, FR-003/FR-011).
  * `build_config` is opaque to C (the builder validates its internals);
  * `build_env` maps ENV_NAME → string | null. Absent file → empty BuildConfig.
  */
@@ -24,9 +24,9 @@ export type BuildConfigResult =
  * Reads (if present) + parses + version-gates the app's build_config.yaml.
  * A missing file is valid (FR-003) and yields empty maps.
  */
-export function loadAppBuildConfig(rootDir: string, appId: string): BuildConfigResult {
-  const file = `${appId}/build_config.yaml`;
-  const filePath = join(rootDir, appId, 'build_config.yaml');
+export function loadAppBuildConfig(rootDir: string, sourcePath: string): BuildConfigResult {
+  const file = `${sourcePath}/build_config.yaml`;
+  const filePath = join(rootDir, sourcePath, 'build_config.yaml');
   if (!existsSync(filePath)) {
     return { kind: 'ok', build_config: { build_config: {}, build_env: {} } };
   }

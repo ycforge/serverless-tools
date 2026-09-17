@@ -32,7 +32,7 @@ describe('aggregation integration (T071)', () => {
     expect(appsHit?.key).toBe('api_key');
     expect(appsHit?.reason).toBe('exact-match:apikey');
 
-    const buildHit = byKey.get('user_service/build_config.yaml:build_config.DB_TOKEN');
+    const buildHit = byKey.get('src/user_service/build_config.yaml:build_config.DB_TOKEN');
     expect(buildHit).toBeDefined();
     expect(buildHit?.key).toBe('DB_TOKEN');
     expect(buildHit?.reason).toBe('suffix-match:token');
