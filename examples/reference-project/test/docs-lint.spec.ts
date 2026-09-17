@@ -45,8 +45,13 @@ describe('docs-lint', () => {
     expect(readme).toMatch(/\.ycsf\/resources\.yaml`?\s*в эталоне\s*\*\*отсутствует\*\*/);
     expect(readme).not.toMatch(/^- `resources\.yaml`/m);
     expect(readme).toContain('defaultScheme');
-    for (const marker of ['D7', 'D9', 'D10', 'D12', 'PML_IDENTITY_COLLISION', 'BRG_PACKAGE_NOT_FOUND']) {
+    // D7/D9 — действующие ограничения; D10/D12 сняты (registry-ref, provider-форма)
+    // и в README не упоминаются.
+    for (const marker of ['D7', 'D9', 'PML_IDENTITY_COLLISION', 'BRG_PACKAGE_NOT_FOUND']) {
       expect(readme).toContain(marker);
+    }
+    for (const fixed of ['D10', 'D12']) {
+      expect(readme).not.toContain(fixed);
     }
   });
 });

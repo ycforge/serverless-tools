@@ -2,9 +2,10 @@
 
 Канонический reference-проект монорепозитория **serverless-tools** (spec 024): четыре
 приложения, проходящие весь конвейер `ycsf-тулов` от исходников (NestJS) до
-валидированного `terraform plan`. Никакого `apply`, публикации артефактов, push в
-registry и секретов — единственная сетевая активность: `pnpm install` (зависимости)
-и `terraform init` (загрузка provider-плагинов).
+валидированного `terraform plan` (и опционального `apply` через скрипт `deploy`).
+Гейтящий путь — без `apply`, публикации артефактов, push в registry и секретов;
+сетевая активность гейтов: `pnpm install` (зависимости) и `terraform init`
+(загрузка provider-плагинов).
 
 | App | Builder | Materializer | Terraform address |
 |-----|---------|--------------|-------------------|
@@ -38,24 +39,27 @@ pnpm --filter @ycforge/reference-project materialize   # ycsf materialize (cwd=i
 cd infra && terraform init && terraform validate && terraform plan
 ```
 
-**Статус гейтов на текущем тулчейне** (без правок `packages/`):
+**Статус гейтов на текущем тулчейне**:
 
-- `ycsf build` по целям зелёный: `user_service` → `function.zip` (cache-aware,
-  детерминированный sha256), `frontend` → статический dist (vite), `openapi` →
-  скомпилированный `openapi.json`. Полный `build` падает на `analytics` — docker
-  builder передаёт относительный `sourcePath` как build context (см. ограничения).
+- `ycsf build` зелёный по всем четырём приложениям: `user_service` → `function.zip`
+  (cache-aware, детерминированный sha256), `frontend` → статический dist (vite),
+  `openapi` → скомпилированный `openapi.json`, `analytics` → registry-ref
+  (детерминированно, без docker-демона).
 - `ycsf check` на холодном дереве **зелёный** (exit 0, `All checks passed.`):
   `.ycsf/*.ycsf.tf.json` снапшоты закоммичены в репо по паттерну pilot canonical
   (`packages/pilot/test/check/fixtures/canonical/.ycsf/`). Extensions/outputs
   разрешаются по IDL в снапшотах. Задокументированная граница (T033/T034):
   `generated-loader.ts:16` читает `.ycsf/`, materialize пишет `infra/` — снапшоты
   устареют после T034 (generated-dir alignment).
-- `ycsf materialize` заблокирован интеграционными дефектами конвейера (D1/D2/D10) —
-  golden-файлы заморожены по контракту + реальным значениям в `test/fixtures/`
-  (см. «Генерируемые файлы» и `specs/024-e2e-reference/tasks.md`).
+- `ycsf materialize` зелёный: эмитит provider-совместимый tf-JSON
+  (`image`-блок, `name`/`memory`, extension-патчи) и companion gateway-спеки
+  с flat-рефами (`${yandex_function_user_service_id}`) + `templatefile`.
+  Golden-файлы в `test/fixtures/` регенерируются из реального выхода конвейера
+  (с подстановкой `<ROOT>`); boundary-набор `test/fixtures/boundary/` — та же
+  генерация + companion-спека в `generated/`.
 
 **Граница без креденшалов (CI-путь)**: `terraform plan` без `YC_TOKEN` /
-`SERVICE_ACCOUNT_KEY_FILE` гарантированно останавливается на настройке провайдера —
+`YC_SERVICE_ACCOUNT_KEY_FILE` гарантированно останавливается на настройке провайдера —
 до какого-либо обращения к Yandex Cloud:
 
 ```
@@ -63,9 +67,15 @@ Error: one of 'token' or 'service_account_key_file' should be specified
 ```
 
 (exit ≠ 0; все стадии до terraform plan проходят локально и оффлайн). Проверено на
-provider-совместимых (boundary) фикстурах `test/fixtures/boundary/`: `terraform validate`
-→ 0 диагностик, `plan` → ровно этот stop. На форме вывода текущих materializer-ов
-`validate` падает (D12 — провайдер требует `image{url}`, `name`, `memory`; см. ограничения).
+boundary-фикстурах `test/fixtures/boundary/`: `terraform validate` → 0 диагностик,
+`plan` → ровно этот stop.
+
+**Деплой (`pnpm ... deploy`)**: `check → build → materialize → terraform init →
+validate → apply -auto-approve`. Требует креденшалы через env:
+`YC_SERVICE_ACCOUNT_KEY_FILE` (путь к ключу SA; пример — `sa-key.json` в корне,
+gitignore-нут) и `YC_FOLDER_ID`. Smoke после apply:
+`https://<gateway-domain>/users`, `/analytics`, `/analytics/kms` (domain —
+`yc serverless api-gateway get <id>`).
 
 ## Конфигурация
 
@@ -84,8 +94,8 @@ provider-совместимых (boundary) фикстурах `test/fixtures/bou
   интеграции gateway — только `mock`. `apps/openapi/auth.yaml` присутствует с
   `defaultScheme: none` — composer требует файл auth-конфига как вход сборки.
 
-Per-app `build_config.yaml` лежит на корне эталона рядом с приложением
-(`<root>/<appId>/build_config.yaml`, читается моделью Project C), исходники — в
+Per-app `build_config.yaml` лежит в `source_path` приложения
+(`apps/<appId>/build_config.yaml`, читается моделью Project C), исходники — там же, в
 `apps/<appId>/`.
 
 Имя бакета Object Storage глобально-уникально (S3-парадигма), поэтому эталон
@@ -103,7 +113,7 @@ materializer падает на app id (обратная совместимост
 `yandex_serverless_container` падает с Internal error на стадии деплоя ревизии.
 `registry-ref` делает `ycsf build` детерминированным (без docker-демона); чтобы
 пересобрать образ из исходников, выполните кросс-сборку
-(`docker buildx build --platform linux/amd64 --push`) и обновите `analytics/build_config.yaml`.
+(`docker buildx build --platform linux/amd64 --push`) и обновите `apps/analytics/build_config.yaml`.
 
 ## Генерируемые файлы
 
@@ -134,27 +144,18 @@ pnpm --filter @ycforge/reference-project test   # hermetic vitest: golden, plan,
   скрипты эталона вызывают `node ../../packages/pilot/dist/cli/index.js` по
   реальному пути из репозитория — без правок `packages/` это единственный рабочий
   инвокейшн (D7).
-- Логические ссылки gateway→apps через `authorizer function_id` не собираются
-  (единственный reference-bearing field composer-сборщика; path-level
-  `x-yc-apigateway-integration`-ссылки не поддерживаются) — в эталоне `mock`-
-  integration, файл `auth.yaml` требуется composer-ом как вход (D11). Carrier
-  `x-yc-apigateway-authorizer.function_id` требует декларацию функции в
-  `resources.yaml` (в эталоне отсутствует, PML_IDENTITY_COLLISION); path-level
-  refs — зарегистрирован follow-up **spec 034** `composer-path-level-refs`.
+- Логические ссылки gateway→apps собираются через path-level рефы
+  (`${resources.functions.<app>.id}` / `${resources.containers.<app>.id}` в
+  `apps/openapi/openapi.yaml`), которые materializer переписывает в flat-переменные
+  `templatefile`. Carrier `x-yc-apigateway-authorizer.function_id` требует декларацию
+  функции в `resources.yaml` (в эталоне отсутствует, PML_IDENTITY_COLLISION).
 - `ycsf check` читает сгенерированную tf-модель только из `.ycsf/`, а materialize
-  пишет только в `infra/` — на холодном дереве check выдаёт 6 диагностик без
+  пишет только в `infra/` — на холодном дереве check выдаёт диагностики без
   снапшотов (D9). T033 решает cold-check-green коммитом `.ycsf/*.ycsf.tf.json`
   снапшотов; полная генерализация — T034 (follow-up spec).
-- docker-builder передаёт относительный `sourcePath` как build context при
-  `cwd=sourcePath` → `unable to prepare context: path ... not found` (D10).
-- materializer-ы эмитят tf-JSON, несовместимый со схемой provider `yandex-cloud`
-  ~> 0.145: `image` должны быть блоком `[{url}]`, для `yandex_function` /
-  `yandex_serverless_container` обязательны `name`+`memory` (D12) — provider-валидная
-  форма проверена в `test/fixtures/boundary/`.
-- `ycsf materialize` / materialization через `ycsf plan` на текущей версии тулов
-  упирается в `archivePath` (должен быть относительным, а build-пайплайн отдаёт
-  абсолютные пути; D1/D2) — см. `specs/024-e2e-reference/tasks.md` и финальный
-  отчёт фазы.
+- api-gateway materializer пишет companion-спеку (`generated/openapi-openapi.yaml`)
+  как побочный эффект `dispatch` — тесты (`test/dispatch.spec.ts`) поэтому работают
+  в sandbox-директории, чтобы не затирать реальный выход `infra/`.
 
 ## Локальная разработка (US-7)
 
@@ -181,6 +182,8 @@ container-рантайм (US-4).
 
 ## Вне scope
 
-`terraform apply` / `ycsf apply`, destroy, publish, деплой, push docker-image,
-cloud-креденшалы в репо (`.env*` запрещены; credentials — runtime-env),
-внешние `resources.yaml`-сущности.
+`ycsf apply` как отдельная стадия тулчейна, destroy, publish, push docker-image
+из конвейера, cloud-креденшалы в репо (`.env*`/`sa-key.json` запрещены;
+credentials — runtime-env: `YC_SERVICE_ACCOUNT_KEY_FILE`, `YC_FOLDER_ID`),
+внешние `resources.yaml`-сущности. `terraform apply` доступен опционально через
+скрипт `deploy` (см. «Деплой» выше) и не является частью гейтящего `plan`-пути.

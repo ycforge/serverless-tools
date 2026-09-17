@@ -2,14 +2,14 @@
   "resource": {
     "yandex_serverless_container": {
       "analytics": {
-        "cores": 1,
         "image": [
           {
-            "url": "cr.yandex/ycforge/analytics@sha256:c16dea4fac51b380fee77eef61fc6344dfde1b306629bb02b4f1b3dbad8ce7f0"
+            "url": "cr.yandex/crps9jj0ui2e954vaj8m/analytics@sha256:85b68206325f6af4fc29f72b87ebcdbc94cf5c8fc086ef48a02abf40372e80f4"
           }
         ],
-        "memory": 64,
-        "name": "analytics"
+        "memory": 128,
+        "name": "analytics",
+        "service_account_id": "ajefi3b58tak71g3ecp1"
       }
     }
   }

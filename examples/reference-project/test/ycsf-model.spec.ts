@@ -12,7 +12,7 @@ function yaml(file: string): Record<string, unknown> {
   return (doc.toJS() ?? {}) as Record<string, unknown>;
 }
 function buildCfg(app: string): Record<string, unknown> {
-  return yaml(join(app, 'build_config.yaml')).build_config as Record<string, unknown>;
+  return yaml(join('apps', app, 'build_config.yaml')).build_config as Record<string, unknown>;
 }
 interface AppEntry {
   builder?: string;
@@ -31,7 +31,7 @@ describe('ycsf-модель эталона', () => {
     }
     for (const app of ['user_service', 'analytics', 'frontend', 'openapi']) {
       const cfg = parseDocument(
-        readFileSync(join(ROOT, app, 'build_config.yaml'), 'utf8'),
+        readFileSync(join(ROOT, 'apps', app, 'build_config.yaml'), 'utf8'),
       ).toJS() as unknown as BuildConfig;
       expect(cfg.version).toBe(1);
       expect(cfg.build_config).toBeTruthy();
@@ -99,7 +99,7 @@ describe('ycsf-модель эталона', () => {
     expect(image.ref).toMatch(/^cr\.yandex\/.+\/analytics@sha256:[0-9a-f]{64}$/);
     expect(an.dockerfile).toBeUndefined();
 
-    const fe = yaml('frontend/build_config.yaml');
+    const fe = yaml('apps/frontend/build_config.yaml');
     const feCfg = fe.build_config as Record<string, unknown>;
     expect(feCfg.out_dir).toBe('dist');
     expect(feCfg.command).toContain('vite build');
@@ -108,7 +108,7 @@ describe('ycsf-модель эталона', () => {
     const oa = buildCfg('openapi');
     expect(oa.openapi_entry).toBe('openapi.yaml');
     for (const app of ['user_service', 'analytics', 'frontend', 'openapi']) {
-      expect(yaml(`${app}/build_config.yaml`).build_env ?? {}).not.toContain('TOKEN');
+      expect(yaml(`apps/${app}/build_config.yaml`).build_env ?? {}).not.toContain('TOKEN');
     }
   });
 
@@ -130,10 +130,10 @@ describe('ycsf-модель эталона', () => {
       '.ycsf/builders.yaml',
       '.ycsf/extensions.yaml',
       '.ycsf/outputs.yaml',
-      'user_service/build_config.yaml',
-      'analytics/build_config.yaml',
-      'frontend/build_config.yaml',
-      'openapi/build_config.yaml',
+      'apps/user_service/build_config.yaml',
+      'apps/analytics/build_config.yaml',
+      'apps/frontend/build_config.yaml',
+      'apps/openapi/build_config.yaml',
     ];
     for (const f of files) {
       const text = readFileSync(join(ROOT, f), 'utf8');

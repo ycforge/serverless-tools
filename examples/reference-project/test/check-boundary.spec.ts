@@ -35,7 +35,7 @@ describe.skipIf(!existsSync(CLI))('ycsf check — границы', () => {
     const dirty = makeTmpProject();
     try {
       writeFileSync(
-        join(dirty, 'frontend/build_config.yaml'),
+        join(dirty, 'apps/frontend/build_config.yaml'),
         '\n  VITE_TOKEN: injected-secret\n',
         { flag: 'a' } as Parameters<typeof writeFileSync>[2],
       );

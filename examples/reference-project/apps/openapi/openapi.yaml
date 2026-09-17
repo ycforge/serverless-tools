@@ -24,3 +24,13 @@ paths:
         type: serverless_containers
         container_id: ${resources.containers.analytics.id}
         service_account_id: ajefi3b58tak71g3ecp1
+  /analytics/kms:
+    get:
+      summary: KMS SA-access probe (analytics container)
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: serverless_containers
+        container_id: ${resources.containers.analytics.id}
+        service_account_id: ajefi3b58tak71g3ecp1
