@@ -50,6 +50,11 @@ A new session always starts the same way: read constitution → read `specs/READ
 - Fail-fast over magic: collisions (artifact type, path/operationId, identity in both apps.yaml and resources.yaml) are errors, never silent merges.
 - Canonical example project used across docs: apps `user_service`, `analytics`, `frontend`, `openapi` — keep examples consistent with it.
 
+## Yandex Cloud CLI
+
+- **Use only the `ycforge-sa` profile** (`yc --profile ycforge-sa` / `YC_PROFILE=ycforge-sa`) — this is always allowed.
+- **Any other profile (including `default`) requires the user's explicit, per-use permission.** Never reuse a previously granted permission for further commands; ask again each time.
+
 ## Git
 
 - `specs/` and `.specify/` are committed (specs are primary artifacts here).
