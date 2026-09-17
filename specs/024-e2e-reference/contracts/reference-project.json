@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ycforge/serverless-tools/blob/dev/specs/024-e2e-reference/contracts/reference-project.json",
+  "title": "reference-project golden contract (spec 024) — fixture schema of expected infra/*.tf.json resources and plan-no-creds boundary",
+  "description": "Схема-контракт для golden-тестов (byte-for-byte fixtures) и characterization-лока terraform-boundary. Значения вида '<...>' — заполняются после реального ycsf materialize (T020/T021); структура детерминирована (serializeJson: лексикографический порядок ключей на каждом уровне).",
+  "version": "1",
+  "reference": {
+    "spec": "specs/024-e2e-reference/spec.md",
+    "plan": "specs/024-e2e-reference/plan.md",
+    "dataModel": "specs/024-e2e-reference/data-model.md",
+    "quickstart": "specs/024-e2e-reference/quickstart.md"
+  },
+  "apps": {
+    "user_service": {
+      "builder": "ycforge:function",
+      "builderPackage": "@ycforge/builders-core/nestjs-function",
+      "materializerKey": "yandex-function",
+      "materializerPackage": "@ycforge/materializers-core/yandex-function",
+      "terraformAddress": "yandex_function.user_service",
+      "logicalDomain": "functions"
+    },
+    "analytics": {
+      "builder": "ycforge:docker-image",
+      "builderPackage": "@ycforge/builders-core/docker",
+      "materializerKey": "yandex-serverless-container",
+      "materializerPackage": "@ycforge/materializers-core/yandex-serverless-container",
+      "terraformAddress": "yandex_serverless_container.analytics",
+      "logicalDomain": "containers"
+    },
+    "frontend": {
+      "builder": "ycforge:frontend",
+      "builderPackage": "@ycforge/builders-core/vite",
+      "materializerKey": "yandex-storage-bucket",
+      "materializerPackage": "@ycforge/materializers-core/yandex-storage-bucket",
+      "terraformAddress": "yandex_storage_bucket.frontend",
+      "logicalDomain": "buckets"
+    },
+    "openapi": {
+      "builder": "ycforge:api-gateway",
+      "builderPackage": "@ycforge/composer/builder",
+      "materializerKey": "yandex-api-gateway",
+      "materializerPackage": "@ycforge/materializers-core/yandex-api-gateway",
+      "terraformAddress": "yandex_api_gateway.openapi",
+      "logicalDomain": "gateways"
+    }
+  },
+  "d4Mapping": {
+    "functions": "yandex_function",
+    "queues": "yandex_message_queue",
+    "buckets": "yandex_storage_bucket",
+    "containers": "yandex_serverless_container",
+    "gateways": "yandex_api_gateway"
+  },
+  "generatedFiles": {
+    "infra/user_service.ycsf.tf.json": {
+      "description": "yandex_function.user_service: runtime nodejs22, entrypoint, user_hash (sha256 архива), content.zip_filename (<archivePath> относительный)",
+      "resource": {
+        "yandex_function": {
+          "user_service": {
+            "runtime": "nodejs22",
+            "entrypoint": "<entryPoint>",
+            "user_hash": "<sha256-of-archive>",
+            "content": { "zip_filename": "<archivePath>" }
+          }
+        }
+      }
+    },
+    "infra/analytics.ycsf.tf.json": {
+      "description": "yandex_serverless_container.analytics: image='<repository>@sha256:<digest>' (immutable; {{.Id}} local inspect при no_push), name=analytics",
+      "resource": {
+        "yandex_serverless_container": {
+          "analytics": {
+            "image": "<repository>@sha256:<digest>",
+            "name": "analytics"
+          }
+        }
+      }
+    },
+    "infra/frontend.ycsf.tf.json": {
+      "description": "yandex_storage_bucket.frontend (bucket=frontend-a31c4d4c, acl=public-read; appId-slug из .ycsf/state.json, spec 035) + yandex_storage_object.frontend_<sanitized-file> на каждый файл dist (bucket=«yandex_storage_bucket.frontend.id», key=<relative>, source=<abs-artifact-path>)",
+      "resource": {
+        "yandex_storage_bucket": {
+          "frontend": {
+            "bucket": "frontend-a31c4d4c",
+            "acl": "public-read"
+          }
+        },
+        "yandex_storage_object": {
+          "frontend_<sanitized-file>": {
+            "bucket": "yandex_storage_bucket.frontend.id",
+            "key": "<relative-path>",
+            "source": "<abs-path-in-artifacts>"
+          }
+        }
+      }
+    },
+    "infra/openapi.ycsf.tf.json": {
+      "description": "yandex_api_gateway.openapi: spec=file(\"${path.module}/generated/openapi-openapi.yaml\"); companion «infra/generated/openapi-openapi.yaml» пишется materializer-ом (BIG-1c: cwd=infra)",
+      "resource": {
+        "yandex_api_gateway": {
+          "openapi": {
+            "spec": "file(\"${path.module}/generated/openapi-openapi.yaml\")"
+          }
+        }
+      }
+    },
+    "infra/99-ycsf-outputs.tf.json": {
+      "description": "user + auto outputs (spec 016; OUT_DUPLICATE_NAME-fail-fast при коллизии). Auto-outputs materializer'ов: <app>_function_id/_container_id/_bucket_id/_gateway_id. Ключи сортируются (serializeJson).",
+      "output": {
+        "analytics_container_id": { "value": "${yandex_serverless_container.analytics.id}" },
+        "frontend_bucket_id": { "value": "${yandex_storage_bucket.frontend.id}" },
+        "gateway_id": { "value": "${yandex_api_gateway.openapi.id}", "description": "API Gateway id (front entry)" },
+        "openapi_gateway_id": { "value": "${yandex_api_gateway.openapi.id}" },
+        "user_service_function_id": { "value": "${yandex_function.user_service.id}" },
+        "user_service_id": { "value": "${yandex_function.user_service.id}", "description": "Yandex Function id (user service)" }
+      }
+    }
+  },
+  "resourceSet": {
+    "sc2": "Ровно 4 managed-приложения; ноль external-сущностей resources.yaml (Constitution VI, FR-007). Точечные addresses (FR-017): yandex_function.user_service | yandex_serverless_container.analytics | yandex_storage_bucket.frontend (+ yandex_storage_object.frontend_*) | yandex_api_gateway.openapi.",
+    "asserted": ["yandex_function.user_service", "yandex_serverless_container.analytics", "yandex_storage_bucket.frontend", "yandex_api_gateway.openapi"],
+    "referenceChain": "gateway↔apps: ${resources.functions.user_service.id} → ${yandex_function.user_service.id}; ${resources.containers.analytics.id} → ${yandex_serverless_container.analytics.id} (materializer replaceResourceRefs по D-4, refs направлены на app_id — FR-007/FR-010 amendment)"
+  },
+  "canonicalConfigs": {
+    "appsYaml": "MAP-form; builder=artifact-type (ycforge:*); openapi.depends_on=[analytics, frontend, user_service]; .ycsf/resources.yaml ОТСУТСТВУЕТ (FR-007/FR-010)",
+    "buildersYaml": "builders keyed ycforge:* → @ycforge/builders-core/{nestjs-function,docker,vite}, @ycforge/composer/builder; materializers keyed semantic yandex-* (Иначе BRG_KEY_COLLISION; keys в selection не участвуют — select.ts по supports/artifact.type)",
+    "extensionsYaml": "только IDL functions.*/gateways.* (IDL_DOMAIN_BY_TF_TYPE); формы rules [{target, patch}], deep-merge (spec 015)",
+    "outputsYaml": "user outputs: user_service_id (functions.user_service), gateway_id (gateways.openapi); имена НЕ пересекаются с auto <app>_*_id (OUT_DUPLICATE_NAME)"
+  },
+  "boundaryPlanNoCreds": {
+    "specRef": "FR-019, D-5: check/build/materialize/init/validate — всегда; plan либо успешен, либо стоп ровно на provider-границе",
+    "provider": { "source": "yandex-cloud/yandex", "version": "~> 0.145.0" },
+    "terraformVersion": ">= 1.5 (эмпирика: v1.15.8 darwin/arm64)",
+    "expectedFailText": "one of 'token' or 'service_account_key_file' should be specified; if you are inside compute instance, you can also use service account key from metadata",
+    "exitCode": "nonzero (тест фиксирует факт ≠ 0, не точное значение)",
+    "noNetworkToYandex": "true",
+    "onlyNetworkActivity": "terraform init → registry.terraform.io (provider plugin download)",
+    "wording": "«ycsf check/build/materialize и terraform validate работают локально и оффлайн; terraform init обращается только к registry.terraform.io; terraform plan без credentials гарантированно завершает fail с диагностикой конфигурации провайдера до какого-либо вызова Yandex Cloud. Docker-registry (push) не выполняется вовсе (no_push; digest — локальный).»"
+  },
+  "dockerBoundary": {
+    "noPush": "true",
+    "noPushDigestSource": "docker image inspect --format '{{.Id}}' (builders-core/src/docker/cli.ts:77)",
+    "noDaemonBehavior": "fail-fast на стадии build: CLI_BUILD_FAILED + builder BLC_* connect-to-daemon; НЕ «тихий» пропуск (FR-013, A-4); hermetic golden — через fake-docker (research T006)"
+  },
+  "determinism": {
+    "req": "byte-for-byte infra/*.tf.json (FR-020), structural-stable plan (D-8)",
+    "mechanisms": ["serializeJson lexicographic keys", "user_hash=sha256(archive)", "sanitizeFilename stable", "docker {{.Id}} deterministic on same src", "content-addressed cache (spec 022)"],
+    "volatileFields": "provider-specific plan-time fields документируются в README (D-8); golden не включает volatile-поля"
+  },
+  "secretBoundary": {
+    "repoSecrets": "none — .env*, keys, tokens forbidden; .env.example документирует ОПЦИОНАЛЬНЫЕ YC_TOKEN/SERVICE_ACCOUNT_KEY_FILE (не секреты)",
+    "frontendBuildEnv": "public-only VITE_* literals; suspicious keys SECRET|TOKEN|PASSWORD → ycsf check category (BIG-6/025) + secret-scan test (FR-023)"
+  }
+}

@@ -1,0 +1,5 @@
+version: 1
+rules:
+  - op: replace
+    target:
+      kind: info

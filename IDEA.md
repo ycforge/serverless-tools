@@ -55,7 +55,7 @@ NestJS queue handler
 A должен:
 
 * запускать/reuse NestJS application в Cloud Function;
-* адаптировать HTTP invocation из API Gateway payload 2.0 к NestJS;
+* адаптировать HTTP invocation из API Gateway payload (v2.0 для ALB/payload-format-2.0, v1 `cloud_functions` event для API Gateway — обе ветки нормализуются через единый canonical v2-поток, спека 036) к NestJS;
 * адаптировать Message Queue invocation;
 * поддерживать queue handlers;
 * поддерживать `@QueueHandler()` и `@QueueMessage()`;
@@ -257,7 +257,7 @@ C учитывает `depends_on` при планировании build graph.
 Каждый app имеет собственный:
 
 ```text
-<app>/build_config.yaml
+<source_path>/build_config.yaml
 ```
 
 C автоматически загружает его.
@@ -495,6 +495,8 @@ export async function buildYcsfOpenApi(): Promise<OpenAPIObject> {
 ```
 
 B вызывает эту функцию, получает готовый `OpenAPIObject`. B не лезет в reflection самостоятельно — он читает обычный OpenAPI spec, где `security` уже проставлен стандартным `SwaggerModule`.
+
+> **Исполнение — в изолированном runner-процессе** (уточнено spec 006, clarify 2026-09-04): B порождает отдельный runner-процесс, который загружает entry point и вызывает `buildYcsfOpenApi`; основной процесс composer не импортирует и не исполняет user-код (Constitution I). Таймаут/падение runner — fail-fast ошибка извлечения.
 
 Рекомендация: в `buildYcsfOpenApi` не вызывать `app.init()`/`app.listen()` и по возможности использовать metadata-only генерацию (`SwaggerModule.createDocument` без полной инициализации провайдеров), чтобы избежать подключений к БД даже при импорте `AppModule` целиком. Холодный старт и размер бандла NestJS-функции — ответственность builder-а `nestjs-function` (bundling через esbuild/webpack, tree-shaking), а не пользователя (см. раздел 21).
 
@@ -1909,7 +1911,7 @@ createYcsfLocalServer({
 });
 ```
 
-Сервер поднимает HTTP-сервер, транслирует входящие запросы в API Gateway v2 payload, вызывает handler из Project A, возвращает ответ. Прокидывает `trace-id` / IAM-токен в `@YandexContext()`.
+Сервер поднимает HTTP-сервер, транслирует входящие запросы в API Gateway v2 payload, вызывает handler из Project A, возвращает ответ. Идентификатор трассировки прокидывается сквозь запрос (envelope/заголовок ответа/per-request лог видят один `trace_id`); IAM-токен синтезируется в raw runtime context (`token`-ключ). Контракт raw-context проверяется на уровне unit (`buildRawContext`): через HTTP-диспатч Nest router connector параметры `@YandexContext()` не заполняет — известная граница Project A (spec 023, A-13).
 
 ---
 
@@ -2150,7 +2152,7 @@ Terraform остаётся источником истины для infrastructu
 
 16. **Все builders получают `projectRoot` и сами работают со своим project scope.**
 
-17. **App-specific configuration находится рядом с app в `build_config.yaml`.**
+17. **App-specific configuration находится в `source_path` app-а в `build_config.yaml`.**
 
 18. **`{{$ENV}}` — единый serverless-tools build-time ENV interpolation syntax.**
 

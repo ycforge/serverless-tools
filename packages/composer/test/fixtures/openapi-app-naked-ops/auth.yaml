@@ -1,0 +1,7 @@
+version: 1
+defaultScheme: user
+schemes:
+  public:
+    type: none
+  user:
+    type: none

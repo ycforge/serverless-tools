@@ -1,0 +1,14 @@
+version: 1
+rules:
+  - op: remove
+    target:
+      kind: operation
+      method: get
+      path: /legacy
+  - op: replace
+    target:
+      kind: operation
+      method: get
+      path: /users
+    value:
+      summary: user list

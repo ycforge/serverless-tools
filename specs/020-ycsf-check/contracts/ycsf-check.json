@@ -1,0 +1,181 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/ycsf-check.json",
+  "title": "@ycforge/pilot — ycsf check validation layer contract (spec 020)",
+  "description": "Machine-readable contract for the ycsf check surface (spec 020): YCK_* error code catalog, exit codes, CheckResult/CheckOptions/YckDiagnostic schemas. Codes are compared via constants in src/check/errors.ts, never string literals (Constitution V). Codes are additive and non-breaking.",
+  "type": "object",
+  "definitions": {
+    "checkOptions": {
+      "$id": "#/definitions/checkOptions",
+      "title": "CheckOptions",
+      "type": "object",
+      "description": "Options for ycsf check invocation (FR-006, D-6).",
+      "properties": {
+        "validateTf": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable terraform validate final step (C13). Requires terraform init as prerequisite (user responsibility). Default: false."
+        },
+        "generatedDir": {
+          "type": "string",
+          "description": "Override path to generated .ycsf.tf.json files (default: <rootDir>/.ycsf/)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "checkResult": {
+      "$id": "#/definitions/checkResult",
+      "title": "CheckResult",
+      "type": "object",
+      "description": "Unified result of all check categories (FR-004). diagnostics is a collect-all array — empty means all checks passed (exit code 0).",
+      "properties": {
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/diagnostic" },
+          "description": "All diagnostics from all categories — collect-all, never abort-on-first (D-4). Empty array = clean (exit code 0)."
+        }
+      },
+      "required": ["diagnostics"],
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "$id": "#/definitions/diagnostic",
+      "title": "Diagnostic (union of all families)",
+      "type": "object",
+      "description": "One validation problem from any check category. Discriminated by 'code' prefix: PML_* (project model), EXT_* (extensions), OUT_* (outputs), MOV_* (moves), YCK_* (check-specific).",
+      "properties": {
+        "code": { "type": "string", "description": "Diagnostic code — PML_*, EXT_*, OUT_*, MOV_*, or YCK_*." },
+        "message": { "type": "string", "description": "Human-readable description of the problem." }
+      },
+      "required": ["code", "message"]
+    },
+    "yckDiagnostic": {
+      "$id": "#/definitions/yckDiagnostic",
+      "title": "YckDiagnostic (check-specific)",
+      "type": "object",
+      "description": "Check-specific diagnostic shape (YCK_* family). Extends the base Diagnostic with fields specific to check categories C1, C4, C7, C13.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "YCK_MISSING_TARGET",
+            "YCK_ENV_IN_PATCH",
+            "YCK_REF_UNRESOLVED",
+            "YCK_TERRAFORM_INVALID",
+            "YCK_TERRAFORM_UNAVAILABLE"
+          ],
+          "description": "YCK_* diagnostic code (see errorCodes)."
+        },
+        "message": { "type": "string" },
+        "target": {
+          "type": "string",
+          "description": "IDL target string (e.g. 'functions.user_service') that failed validation (C1, C7)."
+        },
+        "resourceRef": {
+          "type": "string",
+          "description": "IDL resource reference string (e.g. 'functions.external_svc') from resources.yaml (C4)."
+        },
+        "field": {
+          "type": "string",
+          "description": "Field path within extension patch where the issue was found (C7)."
+        },
+        "file": {
+          "type": "string",
+          "description": "File path where the referenced contract lives (C4)."
+        },
+        "availableIdls": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Available IDLs in the generated model when target was missing (C1). Sorted alphabetically."
+        }
+      },
+      "required": ["code", "message"]
+    }
+  },
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "YCK_* error code catalog",
+    "type": "object",
+    "description": "Check-specific diagnostics of @ycforge/pilot ycsf check (spec 020 Key Entities). Compared via constants in src/check/errors.ts, never string literals (Constitution V). Codes are additive and non-breaking.",
+    "properties": {
+      "YCK_MISSING_TARGET": {
+        "const": "YCK_MISSING_TARGET",
+        "description": "Extension target IDL does not exist in the generated model (C1, FR-008). Contains 'target' and 'availableIdls' fields."
+      },
+      "YCK_ENV_IN_PATCH": {
+        "const": "YCK_ENV_IN_PATCH",
+        "description": "Extension patch contains {{$ENV}} reference (C7, FR-011). Extensions use Terraform expressions, not build env. Contains 'target' and 'field' (recursive path)."
+      },
+      "YCK_REF_UNRESOLVED": {
+        "const": "YCK_REF_UNRESOLVED",
+        "description": "Resource reference from resources.yaml has no matching generated Terraform resource (C4, FR-014). Contains 'resourceRef' and 'file'."
+      },
+      "YCK_TERRAFORM_INVALID": {
+        "const": "YCK_TERRAFORM_INVALID",
+        "description": "terraform validate reported errors (C13, FR-017). Contains 'message' with terraform error output."
+      },
+      "YCK_TERRAFORM_UNAVAILABLE": {
+        "const": "YCK_TERRAFORM_UNAVAILABLE",
+        "description": "terraform binary not found in PATH (C13, FR-019). Base checks continue normally."
+      }
+    },
+    "required": [
+      "YCK_MISSING_TARGET",
+      "YCK_ENV_IN_PATCH",
+      "YCK_REF_UNRESOLVED",
+      "YCK_TERRAFORM_INVALID",
+      "YCK_TERRAFORM_UNAVAILABLE"
+    ],
+    "additionalProperties": false
+  },
+  "exitCodes": {
+    "$id": "#/exitCodes",
+    "title": "Exit code semantics (D-3)",
+    "type": "object",
+    "description": "Binary pass/fail exit codes for ycsf check CLI.",
+    "properties": {
+      "0": {
+        "type": "number",
+        "const": 0,
+        "description": "Clean — CheckResult.diagnostics is empty. All checks passed."
+      },
+      "1": {
+        "type": "number",
+        "const": 1,
+        "description": "Error — CheckResult.diagnostics is non-empty. At least one check failed."
+      }
+    }
+  },
+  "cliSurface": {
+    "$id": "#/cliSurface",
+    "title": "CLI surface (D-6)",
+    "type": "object",
+    "description": "ycsf check command signature.",
+    "properties": {
+      "command": {
+        "type": "string",
+        "const": "ycsf check"
+      },
+      "args": {
+        "type": "object",
+        "properties": {
+          "rootDir": {
+            "type": "string",
+            "default": ".",
+            "description": "Optional root directory (default: cwd)."
+          }
+        }
+      },
+      "flags": {
+        "type": "object",
+        "properties": {
+          "validateTf": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable terraform validate final step. Requires terraform init."
+          }
+        }
+      }
+    }
+  }
+}

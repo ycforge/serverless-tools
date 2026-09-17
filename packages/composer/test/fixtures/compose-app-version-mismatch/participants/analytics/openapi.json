@@ -1,0 +1,12 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "analytics", "version": "1.0.0" },
+  "paths": {
+    "/analytics/{id}": {
+      "get": {
+        "operationId": "getAnalytics",
+        "responses": { "200": { "description": "ok" } }
+      }
+    }
+  }
+}

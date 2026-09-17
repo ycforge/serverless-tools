@@ -1,0 +1,66 @@
+import { isAbsolute, join } from 'node:path';
+import type { FunctionArtifactValue, MaterializationContext, Materializer, TerraformResource } from '../types.js';
+import { YMT_INVALID_ARTIFACT_VALUE, materializerError } from '../diagnostics.js';
+import { isTfAddress, toYcResourceName } from '../helpers/filename.js';
+import { sha256Hex } from './hash.js';
+
+const materializer: Materializer = {
+  supports(artifact, _context: MaterializationContext): boolean {
+    return artifact.type === 'ycforge:function';
+  },
+  async materialize(artifact, context) {
+    if (artifact.value === undefined) {
+      throw materializerError(
+        YMT_INVALID_ARTIFACT_VALUE,
+        `built artifact value is missing for app '${artifact.name ?? 'unknown'}' — run \`ycsf build\` first or pass \`--artifacts <dir>\``,
+      );
+    }
+    const value = artifact.value as FunctionArtifactValue;
+    const { archivePath, entryPoint } = value;
+
+    if (!archivePath || !entryPoint) {
+      throw materializerError(YMT_INVALID_ARTIFACT_VALUE, 'artifact value missing required field: archivePath or entryPoint');
+    }
+
+    if (isAbsolute(archivePath)) {
+      throw materializerError(YMT_INVALID_ARTIFACT_VALUE, 'archivePath must be relative, not absolute');
+    }
+
+    if (typeof artifact.name !== 'string' || !isTfAddress(artifact.name)) {
+      throw materializerError(YMT_INVALID_ARTIFACT_VALUE, 'artifact value missing required field: name (stable app identity)');
+    }
+    const name = artifact.name;
+
+    // archivePath is relative to the terraform module dir `infra/` — resolve
+    // the hash from the same base terraform uses (projectRoot handed down by
+    // the pipeline, spec 028), not from the CLI process cwd.
+    const hashBase = context.projectRoot !== undefined ? join(context.projectRoot, 'infra') : process.cwd();
+    const userHash = await sha256Hex(archivePath, hashBase);
+
+    const resource: TerraformResource = {
+      kind: 'resource',
+      type: 'yandex_function',
+      name,
+      configuration: {
+        // Configuration field order mirrors the terraform provider schema.
+        // `memory` is a provider-default constant — deterministic, no env input.
+        runtime: 'nodejs22',
+        name: toYcResourceName(name),
+        memory: 128,
+        entrypoint: entryPoint,
+        user_hash: userHash,
+        content: {
+          zip_filename: archivePath,
+        },
+      },
+    };
+
+    context.output.declare(`${name}_function_id`, {
+      value: `yandex_function.${name}.id`,
+    });
+
+    return resource;
+  },
+};
+
+export default materializer;

@@ -6,6 +6,15 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+# Source-level unit/integration tests live in test/build/ (spec 021) — not build output
+!packages/pilot/test/build/
+# packages/pilot/src/build/ is the buildApps orchestrator source (spec 021) — not build output
+!packages/pilot/src/build/
+# Fixture dist outputs must stay tracked (convention-entry integration tests)
+!packages/composer/test/fixtures/app-convention/dist/
+!packages/composer/test/fixtures/app-convention/dist/*
+!packages/composer/test/fixtures/app-convention-broken/dist/
+!packages/composer/test/fixtures/app-convention-broken/dist/*
 
 # Test/coverage
 coverage/
@@ -33,6 +42,8 @@ Thumbs.db
 
 # serverless-tools build artifacts (локальные, регенерируются)
 .ycsf/artifacts/
+**/.ycsf/artifacts/
+.ycsf/cache/
 
 # Terraform (user projects / e2e sandboxes)
 **/.terraform/

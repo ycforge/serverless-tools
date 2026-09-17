@@ -1,0 +1,155 @@
+{
+  "timestamp": "2026-08-21T21:44:47.512Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "DATA-ANALYSE.md"
+  },
+  "event": {
+    "version": "2.0",
+    "rawPath": "/probe/ping",
+    "rawQueryString": "",
+    "headers": {
+      "Accept": "*/*",
+      "Host": "conformance.gateway.apigw.yandexcloud.net",
+      "Traceparent": "00-0000000000000000e0d67d210a8c517b-d6239ddc15f74958-01",
+      "Tracestate": "",
+      "Uber-Trace-Id": "e0d67d210a8c517b:d6239ddc15f74958:b9e0e75f1e4e9bba:1",
+      "User-Agent": "conformance-fixture/1.0",
+      "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+      "X-Envoy-External-Address": "203.0.113.10",
+      "X-Envoy-Original-Path": "/probe/ping",
+      "X-Forwarded-For": "203.0.113.10",
+      "X-Forwarded-Proto": "https",
+      "X-Real-Remote-Address": "203.0.113.10:50006",
+      "X-Request-Id": "6b0d3556-e0bb-4067-a9fc-137dda39f5ae",
+      "X-Serverless-Certificate-Ids": "{}",
+      "X-Serverless-Gateway-Id": "gwconf00000000000001",
+      "X-Trace-Id": "edb96f8c-f86f-4149-ab7e-8c30b7bafb67",
+      "Authorization": "Bearer REDACTED_AUTHORIZATION",
+      "Cookie": "test_cookie=cookie-value; session=REDACTED_SESSION; theme=dark",
+      "X-Number": "42",
+      "X-Test": "one",
+      "X-Test-Two": "two",
+      "X-Test-Header": "header-value"
+    },
+    "queryStringParameters": {},
+    "requestContext": {
+      "authorizer": {},
+      "http": {
+        "method": "GET",
+        "path": "/probe/ping?",
+        "sourceIp": "203.0.113.10",
+        "userAgent": "conformance-fixture/1.0"
+      },
+      "requestId": "6b0d3556-e0bb-4067-a9fc-137dda39f5ae",
+      "time": "21/Aug/2026:21:44:47 +0000",
+      "timeEpoch": 1787348687,
+      "apiGateway": {
+        "operationContext": {
+          "probe": {
+            "source": "curl",
+            "test": true,
+            "version": "1.0"
+          }
+        }
+      }
+    },
+    "body": "",
+    "isBase64Encoded": true,
+    "pathParameters": {
+      "ID": "probe/ping"
+    },
+    "parameters": {
+      "ID": "probe/ping",
+      "X-Test-Header": "header-value",
+      "test_cookie": "cookie-value"
+    },
+    "multiValueParameters": {
+      "ID": ["probe/ping"],
+      "X-Test-Header": ["header-value"],
+      "test_cookie": ["cookie-value"]
+    },
+    "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+  },
+  "context": {
+    "awsRequestId": "6b0d3556-e0bb-4067-a9fc-137dda39f5ae",
+    "requestId": "6b0d3556-e0bb-4067-a9fc-137dda39f5ae",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verhttp000000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1787348692412,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "e0d67d210a8c517b:85947f51cdd9326d:abb9e4e1f57e0e9b:1",
+    "_data": {
+      "version": "2.0",
+      "rawPath": "/probe/ping",
+      "rawQueryString": "",
+      "headers": {
+        "Accept": "*/*",
+        "Host": "conformance.gateway.apigw.yandexcloud.net",
+        "Traceparent": "00-0000000000000000e0d67d210a8c517b-d6239ddc15f74958-01",
+        "Tracestate": "",
+        "Uber-Trace-Id": "e0d67d210a8c517b:d6239ddc15f74958:b9e0e75f1e4e9bba:1",
+        "User-Agent": "conformance-fixture/1.0",
+        "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+        "X-Envoy-External-Address": "203.0.113.10",
+        "X-Envoy-Original-Path": "/probe/ping",
+        "X-Forwarded-For": "203.0.113.10",
+        "X-Forwarded-Proto": "https",
+        "X-Real-Remote-Address": "203.0.113.10:50006",
+        "X-Request-Id": "6b0d3556-e0bb-4067-a9fc-137dda39f5ae",
+        "X-Serverless-Certificate-Ids": "{}",
+        "X-Serverless-Gateway-Id": "gwconf00000000000001",
+        "X-Trace-Id": "edb96f8c-f86f-4149-ab7e-8c30b7bafb67",
+        "Authorization": "Bearer REDACTED_AUTHORIZATION",
+        "Cookie": "test_cookie=cookie-value; session=REDACTED_SESSION; theme=dark",
+        "X-Number": "42",
+        "X-Test": "one",
+        "X-Test-Two": "two",
+        "X-Test-Header": "header-value"
+      },
+      "queryStringParameters": {},
+      "requestContext": {
+        "authorizer": {},
+        "http": {
+          "method": "GET",
+          "path": "/probe/ping?",
+          "sourceIp": "203.0.113.10",
+          "userAgent": "conformance-fixture/1.0"
+        },
+        "requestId": "6b0d3556-e0bb-4067-a9fc-137dda39f5ae",
+        "time": "21/Aug/2026:21:44:47 +0000",
+        "timeEpoch": 1787348687,
+        "apiGateway": {
+          "operationContext": {
+            "probe": {
+              "source": "curl",
+              "test": true,
+              "version": "1.0"
+            }
+          }
+        }
+      },
+      "body": "",
+      "isBase64Encoded": true,
+      "pathParameters": {
+        "ID": "probe/ping"
+      },
+      "parameters": {
+        "ID": "probe/ping",
+        "X-Test-Header": "header-value",
+        "test_cookie": "cookie-value"
+      },
+      "multiValueParameters": {
+        "ID": ["probe/ping"],
+        "X-Test-Header": ["header-value"],
+        "test_cookie": ["cookie-value"]
+      },
+      "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+    }
+  }
+}

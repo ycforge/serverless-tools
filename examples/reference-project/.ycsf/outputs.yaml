@@ -1,0 +1,8 @@
+version: 1
+outputs:
+  user_service_id:
+    value: functions.user_service.id
+    description: "Yandex Function id (user service)"
+  gateway_id:
+    value: gateways.openapi.id
+    description: "API Gateway id (front entry)"

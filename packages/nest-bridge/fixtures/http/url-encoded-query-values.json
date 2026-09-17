@@ -1,0 +1,153 @@
+{
+  "timestamp": "2026-08-21T21:44:41.100Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "DATA-ANALYSE.md"
+  },
+  "event": {
+    "version": "2.0",
+    "rawPath": "/probe/query",
+    "rawQueryString": "text=%D1%82%D0%B5%D1%81%D1%82&emoji=%F0%9F%98%80&phrase=hello%20world&punct=%2F%3F%26%3D%25%23%2B",
+    "headers": {
+      "Accept": "*/*",
+      "Host": "conformance.gateway.apigw.yandexcloud.net",
+      "Traceparent": "00-00000000000000005487a63150674aa7-601fdeee331cc6f3-01",
+      "Tracestate": "",
+      "Uber-Trace-Id": "5487a63150674aa7:601fdeee331cc6f3:9c6de963c233aec9:1",
+      "User-Agent": "conformance-fixture/1.0",
+      "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+      "X-Envoy-External-Address": "203.0.113.10",
+      "X-Envoy-Original-Path": "/probe/query?text=%D1%82%D0%B5%D1%81%D1%82&emoji=%F0%9F%98%80&phrase=hello%20world&punct=%2F%3F%26%3D%25%23%2B",
+      "X-Forwarded-For": "203.0.113.10",
+      "X-Forwarded-Proto": "https",
+      "X-Real-Remote-Address": "203.0.113.10:50004",
+      "X-Request-Id": "1336a74a-b9a3-429b-a2e8-e116c3072a21",
+      "X-Serverless-Certificate-Ids": "{}",
+      "X-Serverless-Gateway-Id": "gwconf00000000000001",
+      "X-Trace-Id": "4a6c1e46-e591-4afe-a0b1-3ba75d7d2b84"
+    },
+    "queryStringParameters": {
+      "text": "тест",
+      "emoji": "😀",
+      "phrase": "hello world",
+      "punct": "/?&=%#+"
+    },
+    "requestContext": {
+      "authorizer": {},
+      "http": {
+        "method": "GET",
+        "path": "/probe/query?emoji=%f0%9f%98%80&phrase=hello+world&punct=%2f%3f%26%3d%25%23%2b&text=%d1%82%d0%b5%d1%81%d1%82",
+        "sourceIp": "203.0.113.10",
+        "userAgent": "conformance-fixture/1.0"
+      },
+      "requestId": "1336a74a-b9a3-429b-a2e8-e116c3072a21",
+      "time": "21/Aug/2026:21:44:41 +0000",
+      "timeEpoch": 1787348681,
+      "apiGateway": {
+        "operationContext": {
+          "probe": {
+            "source": "curl",
+            "test": true,
+            "version": "1.0"
+          }
+        }
+      }
+    },
+    "body": "",
+    "isBase64Encoded": true,
+    "pathParameters": {
+      "ID": "probe/query"
+    },
+    "parameters": {
+      "ID": "probe/query",
+      "text": "тест",
+      "punct": "/?&=%#+"
+    },
+    "multiValueParameters": {
+      "ID": ["probe/query"],
+      "text": ["тест"],
+      "punct": ["/?&=%#+"]
+    },
+    "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+  },
+  "context": {
+    "awsRequestId": "1336a74a-b9a3-429b-a2e8-e116c3072a21",
+    "requestId": "1336a74a-b9a3-429b-a2e8-e116c3072a21",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verhttp000000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1787348686000,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "5487a63150674aa7:3f6cc133eeedf106:9cea332c369ed6c9:1",
+    "_data": {
+      "version": "2.0",
+      "rawPath": "/probe/query",
+      "rawQueryString": "text=%D1%82%D0%B5%D1%81%D1%82&emoji=%F0%9F%98%80&phrase=hello%20world&punct=%2F%3F%26%3D%25%23%2B",
+      "headers": {
+        "Accept": "*/*",
+        "Host": "conformance.gateway.apigw.yandexcloud.net",
+        "Traceparent": "00-00000000000000005487a63150674aa7-601fdeee331cc6f3-01",
+        "Tracestate": "",
+        "Uber-Trace-Id": "5487a63150674aa7:601fdeee331cc6f3:9c6de963c233aec9:1",
+        "User-Agent": "conformance-fixture/1.0",
+        "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+        "X-Envoy-External-Address": "203.0.113.10",
+        "X-Envoy-Original-Path": "/probe/query?text=%D1%82%D0%B5%D1%81%D1%82&emoji=%F0%9F%98%80&phrase=hello%20world&punct=%2F%3F%26%3D%25%23%2B",
+        "X-Forwarded-For": "203.0.113.10",
+        "X-Forwarded-Proto": "https",
+        "X-Real-Remote-Address": "203.0.113.10:50004",
+        "X-Request-Id": "1336a74a-b9a3-429b-a2e8-e116c3072a21",
+        "X-Serverless-Certificate-Ids": "{}",
+        "X-Serverless-Gateway-Id": "gwconf00000000000001",
+        "X-Trace-Id": "4a6c1e46-e591-4afe-a0b1-3ba75d7d2b84"
+      },
+      "queryStringParameters": {
+        "text": "тест",
+        "emoji": "😀",
+        "phrase": "hello world",
+        "punct": "/?&=%#+"
+      },
+      "requestContext": {
+        "authorizer": {},
+        "http": {
+          "method": "GET",
+          "path": "/probe/query?emoji=%f0%9f%98%80&phrase=hello+world&punct=%2f%3f%26%3d%25%23%2b&text=%d1%82%d0%b5%d1%81%d1%82",
+          "sourceIp": "203.0.113.10",
+          "userAgent": "conformance-fixture/1.0"
+        },
+        "requestId": "1336a74a-b9a3-429b-a2e8-e116c3072a21",
+        "time": "21/Aug/2026:21:44:41 +0000",
+        "timeEpoch": 1787348681,
+        "apiGateway": {
+          "operationContext": {
+            "probe": {
+              "source": "curl",
+              "test": true,
+              "version": "1.0"
+            }
+          }
+        }
+      },
+      "body": "",
+      "isBase64Encoded": true,
+      "pathParameters": {
+        "ID": "probe/query"
+      },
+      "parameters": {
+        "ID": "probe/query",
+        "text": "тест",
+        "punct": "/?&=%#+"
+      },
+      "multiValueParameters": {
+        "ID": ["probe/query"],
+        "text": ["тест"],
+        "punct": ["/?&=%#+"]
+      },
+      "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+    }
+  }
+}

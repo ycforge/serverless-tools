@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/ycsf-api-check-output.json",
+  "title": "ycsf-api check --json Output",
+  "type": "object",
+  "properties": {
+    "projectDir": {
+      "type": "string",
+      "description": "Project root directory that was checked"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when check was run"
+    },
+    "results": {
+      "type": "array",
+      "description": "Individual check results",
+      "items": {
+        "type": "object",
+        "properties": {
+          "check": {
+            "type": "string",
+            "enum": [
+              "openapi-sources-exist",
+              "auth-schemes-valid",
+              "no-path-operationid-conflicts",
+              "resource-refs-resolvable",
+              "overrides-targets-exist"
+            ],
+            "description": "Name of the check"
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Whether this check passed"
+          },
+          "details": {
+            "type": "string",
+            "description": "Human-readable details (on failure)"
+          },
+          "errors": {
+            "type": "array",
+            "description": "Structured error details (on failure)",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "Machine-readable error code"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Human-readable error message"
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Source file path"
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Line number in source file"
+                },
+                "column": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Column number in source file"
+                },
+                "apps": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Affected app IDs"
+                },
+                "routes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "path": { "type": "string" },
+                      "method": { "type": "string" },
+                      "operationId": { "type": "string" }
+                    },
+                    "required": ["path", "method"]
+                  },
+                  "description": "Affected routes"
+                }
+              },
+              "required": ["code", "message"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["check", "passed"],
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["passed", "failed", "total"],
+      "additionalProperties": false
+    },
+    "exitCode": {
+      "type": "integer",
+      "enum": [0, 1, 2],
+      "description": "Process exit code: 0=all pass, 1=validation failures, 2=input/config error"
+    }
+  },
+  "required": ["projectDir", "timestamp", "results", "summary", "exitCode"],
+  "additionalProperties": false
+}

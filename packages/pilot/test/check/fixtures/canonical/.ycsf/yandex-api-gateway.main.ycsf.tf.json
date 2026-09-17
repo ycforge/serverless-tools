@@ -1,0 +1,10 @@
+{
+  "resource": {
+    "yandex_api_gateway": {
+      "main": {
+        "name": "main-gw",
+        "spec": {}
+      }
+    }
+  }
+}

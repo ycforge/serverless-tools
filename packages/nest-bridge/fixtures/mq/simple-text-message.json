@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-08-21T21:44:41.440Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "DATA-ANALYSE.md"
+  },
+  "event": {
+    "messages": [
+      {
+        "event_metadata": {
+          "event_id": "8f1e5125-e5328028-7cd97e9f-ff7e02f7",
+          "event_type": "yandex.cloud.events.messagequeue.QueueMessage",
+          "created_at": "2026-08-21T21:44:41.100Z",
+          "tracing_context": null,
+          "cloud_id": "a1b2c3d4000000000000",
+          "folder_id": "e5f6a7b8000000000000"
+        },
+        "details": {
+          "queue_id": "yrn:yc:ymq:ru-central1:e5f6a7b8000000000000:f-test",
+          "message": {
+            "message_id": "8f1e5125-e5328028-7cd97e9f-ff7e02f7",
+            "md5_of_body": "4aec5f8d749e2b58e083f11957a9570c",
+            "body": "Hello from Yandex Message Queue!",
+            "attributes": {
+              "ApproximateFirstReceiveTimestamp": "1787348681400",
+              "ApproximateReceiveCount": "1",
+              "SenderId": "ymqsender000000001@as",
+              "SentTimestamp": "1787348681100"
+            },
+            "message_attributes": {},
+            "md5_of_message_attributes": ""
+          }
+        }
+      }
+    ]
+  },
+  "context": {
+    "awsRequestId": "914105ad-0884-4b91-a6e3-7cbc7f3c6257",
+    "requestId": "914105ad-0884-4b91-a6e3-7cbc7f3c6257",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verqueue0000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1787348687000,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "4aa3a497aaef7c05:89d1eec893e3a12b:effe7cae78ec5a89:1",
+    "_data": {
+      "messages": [
+        {
+          "event_metadata": {
+            "event_id": "8f1e5125-e5328028-7cd97e9f-ff7e02f7",
+            "event_type": "yandex.cloud.events.messagequeue.QueueMessage",
+            "created_at": "2026-08-21T21:44:41.100Z",
+            "tracing_context": null,
+            "cloud_id": "a1b2c3d4000000000000",
+            "folder_id": "e5f6a7b8000000000000"
+          },
+          "details": {
+            "queue_id": "yrn:yc:ymq:ru-central1:e5f6a7b8000000000000:f-test",
+            "message": {
+              "message_id": "8f1e5125-e5328028-7cd97e9f-ff7e02f7",
+              "md5_of_body": "4aec5f8d749e2b58e083f11957a9570c",
+              "body": "Hello from Yandex Message Queue!",
+              "attributes": {
+                "ApproximateFirstReceiveTimestamp": "1787348681400",
+                "ApproximateReceiveCount": "1",
+                "SenderId": "ymqsender000000001@as",
+                "SentTimestamp": "1787348681100"
+              },
+              "message_attributes": {},
+              "md5_of_message_attributes": ""
+            }
+          }
+        }
+      ]
+    }
+  }
+}

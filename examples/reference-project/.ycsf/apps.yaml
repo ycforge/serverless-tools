@@ -1,0 +1,18 @@
+version: 1
+apps:
+  user_service:
+    source_path: apps/user_service
+    builder: ycforge:function
+    depends_on: []
+  analytics:
+    source_path: apps/analytics
+    builder: ycforge:docker-image
+    depends_on: []
+  frontend:
+    source_path: apps/frontend
+    builder: ycforge:frontend
+    depends_on: []
+  openapi:
+    source_path: apps/openapi
+    builder: ycforge:api-gateway
+    depends_on: [analytics, frontend, user_service]

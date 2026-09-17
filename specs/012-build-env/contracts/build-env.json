@@ -1,0 +1,130 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/build-env.json",
+  "title": "@ycforge/pilot build-env — resolved build environment runtime API contract",
+  "description": "Machine-readable contract for the Project C build-env runtime-prep layer (spec 012). Documents the input (BuildConfig + snapshot env), the output (resolved buildEnv + interpolated buildConfig), the EnvValue kind grammar, and the PML_ENV_UNRESOLVED runtime diagnostics shape. Additive: adds the PML_ENV_UNRESOLVED code to the shared project-model catalog (contracts/011/project-model.json) — no .ycsf format version change.",
+  "type": "object",
+  "definitions": {
+    "envValue": {
+      "$id": "#/definitions/envValue",
+      "title": "Interretetation of one build_env record entry",
+      "oneOf": [
+        {
+          "title": "null kind — strict requirement from process env",
+          "type": "object",
+          "properties": { "kind": { "const": "null" } },
+          "additionalProperties": false,
+          "required": ["kind"]
+        },
+        {
+          "title": "literal kind — no {{$...}}, passed as-is",
+          "type": "object",
+          "properties": {
+            "kind": { "const": "literal" },
+            "value": { "type": "string" }
+          },
+          "additionalProperties": false,
+          "required": ["kind", "value"]
+        },
+        {
+          "title": "interpolated kind — contains one or more {{$NAME}}",
+          "type": "object",
+          "properties": {
+            "kind": { "const": "interpolated" },
+            "refs": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[A-Z0-9_]+$" },
+              "description": "Deduplicated referenced env names."
+            }
+          },
+          "additionalProperties": false,
+          "required": ["kind", "refs"]
+        }
+      ]
+    },
+    "buildEnvResolutionResult": {
+      "$id": "#/definitions/buildEnvResolutionResult",
+      "title": "Per-app result of build_env resolution + build_config interpolation",
+      "oneOf": [
+        {
+          "title": "success — resolved env + interpolated opaque build_config",
+          "type": "object",
+          "properties": {
+            "kind": { "const": "ok" },
+            "resolvedEnv": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Effective env map; no null, no residual {{$...}} (FR-006)."
+            },
+            "buildConfig": {
+              "description": "Interpolated build_config; opaque to C (FR-011)."
+            }
+          },
+          "additionalProperties": false,
+          "required": ["kind", "resolvedEnv", "buildConfig"]
+        },
+        {
+          "title": "failure — PML_ENV_UNRESOLVED diagnostics, fail-fast",
+          "type": "object",
+          "properties": {
+            "kind": { "const": "invalid" },
+            "errors": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/unresolvedDiagnostic" }
+            }
+          },
+          "additionalProperties": false,
+          "required": ["kind", "errors"]
+        }
+      ]
+    },
+    "unresolvedDiagnostic": {
+      "$id": "#/definitions/unresolvedDiagnostic",
+      "title": "PML_ENV_UNRESOLVED runtime diagnostic",
+      "type": "object",
+      "properties": {
+        "code": { "const": "PML_ENV_UNRESOLVED" },
+        "message": { "type": "string", "description": "Human-readable (EN) naming app, field, variable." },
+        "file": { "type": "string", "description": "App build_config source path, e.g. analytics/build_config.yaml." },
+        "app": { "type": "string", "description": "app_id." },
+        "field": { "type": "string", "description": "build_config | build_env | specific ENV_NAME." },
+        "identity": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["code", "message", "file", "app", "field"],
+      "additionalProperties": false
+    },
+    "preparedBuildEnv": {
+      "$id": "#/definitions/preparedBuildEnv",
+      "title": "Public per-app materialized input for spec 021 → BuildContext (spec 002)",
+      "type": "object",
+      "properties": {
+        "appId": { "type": "string" },
+        "resolvedEnv": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "buildConfig": {
+          "description": "Interpolated, opaque build_config (FR-011)."
+        }
+      },
+      "additionalProperties": false,
+      "required": ["appId", "resolvedEnv", "buildConfig"]
+    }
+  },
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "PML_ENV_UNRESOLVED — additive runtime code",
+    "type": "object",
+    "description": "Runtime fail-fast code added to the shared project-model catalog (contracts/011/project-model.json). Distinct from load-time PML_ENV_NOT_SET so 020/021 can tell load vs runtime-prep failures apart. Additive / semver-compatible (Constitution III).",
+    "properties": {
+      "PML_ENV_UNRESOLVED": {
+        "const": "PML_ENV_UNRESOLVED",
+        "description": "A {{$NAME}} in build_config/build_env could not be resolved to a non-empty process-env value, or a residual {{$NAME}} remains, at runtime-prep (spec 012)."
+      }
+    },
+    "required": ["PML_ENV_UNRESOLVED"],
+    "additionalProperties": false
+  }
+}

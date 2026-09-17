@@ -1,0 +1,8 @@
+version: 1
+defaultScheme: public
+
+schemes:
+  anon:
+    type: none
+  public:
+    type: none

@@ -1,0 +1,11 @@
+export function createDocument() {
+  return {
+    openapi: '3.0.0',
+    info: { title: 'app-safe-entry', version: '1.0.0' },
+    paths: {
+      '/users': {
+        get: { responses: { '200': { description: 'ok' } } },
+      },
+    },
+  };
+}

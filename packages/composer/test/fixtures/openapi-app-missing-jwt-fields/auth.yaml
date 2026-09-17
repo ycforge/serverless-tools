@@ -1,0 +1,7 @@
+version: 1
+defaultScheme: user
+schemes:
+  user:
+    type: jwt
+    jwksUri: https://auth.example.com/jwks.json
+    issuer: https://auth.example.com

@@ -1,0 +1,213 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/materializers-core.json",
+  "title": "@ycforge/materializers-core — materializer catalog, artifact value shapes, YMT_* error code catalog",
+  "description": "Machine-readable contract for the core materializer package (spec 019): the materializer-id → artifact-type catalog (forward contract for dispatch/021), the five Artifact.value shapes (including the two new types ycforge:api-gateway and ycforge:queue fixed here as forward contract), the standalone structural contract replicas, and the catalog of YMT_* materializer diagnostics. Type references here mirror src/types.ts/src/catalog.ts/src/diagnostics.ts of @ycforge/materializers-core (standalone structural types, zero imports from @ycforge/pilot — Constitution I).",
+  "type": "object",
+  "definitions": {
+    "outputBuilder": {
+      "$id": "#/definitions/outputBuilder",
+      "title": "OutputBuilder (spec 002, standalone structural replica)",
+      "type": "object",
+      "description": "Channel for auto-generated outputs (IDEA §26). value is a Terraform expression string WITHOUT the ${...} wrapper; wrapping during .tf.json serialization is Project C's responsibility.",
+      "properties": {
+        "declare": {
+          "type": "string",
+          "description": "declare(name: string, output: { value: string; description?: string }): void"
+        }
+      },
+      "required": ["declare"]
+    },
+    "materializationContext": {
+      "$id": "#/definitions/materializationContext",
+      "title": "MaterializationContext (spec 002, standalone structural replica)",
+      "type": "object",
+      "properties": {
+        "output": { "$ref": "#/definitions/outputBuilder" }
+      },
+      "required": ["output"],
+      "additionalProperties": false
+    },
+    "terraformResource": {
+      "$id": "#/definitions/terraformResource",
+      "title": "TerraformResource (spec 002, standalone structural replica)",
+      "type": "object",
+      "properties": {
+        "kind": { "const": "resource" },
+        "type": { "type": "string", "description": "Provider resource type (e.g. yandex_function) — known to the materializer only.", "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$" },
+        "name": { "type": "string", "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$" },
+        "configuration": { "description": "Provider-specific schema — opaque to C and to the contracts module (Constitution IV)." }
+      },
+      "required": ["kind", "type", "name", "configuration"],
+      "additionalProperties": false
+    },
+    "artifact": {
+      "$id": "#/definitions/artifact",
+      "title": "Artifact (spec 002, standalone structural replica)",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "description": "Follows <package-scope>:<kind> convention, e.g. ycforge:function." },
+        "name": { "type": "string", "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$", "description": "Stable app identity per spec 014; must be a TF address (missing/non-string/non-TF-address → YMT_INVALID_ARTIFACT_VALUE at materialize)." },
+        "value": { "description": "Opaque to C — only the matching materializer interprets it." }
+      },
+      "required": ["type", "name", "value"],
+      "additionalProperties": false
+    },
+    "materializer": {
+      "$id": "#/definitions/materializer",
+      "title": "Materializer (spec 002, standalone structural replica)",
+      "type": "object",
+      "description": "Supports sync + cheap; materialize returns a single TerraformResource OR a readonly array (multi-resource, e.g. bucket + objects — additive contract extension, spec 019 research D-RE-5).",
+      "properties": {
+        "supports": { "type": "string", "description": "supports(artifact, context): boolean — sync, pure, cheap (selection key of dispatch phase 1)." },
+        "materialize": { "type": "string", "description": "materialize(artifact, context): Promise<TerraformResource | readonly TerraformResource[]> — may declare outputs via context.output." }
+      },
+      "required": ["supports", "materialize"],
+      "additionalProperties": false
+    },
+    "functionArtifactValue": {
+      "$id": "#/definitions/functionArtifactValue",
+      "title": "Artifact.value of ycforge:function (spec 018)",
+      "type": "object",
+      "properties": {
+        "archivePath": { "type": "string", "description": "Infra-relative path to the .zip (never absolute); copied verbatim into content.zip_filename (DQ-2)." },
+        "entryPoint": { "type": "string", "description": "Non-empty handler identifier, \"<basename>.handler\"." }
+      },
+      "required": ["archivePath", "entryPoint"],
+      "additionalProperties": false
+    },
+    "dockerArtifactValue": {
+      "$id": "#/definitions/dockerArtifactValue",
+      "title": "Artifact.value of ycforge:docker-image (spec 018)",
+      "type": "object",
+      "properties": {
+        "image": { "type": "string", "pattern": "^cr\\.yandex/[^:]+(@sha256:[0-9a-f]{8,64})?$", "description": "cr.yandex repository, optionally pinned to a sha256 digest (8–64 hex); plain images allowed. Mutable `:latest`-style tags never appear here." }
+      },
+      "required": ["image"],
+      "additionalProperties": false
+    },
+    "frontendArtifactValue": {
+      "$id": "#/definitions/frontendArtifactValue",
+      "title": "Artifact.value of ycforge:frontend (spec 018)",
+      "type": "object",
+      "properties": {
+        "directory": { "type": "string", "description": "Infra-relative path to static build output (never absolute)." }
+      },
+      "required": ["directory"],
+      "additionalProperties": false
+    },
+    "resourceReference": {
+      "$id": "#/definitions/resourceReference",
+      "title": "ResourceReference (IDEA §33, forward contract)",
+      "type": "object",
+      "properties": {
+        "logical": { "type": "string", "description": "Logical reference id, e.g. \"functions.user_service\"." },
+        "terraformType": { "type": "string", "description": "Terraform resource type, e.g. \"yandex_function\"." }
+      },
+      "required": ["logical", "terraformType"],
+      "additionalProperties": false
+    },
+    "apiGatewayArtifactValue": {
+      "$id": "#/definitions/apiGatewayArtifactValue",
+      "title": "Artifact.value of ycforge:api-gateway (spec 019, forward contract; producer = Project B / composer)",
+      "type": "object",
+      "properties": {
+        "specPath": { "type": "string", "description": "Path to the B-generated OpenAPI spec/template." },
+        "resourceReferences": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/resourceReference" },
+          "default": []
+        }
+      },
+      "required": ["specPath", "resourceReferences"],
+      "additionalProperties": false
+    },
+    "queueArtifactValue": {
+      "$id": "#/definitions/queueArtifactValue",
+      "title": "Artifact.value of ycforge:queue (spec 019, forward contract; producer = explicit configuration)",
+      "type": "object",
+      "properties": {
+        "queueUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full Yandex Message Queue URL, e.g. https://message-queue.api.cloud.yandex.net/b1g1/queues/my-queue. Invalid format → YMT_INVALID_QUEUE_URL."
+        }
+      },
+      "required": ["queueUrl"],
+      "additionalProperties": false
+    },
+    "artifactCatalog": {
+      "$id": "#/definitions/artifactCatalog",
+      "title": "materializer-id → artifact-type catalog (FR-003)",
+      "type": "object",
+      "properties": {
+        "yandex-function": {
+          "type": "object",
+          "properties": { "artifactType": { "const": "ycforge:function" } },
+          "required": ["artifactType"],
+          "additionalProperties": false
+        },
+        "yandex-serverless-container": {
+          "type": "object",
+          "properties": { "artifactType": { "const": "ycforge:docker-image" } },
+          "required": ["artifactType"],
+          "additionalProperties": false
+        },
+        "yandex-api-gateway": {
+          "type": "object",
+          "properties": { "artifactType": { "const": "ycforge:api-gateway" } },
+          "required": ["artifactType"],
+          "additionalProperties": false
+        },
+        "yandex-message-queue": {
+          "type": "object",
+          "properties": { "artifactType": { "const": "ycforge:queue" } },
+          "required": ["artifactType"],
+          "additionalProperties": false
+        },
+        "yandex-storage-bucket": {
+          "type": "object",
+          "properties": { "artifactType": { "const": "ycforge:frontend" } },
+          "required": ["artifactType"],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "yandex-function",
+        "yandex-serverless-container",
+        "yandex-api-gateway",
+        "yandex-message-queue",
+        "yandex-storage-bucket"
+      ],
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "$id": "#/definitions/diagnostic",
+      "title": "Materializer diagnostic",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "YMT_* code (see errorCodes)." },
+        "message": { "type": "string" },
+        "materializer": { "type": "string", "description": "Materializer id that emitted the diagnostic." }
+      },
+      "required": ["code", "message"]
+    }
+  },
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "YMT_* error code catalog",
+    "type": "object",
+    "description": "Materializer diagnostics of @ycforge/materializers-core (spec 019 Key Entities). Compared via constants in src/diagnostics.ts, never string literals (Constitution V). Codes are additive and non-breaking.",
+    "properties": {
+      "YMT_INVALID_QUEUE_URL": { "const": "YMT_INVALID_QUEUE_URL", "description": "Invalid queueUrl format; cannot extract queue_name or region (FR-020/026)." },
+      "YMT_INVALID_ARTIFACT_VALUE": { "const": "YMT_INVALID_ARTIFACT_VALUE", "description": "Artifact value missing required fields (e.g., no archivePath)." },
+      "YMT_EMPTY_DIRECTORY": { "const": "YMT_EMPTY_DIRECTORY", "description": "No files in frontend directory (warning; bucket created without objects, FR-024)." }
+    },
+    "required": [
+      "YMT_INVALID_QUEUE_URL",
+      "YMT_INVALID_ARTIFACT_VALUE",
+      "YMT_EMPTY_DIRECTORY"
+    ],
+    "additionalProperties": false
+  }
+}

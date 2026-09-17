@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/moves.json",
+  "title": "@ycforge/pilot moves — .ycsf/moved.yaml schema and MOV_* error code catalog",
+  "description": "Machine-readable contract for Project C migration history (spec 017): JSON Schema for the optional .ycsf/moved.yaml file (requiring version: 1 and the moves entry list), the MoveEndpoint/MoveEntry identity shape ({idl, idt} pairs), the MovesDiagnostic shape, the BuildMovesResult/TerraformMoved[] compile output shape (contract 002), and the catalog of the 8 MOV_* load/validation error codes. The file is OPTIONAL in a project (absence is a valid no-migrations state, not an error); current logical mapping is computed by buildMoves from currentResources (dispatch 014 output), NOT from this file.",
+  "type": "object",
+  "definitions": {
+    "moveEndpoint": {
+      "$id": "#/definitions/moveEndpoint",
+      "title": "One side of a migration",
+      "type": "object",
+      "description": "Logical identity (IDL) plus Terraform address (IDT) of a resource (IDEA §16/§34–35). Either side may change between from and to.",
+      "properties": {
+        "idl": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+          "description": "Two-segment IDL domain.name (segment grammar [a-z][a-z0-9_]*): e.g. functions.user_service. Exactly two segments; 1 or 3+ segments, empty segment, uppercase or '-' → MOV_INVALID."
+        },
+        "idt": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*\\.[a-zA-Z_][a-zA-Z0-9_]*$",
+          "description": "Terraform address type.name (segment grammar [a-zA-Z_][a-zA-Z0-9_]*, pattern of spec 014 MTL_INVALID_TERRAFORM_ADDRESS): e.g. yandex_function.user_service. Exactly two segments; '-' or '/' inside a segment → MOV_INVALID. Indexed forms (x[0], x[\"k\"]) are out of scope."
+        }
+      },
+      "required": ["idl", "idt"],
+      "additionalProperties": false
+    },
+    "moveEntry": {
+      "$id": "#/definitions/moveEntry",
+      "title": "One migration record",
+      "type": "object",
+      "description": "Migration of a resource identity from {idl, idt} to {idl, idt}. from and to must not be fully identical (no-op → MOV_INVALID). A change of the Terraform resource type (first segment of from.idt differs from first segment of to.idt) is NOT a safe rename → MOV_TYPE_CHANGE (fail-fast, IDEA §35).",
+      "properties": {
+        "from": { "$ref": "#/definitions/moveEndpoint" },
+        "to": { "$ref": "#/definitions/moveEndpoint" }
+      },
+      "required": ["from", "to"],
+      "additionalProperties": false
+    },
+    "movesYaml": {
+      "$id": "#/definitions/movesYaml",
+      "title": ".ycsf/moved.yaml entry",
+      "type": "object",
+      "description": "Formatted contract (Constitution III): version: 1 and the moves entry list. Exactly two top-level keys are allowed; any other key is rejected (MOV_INVALID, Constitution V). The file is OPTIONAL; absence is NOT an error (loadMoves returns ok with moves: [] — unlike EXT_MISSING_FILE in 015). moves: [] is valid (no migrations → no emitted moved blocks).",
+      "properties": {
+        "version": { "const": 1, "description": "Required. Format version (Constitution III); anything else or absent → MOV_VERSION (single short-circuit error)." },
+        "moves": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/moveEntry" },
+          "description": "List of migration records. Empty list is valid. Full duplicate of a migration (same from AND to) → MOV_DUPLICATE; same from with different to, or same to with different from → MOV_CONTRADICTORY (fail-fast, Constitution V; never silent merge). Chains link by exact prev.to === next.from pair equality (both idl and idt)."
+        }
+      },
+      "required": ["version", "moves"],
+      "additionalProperties": false
+    },
+    "movesDiagnostic": {
+      "$id": "#/definitions/movesDiagnostic",
+      "title": "buildMoves validation diagnostic",
+      "type": "object",
+      "description": "Emitted by the buildMoves validation phase (MOV_DUPLICATE / MOV_TYPE_CHANGE / MOV_CONTRADICTORY / MOV_CYCLE / MOV_TARGET_UNRESOLVED / MOV_DANGLING; defensive MOV_INVALID for grammar/no-op on a programmatically built MovesYaml). Structural loader diagnostics (MOV_VERSION/MOV_INVALID) reuse the ProjectModelDiagnostic shape (spec 011) with file/line/column populated; at buildMoves time the transform has no file knowledge, so location fields stay undefined and entry/endpoint/field are used instead.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "MOV_VERSION",
+            "MOV_INVALID",
+            "MOV_DUPLICATE",
+            "MOV_TYPE_CHANGE",
+            "MOV_CONTRADICTORY",
+            "MOV_CYCLE",
+            "MOV_TARGET_UNRESOLVED",
+            "MOV_DANGLING"
+          ],
+          "description": "MOV_* error code."
+        },
+        "message": { "type": "string", "description": "Human-readable diagnostic with context (for MOV_TARGET_UNRESOLVED: the terminal and the alphabetically ordered list of available current identities)." },
+        "entry": { "type": "integer", "description": "0-based index of the offending record in moves (per-entry errors; MOV_DUPLICATE/MOV_TYPE_CHANGE/MOV_CONTRADICTORY/MOV_DANGLING)." },
+        "endpoint": { "$ref": "#/definitions/moveEndpoint", "description": "Offending endpoint (defensive MOV_INVALID grammar/no-op cases; MOV_TARGET_UNRESOLVED terminal)." },
+        "field": { "type": "string", "description": "Optional: 'from.idl' | 'from.idt' | 'to.idl' | 'to.idt' | 'moves' | 'version' when a specific field is at fault." },
+        "file": { "type": "string", "description": "Optional: only populated by the loader for structural (ProjectModelDiagnostic) diagnostics." },
+        "line": { "type": "integer", "description": "Optional: 1-based line from the YAML parse gate." },
+        "column": { "type": "integer", "description": "Optional: column from the YAML parse gate." },
+        "available": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Alphabetically ordered list of current resource identities from currentResources (MOV_TARGET_UNRESOLVED only; FR-010)."
+        }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    }
+  },
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "MOV_* error code catalog",
+    "type": "object",
+    "description": "All moved load/validation error codes (spec 017). Distinct MOV_* family, separate from PML_* (project-model), BRG_* (plugin-registry), MTL_* (materializer-dispatch) and EXT_* (extensions) codes. Compared via constants in src/contracts/moves.ts, never string literals (Constitution V). There is NO code for a successful idl-only no-op (valid kind:'ok' with empty moved) and NO code for a missing file (valid ok with moves: []).",
+    "properties": {
+      "MOV_VERSION": {
+        "const": "MOV_VERSION",
+        "description": "version key absent or not equal to 1 (FR-003, Constitution III). Load stage; short-circuits with a single error."
+      },
+      "MOV_INVALID": {
+        "const": "MOV_INVALID",
+        "description": "Structural invalidity (FR-004): YAML syntax errors / duplicate YAML keys (parse gate uniqueKeys) / unknown top-level keys / moves missing or not a list / entry not a mapping / entry keys other than exactly from+to / from or to not a mapping / idl or idt not a string or violating its grammar (two-segment [a-z][a-z0-9_]* IDL, two-segment [a-zA-Z_][a-zA-Z0-9_]* IDT) / from fully equal to to (no-op). Also defensive at buildMoves validation on a programmatically built MovesYaml. Collected for ALL errors (collect-all). Load + Validate."
+      },
+      "MOV_DUPLICATE": {
+        "const": "MOV_DUPLICATE",
+        "description": "Full duplicate of a migration (same from AND same to) (FR-007). Redundant history; fail-fast (Constitution V). Validate."
+      },
+      "MOV_TYPE_CHANGE": {
+        "const": "MOV_TYPE_CHANGE",
+        "description": "Terraform resource type (first segment of from.idt) differs from to.idt's type (FR-005). A type change is NOT a safe rename/move (IDEA §35) — potentially a different resource; fail-fast error, never auto-interpreted as a rename."
+      },
+      "MOV_CONTRADICTORY": {
+        "const": "MOV_CONTRADICTORY",
+        "description": "Two migrations with the same from but different to, or the same to but different from (FR-006). Collision → error, never silent merge (Constitution V; precedents MTL_COLLISION / PML_DUPLICATE_APP_ID). Guarantees each identity pair has at most one outgoing and at most one incoming edge."
+      },
+      "MOV_CYCLE": {
+        "const": "MOV_CYCLE",
+        "description": "A cycle in the migration graph, e.g. a→b, b→a (FR-008). History cannot rotate; no progress toward the current state. One diagnostic per cycle component. Validate (chain)."
+      },
+      "MOV_TARGET_UNRESOLVED": {
+        "const": "MOV_TARGET_UNRESOLVED",
+        "description": "A chain's terminal does not match any current resource by the exact {idl, idt} pair (FR-010). Message carries the terminal and the alphabetically ordered list of available current identities. Emitted at buildMoves (also the 020 check seam)."
+      },
+      "MOV_DANGLING": {
+        "const": "MOV_DANGLING",
+        "description": "An entry of a chain whose terminal does not match any current resource — the whole chain 'dangles' (FR-010/US6). Emitted on every entry of the unresolved chain, in addition to MOV_TARGET_UNRESOLVED on its terminal (N+1 diagnostics for an N-entry chain)."
+      }
+    },
+    "required": [
+      "MOV_VERSION",
+      "MOV_INVALID",
+      "MOV_DUPLICATE",
+      "MOV_TYPE_CHANGE",
+      "MOV_CONTRADICTORY",
+      "MOV_CYCLE",
+      "MOV_TARGET_UNRESOLVED",
+      "MOV_DANGLING"
+    ],
+    "additionalProperties": false
+  }
+}

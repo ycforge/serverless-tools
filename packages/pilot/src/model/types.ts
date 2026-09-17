@@ -1,0 +1,13 @@
+/**
+ * Internal model-layer type guards. The extractors operate on the plain JS
+ * document (`parseYaml`'s `data`) and raise contract-typed diagnostics —
+ * `yaml` never leaks past `parse.ts` (Constitution: contracts stay pure).
+ */
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}

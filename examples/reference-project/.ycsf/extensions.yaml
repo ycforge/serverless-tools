@@ -1,0 +1,10 @@
+version: 1
+extensions:
+  - target: functions.user_service
+    patch:
+      memory: 128
+      execution_timeout: 5
+      service_account_id: ajefi3b58tak71g3ecp1
+  - target: containers.analytics
+    patch:
+      service_account_id: ajefi3b58tak71g3ecp1

@@ -1,0 +1,8 @@
+version: 1
+rules:
+  - op: add
+    target:
+      kind: path
+      path: /users
+    value:
+      get: {}

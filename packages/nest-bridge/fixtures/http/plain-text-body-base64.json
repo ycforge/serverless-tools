@@ -1,0 +1,139 @@
+{
+  "timestamp": "2026-08-21T21:44:56.201Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "DATA-ANALYSE.md"
+  },
+  "event": {
+    "version": "2.0",
+    "rawPath": "/probe/echo",
+    "rawQueryString": "",
+    "headers": {
+      "Accept": "*/*",
+      "Host": "conformance.gateway.apigw.yandexcloud.net",
+      "Traceparent": "00-00000000000000003a9e081eb4f5cd00-8cb84df445433453-01",
+      "Tracestate": "",
+      "Uber-Trace-Id": "3a9e081eb4f5cd00:8cb84df445433453:4bd4598013716661:1",
+      "User-Agent": "conformance-fixture/1.0",
+      "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+      "X-Envoy-External-Address": "203.0.113.10",
+      "X-Envoy-Original-Path": "/probe/echo",
+      "X-Forwarded-For": "203.0.113.10",
+      "X-Forwarded-Proto": "https",
+      "X-Real-Remote-Address": "203.0.113.10:50008",
+      "X-Request-Id": "abeeac74-c83b-4b2e-a6df-7ee1f55b036b",
+      "X-Serverless-Certificate-Ids": "{}",
+      "X-Serverless-Gateway-Id": "gwconf00000000000001",
+      "X-Trace-Id": "a8d753fb-54c5-4892-ab00-9972ce6d5459",
+      "Content-Type": "text/plain",
+      "Content-Length": "29"
+    },
+    "queryStringParameters": {},
+    "requestContext": {
+      "authorizer": {},
+      "http": {
+        "method": "POST",
+        "path": "/probe/echo?",
+        "sourceIp": "203.0.113.10",
+        "userAgent": "conformance-fixture/1.0"
+      },
+      "requestId": "abeeac74-c83b-4b2e-a6df-7ee1f55b036b",
+      "time": "21/Aug/2026:21:44:56 +0000",
+      "timeEpoch": 1787348696,
+      "apiGateway": {
+        "operationContext": {
+          "probe": {
+            "source": "curl",
+            "test": true,
+            "version": "1.0"
+          }
+        }
+      }
+    },
+    "body": "SGVsbG8sIFlhbmRleCBDbG91ZCBGdW5jdGlvbiE=",
+    "isBase64Encoded": true,
+    "pathParameters": {
+      "ID": "probe/echo"
+    },
+    "parameters": {
+      "ID": "probe/echo"
+    },
+    "multiValueParameters": {
+      "ID": ["probe/echo"]
+    },
+    "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+  },
+  "context": {
+    "awsRequestId": "abeeac74-c83b-4b2e-a6df-7ee1f55b036b",
+    "requestId": "abeeac74-c83b-4b2e-a6df-7ee1f55b036b",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verhttp000000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1787348701101,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "3a9e081eb4f5cd00:354334544fd48bc8:1666173108954db4:1",
+    "_data": {
+      "version": "2.0",
+      "rawPath": "/probe/echo",
+      "rawQueryString": "",
+      "headers": {
+        "Accept": "*/*",
+        "Host": "conformance.gateway.apigw.yandexcloud.net",
+        "Traceparent": "00-00000000000000003a9e081eb4f5cd00-8cb84df445433453-01",
+        "Tracestate": "",
+        "Uber-Trace-Id": "3a9e081eb4f5cd00:8cb84df445433453:4bd4598013716661:1",
+        "User-Agent": "conformance-fixture/1.0",
+        "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+        "X-Envoy-External-Address": "203.0.113.10",
+        "X-Envoy-Original-Path": "/probe/echo",
+        "X-Forwarded-For": "203.0.113.10",
+        "X-Forwarded-Proto": "https",
+        "X-Real-Remote-Address": "203.0.113.10:50008",
+        "X-Request-Id": "abeeac74-c83b-4b2e-a6df-7ee1f55b036b",
+        "X-Serverless-Certificate-Ids": "{}",
+        "X-Serverless-Gateway-Id": "gwconf00000000000001",
+        "X-Trace-Id": "a8d753fb-54c5-4892-ab00-9972ce6d5459",
+        "Content-Type": "text/plain",
+        "Content-Length": "29"
+      },
+      "queryStringParameters": {},
+      "requestContext": {
+        "authorizer": {},
+        "http": {
+          "method": "POST",
+          "path": "/probe/echo?",
+          "sourceIp": "203.0.113.10",
+          "userAgent": "conformance-fixture/1.0"
+        },
+        "requestId": "abeeac74-c83b-4b2e-a6df-7ee1f55b036b",
+        "time": "21/Aug/2026:21:44:56 +0000",
+        "timeEpoch": 1787348696,
+        "apiGateway": {
+          "operationContext": {
+            "probe": {
+              "source": "curl",
+              "test": true,
+              "version": "1.0"
+            }
+          }
+        }
+      },
+      "body": "SGVsbG8sIFlhbmRleCBDbG91ZCBGdW5jdGlvbiE=",
+      "isBase64Encoded": true,
+      "pathParameters": {
+        "ID": "probe/echo"
+      },
+      "parameters": {
+        "ID": "probe/echo"
+      },
+      "multiValueParameters": {
+        "ID": ["probe/echo"]
+      },
+      "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+    }
+  }
+}

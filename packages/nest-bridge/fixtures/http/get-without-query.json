@@ -1,0 +1,135 @@
+{
+  "timestamp": "2026-08-21T21:44:34.266Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "DATA-ANALYSE.md"
+  },
+  "event": {
+    "version": "2.0",
+    "rawPath": "/probe/ping",
+    "rawQueryString": "",
+    "headers": {
+      "Accept": "*/*",
+      "Host": "conformance.gateway.apigw.yandexcloud.net",
+      "Traceparent": "00-000000000000000019fcffb9e777c3fb-5bb6aa5c66657d30-01",
+      "Tracestate": "",
+      "Uber-Trace-Id": "19fcffb9e777c3fb:5bb6aa5c66657d30:06d027ab0322c8c9:1",
+      "User-Agent": "conformance-fixture/1.0",
+      "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+      "X-Envoy-External-Address": "203.0.113.10",
+      "X-Envoy-Original-Path": "/probe/ping",
+      "X-Forwarded-For": "203.0.113.10",
+      "X-Forwarded-Proto": "https",
+      "X-Real-Remote-Address": "203.0.113.10:50001",
+      "X-Request-Id": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+      "X-Serverless-Certificate-Ids": "{}",
+      "X-Serverless-Gateway-Id": "gwconf00000000000001",
+      "X-Trace-Id": "0ee320df-0ca4-44f9-af8e-ddf62d00bf79"
+    },
+    "queryStringParameters": {},
+    "requestContext": {
+      "authorizer": {},
+      "http": {
+        "method": "GET",
+        "path": "/probe/ping?",
+        "sourceIp": "203.0.113.10",
+        "userAgent": "conformance-fixture/1.0"
+      },
+      "requestId": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+      "time": "21/Aug/2026:21:44:34 +0000",
+      "timeEpoch": 1787348674,
+      "apiGateway": {
+        "operationContext": {
+          "probe": {
+            "source": "curl",
+            "test": true,
+            "version": "1.0"
+          }
+        }
+      }
+    },
+    "body": "",
+    "isBase64Encoded": true,
+    "pathParameters": {
+      "ID": "probe/ping"
+    },
+    "parameters": {
+      "ID": "probe/ping"
+    },
+    "multiValueParameters": {
+      "ID": ["probe/ping"]
+    },
+    "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+  },
+  "context": {
+    "awsRequestId": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+    "requestId": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verhttp000000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1787348679166,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "19fcffb9e777c3fb:03d75666c5aa6bb5:9c8c2230ba720d60:1",
+    "_data": {
+      "version": "2.0",
+      "rawPath": "/probe/ping",
+      "rawQueryString": "",
+      "headers": {
+        "Accept": "*/*",
+        "Host": "conformance.gateway.apigw.yandexcloud.net",
+        "Traceparent": "00-000000000000000019fcffb9e777c3fb-5bb6aa5c66657d30-01",
+        "Tracestate": "",
+        "Uber-Trace-Id": "19fcffb9e777c3fb:5bb6aa5c66657d30:06d027ab0322c8c9:1",
+        "User-Agent": "conformance-fixture/1.0",
+        "X-Api-Gateway-Function-Id": "gwconf00000000000001",
+        "X-Envoy-External-Address": "203.0.113.10",
+        "X-Envoy-Original-Path": "/probe/ping",
+        "X-Forwarded-For": "203.0.113.10",
+        "X-Forwarded-Proto": "https",
+        "X-Real-Remote-Address": "203.0.113.10:50001",
+        "X-Request-Id": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+        "X-Serverless-Certificate-Ids": "{}",
+        "X-Serverless-Gateway-Id": "gwconf00000000000001",
+        "X-Trace-Id": "0ee320df-0ca4-44f9-af8e-ddf62d00bf79"
+      },
+      "queryStringParameters": {},
+      "requestContext": {
+        "authorizer": {},
+        "http": {
+          "method": "GET",
+          "path": "/probe/ping?",
+          "sourceIp": "203.0.113.10",
+          "userAgent": "conformance-fixture/1.0"
+        },
+        "requestId": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+        "time": "21/Aug/2026:21:44:34 +0000",
+        "timeEpoch": 1787348674,
+        "apiGateway": {
+          "operationContext": {
+            "probe": {
+              "source": "curl",
+              "test": true,
+              "version": "1.0"
+            }
+          }
+        }
+      },
+      "body": "",
+      "isBase64Encoded": true,
+      "pathParameters": {
+        "ID": "probe/ping"
+      },
+      "parameters": {
+        "ID": "probe/ping"
+      },
+      "multiValueParameters": {
+        "ID": ["probe/ping"]
+      },
+      "operationId": "2e690fa9c87631b02a771908de3b3712ac06ff20dd5e3709dc5bb528c019707a"
+    }
+  }
+}

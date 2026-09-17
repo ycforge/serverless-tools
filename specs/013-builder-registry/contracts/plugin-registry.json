@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/plugin-registry.json",
+  "title": "@ycforge/pilot plugin-registry — .ycsf/builders.yaml schema and BRG_* error code catalog",
+  "description": "Machine-readable contract for the Project C builder/materializer registry (spec 013): JSON Schema for the .ycsf/builders.yaml file (requiring version: 1), the PluginRegistry/PluginEntry/PluginLoadError runtime shapes, and the catalog of BRG_* validation, load and model-validation error codes.",
+  "type": "object",
+  "definitions": {
+    "buildersYaml": {
+      "$id": "#/definitions/buildersYaml",
+      "title": ".ycsf/builders.yaml entry",
+      "type": "object",
+      "description": "Explicit mapping of builder/materializer identifiers to plugin import specifiers (Constitution V: explicit over magic, one source of truth).",
+      "properties": {
+        "version": { "const": 1, "description": "Required. Format version (Constitution III)." },
+        "builders": {
+          "type": "object",
+          "description": "Map identifier → builder package import specifier.",
+          "patternProperties": {
+            "^[\\w-]+$": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "materializers": {
+          "type": "object",
+          "description": "Map identifier → materializer package import specifier.",
+          "patternProperties": {
+            "^[\\w-]+$": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["version"],
+      "additionalProperties": false,
+      "description": "builders and materializers key sets MUST NOT overlap (BRG_KEY_COLLISION). Both maps optional; empty file with only version:1 is a valid empty registry."
+    },
+    "pluginEntry": {
+      "$id": "#/definitions/pluginEntry",
+      "title": "One successfully loaded and recognized registry entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Identifier (builders.yaml key)." },
+        "packageName": { "type": "string", "description": "Import specifier (npm package path/name, or fixture path in tests)." },
+        "kind": { "enum": ["builder", "materializer"], "description": "PluginKind (spec 002 shape, research 2)." },
+        "module": { "description": "Loaded module exporting Builder or Materializer (spec 002)." }
+      },
+      "additionalProperties": false,
+      "required": ["id", "packageName", "kind", "module"]
+    },
+    "pluginRegistry": {
+      "$id": "#/definitions/pluginRegistry",
+      "title": "Immutable result of registry load (success)",
+      "type": "object",
+      "properties": {
+        "records": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/pluginEntry" },
+          "description": "identifier → PluginEntry; one entry per unique identifier."
+        }
+      },
+      "additionalProperties": false,
+      "required": ["records"]
+    },
+    "pluginLoadError": {
+      "$id": "#/definitions/pluginLoadError",
+      "title": "Error loading one plugin entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Identifier." },
+        "packageName": { "type": "string" },
+        "code": {
+          "enum": ["BRG_PACKAGE_NOT_FOUND", "BRG_NOT_A_PLUGIN", "BRG_LOAD_ERROR"],
+          "description": "Distinct load failure category."
+        },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "required": ["id", "packageName", "code", "message"]
+    },
+    "diagnostic": {
+      "$id": "#/definitions/diagnostic",
+      "title": "Registry / validation diagnostic",
+      "type": "object",
+      "description": "Reuses the project-model diagnostic shape (code/message/file + optional app/field/line/column) for registry structural errors and BRG_UNKNOWN_BUILDER model validation.",
+      "properties": {
+        "code": { "type": "string", "description": "BRG_* code (see errorCodes)." },
+        "message": { "type": "string" },
+        "file": { "type": "string" },
+        "app": { "type": "string" },
+        "identity": { "type": "string" },
+        "field": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["code", "message", "file"],
+      "additionalProperties": false
+    }
+  },
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "BRG_* error code catalog",
+    "type": "object",
+    "description": "All builder-registry validation, load and model-validation error codes (spec 013). Distinct BRG_* family, separate from PML_* project-model codes. Compared via constants, never string literals (Constitution V).",
+    "properties": {
+      "BRG_MISSING_FILE": { "const": "BRG_MISSING_FILE", "description": ".ycsf/builders.yaml is required but absent (FR-005)." },
+      "BRG_VERSION": { "const": "BRG_VERSION", "description": "Missing or invalid version:1 in builders.yaml (FR-002)." },
+      "BRG_DUPLICATE_KEY": { "const": "BRG_DUPLICATE_KEY", "description": "Duplicate key within builders or materializers section (FR-003, uniqueKeys)." },
+      "BRG_KEY_COLLISION": { "const": "BRG_KEY_COLLISION", "description": "Same identifier in both builders and materializers (FR-003, Constitution V)." },
+      "BRG_INVALID": { "const": "BRG_INVALID", "description": "Invalid builders.yaml shape: non-string/empty value, empty key, bad top-level structure (FR-004)." },
+      "BRG_PACKAGE_NOT_FOUND": { "const": "BRG_PACKAGE_NOT_FOUND", "description": "Dynamic import failed: module not found / not resolvable (FR-009)." },
+      "BRG_NOT_A_PLUGIN": { "const": "BRG_NOT_A_PLUGIN", "description": "Module loaded but does not export a Builder or Materializer shape (FR-010)." },
+      "BRG_LOAD_ERROR": { "const": "BRG_LOAD_ERROR", "description": "Other import() error during module evaluation, e.g. syntax/runtime (FR-011)." },
+      "BRG_UNKNOWN_BUILDER": { "const": "BRG_UNKNOWN_BUILDER", "description": "App.builder identifier is absent from the registry (FR-013); carries app_id and available builders." }
+    },
+    "required": [
+      "BRG_MISSING_FILE",
+      "BRG_VERSION",
+      "BRG_DUPLICATE_KEY",
+      "BRG_KEY_COLLISION",
+      "BRG_INVALID",
+      "BRG_PACKAGE_NOT_FOUND",
+      "BRG_NOT_A_PLUGIN",
+      "BRG_LOAD_ERROR",
+      "BRG_UNKNOWN_BUILDER"
+    ],
+    "additionalProperties": false
+  }
+}

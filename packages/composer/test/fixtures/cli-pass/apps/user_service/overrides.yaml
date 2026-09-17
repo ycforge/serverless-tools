@@ -1,0 +1,8 @@
+version: 1
+rules:
+  - op: replace
+    target:
+      kind: path
+      path: /admin
+    value:
+      summary: Admin panel

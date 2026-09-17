@@ -1,0 +1,9 @@
+{
+  "resource": {
+    "yandex_api_gateway": {
+      "openapi": {
+        "spec": "file(\"${path.module}/generated/openapi-openapi.yaml\")"
+      }
+    }
+  }
+}

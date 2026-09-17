@@ -30,9 +30,17 @@ export interface OutputBuilder {
  * Context of materialization. Clarified 2026-09-03: the context contains
  * ONLY `output` — a materializer is a pure translation artifact →
  * TerraformResource and reads nothing from the project itself.
+ *
+ * Spec 028 (plan D-2): `projectRoot` is an additive/optional root of the
+ * pipeline run. Materializers that write companion files next to the
+ * infrastructure (e.g. the api-gateway OpenAPI companion) use it to make the
+ * write root-relative (`<rootDir>/infra/generated/`) instead of
+ * cwd-dependent. Legacy materializers that receive none keep their
+ * historical behavior.
  */
 export interface MaterializationContext {
   readonly output: OutputBuilder;
+  readonly projectRoot?: string;
 }
 
 /**
@@ -40,7 +48,7 @@ export interface MaterializationContext {
  * `materialize` returns {@link TerraformResource} directly — there is no
  * intermediate abstraction layer (IDEA §22).
  */
-export interface Materializer<A extends Artifact = Artifact> {
+export interface Materializer<A = Artifact> {
   /**
    * Synchronous selection by `artifact.type` (and anything else the
    * materializer considers). Must stay pure and cheap: C calls it for every

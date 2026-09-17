@@ -1,0 +1,61 @@
+{
+  "name": "@ycforge/js-dev-tools",
+  "version": "0.1.0",
+  "description": "Local development tools for Yandex Cloud Functions — dev server, secrets management, project scaffolding.",
+  "author": "ycforge (https://github.com/ycforge)",
+  "license": "MIT",
+  "homepage": "https://github.com/ycforge/serverless-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ycforge/serverless-tools.git",
+    "directory": "packages/js-dev-tools"
+  },
+  "keywords": [
+    "yandex-cloud",
+    "cloud-functions",
+    "local-dev-server",
+    "dev-tools"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "exports": {
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "require": "./dist/server/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "tsup && vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ycforge/nestjs-connector": "workspace:*",
+    "yaml": "^2.9.0"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^11.2.1",
+    "@nestjs/core": "^11.2.1",
+    "@swc/core": "^1.16.1",
+    "@types/node": "^22.15.0",
+    "reflect-metadata": "^0.2.2",
+    "tsx": "^4.21.3",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

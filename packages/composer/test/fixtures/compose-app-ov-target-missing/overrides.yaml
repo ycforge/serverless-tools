@@ -1,0 +1,6 @@
+version: 1
+rules:
+  - op: remove
+    target:
+      kind: path
+      path: /nope

@@ -1,0 +1,116 @@
+{
+  "timestamp": "2026-09-17T04:19:34.000Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "real Yandex API Gateway (cloud_functions integration) capture, spec 036"
+  },
+  "event": {
+    "httpMethod": "GET",
+    "path": "/users",
+    "url": "/users?",
+    "headers": {
+      "Accept": "*/*",
+      "Host": "conformance.gateway.apigw.yandexcloud.net",
+      "Traceparent": "00-000000000000000019fcffb9e777c3fb-5bb6aa5c66657d30-01",
+      "Tracestate": "",
+      "Uber-Trace-Id": "19fcffb9e777c3fb:5bb6aa5c66657d30:06d027ab0322c8c9:1",
+      "User-Agent": "conformance-fixture/1.0",
+      "X-Api-Gateway-Function-Id": "fnconf00000000000001",
+      "X-Envoy-External-Address": "203.0.113.10",
+      "X-Envoy-Original-Path": "/users",
+      "X-Forwarded-For": "203.0.113.10",
+      "X-Forwarded-Proto": "https",
+      "X-Real-Remote-Address": "203.0.113.10:50002",
+      "X-Request-Id": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+      "X-Serverless-Certificate-Ids": "{}",
+      "X-Serverless-Gateway-Id": "gwconf00000000000001",
+      "X-Trace-Id": "0ee320df-0ca4-44f9-af8e-ddf62d00bf79"
+    },
+    "multiValueHeaders": {
+      "Accept": ["*/*"],
+      "Host": ["conformance.gateway.apigw.yandexcloud.net"],
+      "Traceparent": ["00-000000000000000019fcffb9e777c3fb-5bb6aa5c66657d30-01"],
+      "Tracestate": [""],
+      "Uber-Trace-Id": ["19fcffb9e777c3fb:5bb6aa5c66657d30:06d027ab0322c8c9:1"],
+      "User-Agent": ["conformance-fixture/1.0"],
+      "X-Api-Gateway-Function-Id": ["fnconf00000000000001"],
+      "X-Envoy-External-Address": ["203.0.113.10"],
+      "X-Envoy-Original-Path": ["/users"],
+      "X-Forwarded-For": ["203.0.113.10"],
+      "X-Forwarded-Proto": ["https"],
+      "X-Real-Remote-Address": ["203.0.113.10:50002"],
+      "X-Request-Id": ["d69fa5cc-f648-432f-a238-1057a1bd2c7b"],
+      "X-Serverless-Certificate-Ids": ["{}"],
+      "X-Serverless-Gateway-Id": ["gwconf00000000000001"],
+      "X-Trace-Id": ["0ee320df-0ca4-44f9-af8e-ddf62d00bf79"]
+    },
+    "queryStringParameters": {},
+    "multiValueQueryStringParameters": {},
+    "params": {},
+    "multiValueParams": {},
+    "pathParams": {},
+    "body": "",
+    "isBase64Encoded": true,
+    "requestContext": {
+      "identity": {
+        "sourceIp": "203.0.113.10",
+        "userAgent": "conformance-fixture/1.0"
+      },
+      "httpMethod": "GET",
+      "requestId": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+      "requestTime": "17/Sep/2026:04:19:34 +0000",
+      "requestTimeEpoch": 1789618774
+    }
+  },
+  "context": {
+    "awsRequestId": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+    "requestId": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verv10000000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1789618774166,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "19fcffb9e777c3fb:03d75666c5aa6bb5:9c8c2230ba720d60:1",
+    "_data": {
+      "httpMethod": "GET",
+      "path": "/users",
+      "url": "/users?",
+      "headers": {
+        "Accept": "*/*",
+        "Host": "conformance.gateway.apigw.yandexcloud.net",
+        "Traceparent": "00-000000000000000019fcffb9e777c3fb-5bb6aa5c66657d30-01",
+        "Tracestate": "",
+        "Uber-Trace-Id": "19fcffb9e777c3fb:5bb6aa5c66657d30:06d027ab0322c8c9:1",
+        "User-Agent": "conformance-fixture/1.0",
+        "X-Api-Gateway-Function-Id": "fnconf00000000000001",
+        "X-Envoy-External-Address": "203.0.113.10",
+        "X-Envoy-Original-Path": "/users",
+        "X-Forwarded-For": "203.0.113.10",
+        "X-Forwarded-Proto": "https",
+        "X-Real-Remote-Address": "203.0.113.10:50002",
+        "X-Request-Id": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+        "X-Serverless-Certificate-Ids": "{}",
+        "X-Serverless-Gateway-Id": "gwconf00000000000001",
+        "X-Trace-Id": "0ee320df-0ca4-44f9-af8e-ddf62d00bf79"
+      },
+      "queryStringParameters": {},
+      "requestContext": {
+        "identity": {
+          "sourceIp": "203.0.113.10",
+          "userAgent": "conformance-fixture/1.0"
+        },
+        "httpMethod": "GET",
+        "requestId": "d69fa5cc-f648-432f-a238-1057a1bd2c7b",
+        "requestTime": "17/Sep/2026:04:19:34 +0000",
+        "requestTimeEpoch": 1789618774
+      },
+      "body": "",
+      "isBase64Encoded": true,
+      "path": "/users"
+    }
+  }
+}

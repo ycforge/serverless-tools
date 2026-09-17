@@ -1,0 +1,354 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/ycsf-cli.json",
+  "title": "@ycforge/pilot — ycsf CLI contract (spec 021)",
+  "description": "Machine-readable contract for the ycsf CLI surface: commands, flags, exit codes, --json output schema, CLI_* error codes. Codes are compared via constants in src/cli/errors.ts, never string literals (Constitution V). Codes are additive and non-breaking.",
+  "type": "object",
+
+  "definitions": {
+    "cliResult": {
+      "$id": "#/definitions/cliResult",
+      "title": "CLIResult",
+      "type": "object",
+      "description": "Unified structured output for all commands (--json flag, D-RE-7).",
+      "properties": {
+        "command": {
+          "type": "string",
+          "enum": ["build", "materialize", "check", "plan", "apply", "destroy", ""],
+          "description": "Command name. Empty string = program-level error (unknown command, FR-001); no subcommand was parsed (T151)."
+        },
+        "exitCode": {
+          "type": "number",
+          "enum": [0, 1, 2],
+          "description": "Exit code: 0 = success, 1 = error, 2 = input/config error."
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/cliDiagnostic" },
+          "description": "Diagnostics from library + CLI errors. Empty array = clean."
+        },
+        "summary": {
+          "type": "object",
+          "description": "Command-specific summary data (see commandSchemas)."
+        }
+      },
+      "required": ["command", "exitCode", "diagnostics"]
+    },
+
+    "cliDiagnostic": {
+      "$id": "#/definitions/cliDiagnostic",
+      "title": "CLIDiagnostic",
+      "type": "object",
+      "description": "One diagnostic entry. Code is from CLI_* or library families (PML_*, EXT_*, BRG_*, MTL_*, YCK_*).",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Diagnostic code — CLI_* or library code."
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable description."
+        },
+        "details": {
+          "type": "object",
+          "description": "Additional context fields (command-specific)."
+        }
+      },
+      "required": ["code", "message"]
+    },
+
+    "commandSchema": {
+      "$id": "#/definitions/commandSchema",
+      "title": "CommandSchema",
+      "type": "object",
+      "description": "Schema for a single CLI command.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Command name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Command description."
+        },
+        "flags": {
+          "type": "object",
+          "description": "Available flags for this command."
+        }
+      },
+      "required": ["name", "description"]
+    }
+  },
+
+  "errorCodes": {
+    "$id": "#/errorCodes",
+    "title": "CLI_* error code catalog",
+    "type": "object",
+    "description": "CLI-level diagnostics of ycsf CLI (spec 021 Key Entities). Compared via constants in src/cli/errors.ts, never string literals (Constitution V). Codes are additive and non-breaking.",
+    "properties": {
+      "CLI_UNKNOWN_COMMAND": {
+        "const": "CLI_UNKNOWN_COMMAND",
+        "description": "Unknown subcommand (FR-001). Exit code 2."
+      },
+      "CLI_MISSING_PROJECT_DIR": {
+        "const": "CLI_MISSING_PROJECT_DIR",
+        "description": "No .ycsf/ found in cwd and --project-dir not provided. Exit code 2."
+      },
+      "CLI_APP_NOT_FOUND": {
+        "const": "CLI_APP_NOT_FOUND",
+        "description": "--target app not found in apps.yaml (FR-008, D-7). Exit code 2."
+      },
+      "CLI_BUILD_FAILED": {
+        "const": "CLI_BUILD_FAILED",
+        "description": "Builder execution failed (FR-007). Exit code 1."
+      },
+      "CLI_TERRAFORM_FAILED": {
+        "const": "CLI_TERRAFORM_FAILED",
+        "description": "Terraform CLI returned non-zero exit code (FR-018..029). Exit code 1."
+      },
+      "CLI_TERRAFORM_NOT_FOUND": {
+        "const": "CLI_TERRAFORM_NOT_FOUND",
+        "description": "terraform binary not found in PATH (FR-021). Exit code 1."
+      },
+      "CLI_DESTROY_REQUIRES_YES": {
+        "const": "CLI_DESTROY_REQUIRES_YES",
+        "description": "ycsf destroy without --yes in non-interactive mode (FR-027). Exit code 2."
+      },
+      "CLI_UNEXPECTED_ERROR": {
+        "const": "CLI_UNEXPECTED_ERROR",
+        "description": "Unhandled exception caught by CLI error handler (FR-003). Exit code 1."
+      }
+    },
+    "required": [
+      "CLI_UNKNOWN_COMMAND",
+      "CLI_MISSING_PROJECT_DIR",
+      "CLI_APP_NOT_FOUND",
+      "CLI_BUILD_FAILED",
+      "CLI_TERRAFORM_FAILED",
+      "CLI_TERRAFORM_NOT_FOUND",
+      "CLI_DESTROY_REQUIRES_YES",
+      "CLI_UNEXPECTED_ERROR"
+    ],
+    "additionalProperties": false
+  },
+
+  "exitCodes": {
+    "$id": "#/exitCodes",
+    "title": "Exit code semantics (D-3, D-RE-8)",
+    "type": "object",
+    "description": "Unified exit codes for all ycsf CLI commands.",
+    "properties": {
+      "0": {
+        "type": "number",
+        "const": 0,
+        "description": "Success: all operations completed without errors."
+      },
+      "1": {
+        "type": "number",
+        "const": 1,
+        "description": "Error: validation error, runtime error, terraform failure."
+      },
+      "2": {
+        "type": "number",
+        "const": 2,
+        "description": "Input/config error: invalid path, missing file, unknown command."
+      },
+      "130": {
+        "type": "number",
+        "const": 130,
+        "description": "SIGINT: process interrupted (128 + signal 2)."
+      }
+    }
+  },
+
+  "commands": {
+    "$id": "#/commands",
+    "title": "CLI command catalog",
+    "type": "object",
+    "description": "All ycsf subcommands with their flags.",
+    "properties": {
+      "build": {
+        "$ref": "#/definitions/commandSchema",
+        "description": "Build apps → artifacts.",
+        "properties": {
+          "name": { "const": "build" },
+          "description": { "const": "Build all apps using their configured builders" },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "projectDir": { "type": "string", "default": ".", "description": "Project root directory." },
+              "target": { "type": "string", "description": "Build only this app (by app ID from apps.yaml)." },
+              "json": { "type": "boolean", "default": false, "description": "Output JSON." },
+              "noColor": { "type": "boolean", "default": false, "description": "Disable ANSI colors." }
+            }
+          }
+        }
+      },
+      "materialize": {
+        "$ref": "#/definitions/commandSchema",
+        "description": "Materialize artifacts → generated .tf.json files.",
+        "properties": {
+          "name": { "const": "materialize" },
+          "description": { "const": "Run materializers to generate Terraform .tf.json files" },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "projectDir": { "type": "string", "default": ".", "description": "Project root directory." },
+              "target": { "type": "string", "description": "Materialize only this app." },
+              "json": { "type": "boolean", "default": false, "description": "Output JSON." },
+              "noColor": { "type": "boolean", "default": false, "description": "Disable ANSI colors." }
+            }
+          }
+        }
+      },
+      "check": {
+        "$ref": "#/definitions/commandSchema",
+        "description": "Validate project contracts (C1–C13).",
+        "properties": {
+          "name": { "const": "check" },
+          "description": { "const": "Validate project-level contracts without Terraform" },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "projectDir": { "type": "string", "default": ".", "description": "Project root directory." },
+              "validateTf": { "type": "boolean", "default": false, "description": "Enable terraform validate step." },
+              "json": { "type": "boolean", "default": false, "description": "Output JSON." },
+              "noColor": { "type": "boolean", "default": false, "description": "Disable ANSI colors." }
+            }
+          }
+        }
+      },
+      "plan": {
+        "$ref": "#/definitions/commandSchema",
+        "description": "Pipeline: build → materialize → terraform init → terraform plan.",
+        "properties": {
+          "name": { "const": "plan" },
+          "description": { "const": "Run full pipeline: build, materialize, then terraform plan" },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "projectDir": { "type": "string", "default": ".", "description": "Project root directory." },
+              "json": { "type": "boolean", "default": false, "description": "Output JSON." },
+              "noColor": { "type": "boolean", "default": false, "description": "Disable ANSI colors." }
+            }
+          }
+        }
+      },
+      "apply": {
+        "$ref": "#/definitions/commandSchema",
+        "description": "Pipeline: build → materialize → terraform init → plan → apply.",
+        "properties": {
+          "name": { "const": "apply" },
+          "description": { "const": "Run full pipeline: build, materialize, terraform plan, then terraform apply" },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "projectDir": { "type": "string", "default": ".", "description": "Project root directory." },
+              "json": { "type": "boolean", "default": false, "description": "Output JSON." },
+              "noColor": { "type": "boolean", "default": false, "description": "Disable ANSI colors." }
+            }
+          }
+        }
+      },
+      "destroy": {
+        "$ref": "#/definitions/commandSchema",
+        "description": "terraform destroy + optional artifact cleanup.",
+        "properties": {
+          "name": { "const": "destroy" },
+          "description": { "const": "Destroy infrastructure via terraform destroy, optionally clean up generated files" },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "projectDir": { "type": "string", "default": ".", "description": "Project root directory." },
+              "yes": { "type": "boolean", "default": false, "description": "Skip confirmation prompt." },
+              "cleanup": { "type": "boolean", "default": false, "description": "Remove generated .tf.json files (infra/*.ycsf.tf.json + infra/99-ycsf-outputs.tf.json) after destroy." },
+              "json": { "type": "boolean", "default": false, "description": "Output JSON." },
+              "noColor": { "type": "boolean", "default": false, "description": "Disable ANSI colors." }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "cliSurface": {
+    "$id": "#/cliSurface",
+    "title": "CLI surface",
+    "type": "object",
+    "description": "ycsf CLI command signatures.",
+    "properties": {
+      "binary": {
+        "type": "string",
+        "const": "ycsf"
+      },
+      "globalFlags": {
+        "type": "object",
+        "properties": {
+          "projectDir": {
+            "type": "string",
+            "alias": "p",
+            "default": ".",
+            "description": "Project root directory."
+          },
+          "json": {
+            "type": "boolean",
+            "default": false,
+            "description": "Machine-readable JSON output."
+          },
+          "noColor": {
+            "type": "boolean",
+            "default": false,
+            "description": "Disable ANSI colors."
+          }
+        }
+      }
+    }
+  },
+
+  "summarySchemas": {
+    "$id": "#/summarySchemas",
+    "title": "Command-specific --json summary schemas",
+    "type": "object",
+    "properties": {
+      "build": {
+        "type": "object",
+        "properties": {
+          "apps": { "type": "number", "description": "Number of apps processed." },
+          "artifacts": { "type": "number", "description": "Number of artifacts built." }
+        }
+      },
+      "materialize": {
+        "type": "object",
+        "properties": {
+          "files": { "type": "number", "description": "Number of .tf.json files generated." },
+          "extensions": { "type": "number", "description": "Number of extension rules applied." }
+        }
+      },
+      "check": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "number", "description": "Total diagnostics count." }
+        }
+      },
+      "plan": {
+        "type": "object",
+        "properties": {
+          "tfPlanOutput": { "type": "string", "description": "Terraform plan stdout." }
+        }
+      },
+      "apply": {
+        "type": "object",
+        "properties": {
+          "tfApplyOutput": { "type": "string", "description": "Terraform apply stdout." }
+        }
+      },
+      "destroy": {
+        "type": "object",
+        "properties": {
+          "tfDestroyOutput": { "type": "string", "description": "Terraform destroy stdout." },
+          "cleanedUp": { "type": "boolean", "description": "Whether generated files were removed." }
+        }
+      }
+    }
+  }
+}

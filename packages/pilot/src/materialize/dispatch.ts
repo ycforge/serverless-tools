@@ -1,0 +1,142 @@
+import type {
+  DispatchOptions,
+  DispatchResult,
+  GeneratedTfFile,
+  PluginRegistry,
+  ProjectModel,
+  TerraformResource,
+} from '../contracts/index.js';
+import { applyExtensions } from '../extensions/index.js';
+import { createOutputBuilder } from './context.js';
+import { materializeAll } from './materialize.js';
+import {
+  outputCollisionDiagnostics,
+  serializeAppFile,
+  detectFilenameCollision,
+} from './serialize.js';
+import { selectArtifacts } from './select.js';
+
+/**
+ * Dispatch orchestration (data-model "Dispatch Flow"). Pure + async — no I/O
+ * (FR-015); the resulting files are persisted by `writeGeneratedTerraform`.
+ *
+ *  Phase 1 — SELECT: deterministic order → supports iteration → collect-ALL
+ *  selection errors (FR-017). Any error → invalid, materialize never called.
+ *  Phase 2 — MATERIALIZE: one shared OutputBuilder context; abort-on-first
+ *  MTL_MATERIALIZE_FAILED (FR-006). `options.artifacts` (spec 025, FR-002/003)
+ *  threads built values into the ArtifactDescriptors; when absent, descriptors
+ *  carry no `value` (US-5 backward compatibility).
+ *  SERIALIZE: address guard + filename per app → files.
+ *  RESULT: ok carries `materializerOutputs` (declared outputs, FR-004).
+ *
+ *  Phase 3 (F-EXT-SERIALIZATION) — EXTENSIONS: when `options.extensions` is
+ *  present, `applyExtensions` deep-merges `.ycsf/extensions.yaml` patches onto
+ *  the materialized resources BEFORE serialization, so patches (execution_timeout,
+ *  memory, …) reach the emitted Terraform. All-or-nothing: any error → invalid.
+ */
+export async function dispatch(
+  projectModel: ProjectModel,
+  registry: PluginRegistry,
+  options: DispatchOptions = {},
+): Promise<DispatchResult> {
+  const { artifacts } = options;
+
+  // Phase 1 — selection, all-or-nothing (FR-017).
+  const selection = selectArtifacts(projectModel, registry, artifacts);
+  if (selection.kind === 'invalid') {
+    return { kind: 'invalid', errors: selection.errors };
+  }
+
+  // Phase 2 — materialize, abort-on-first (FR-006). projectRoot (spec 028,
+  // T024) is additive in DispatchOptions and threaded into every context.
+  const outputBuilder = createOutputBuilder();
+  const materialization = await materializeAll(
+    projectModel,
+    registry,
+    selection.matches,
+    outputBuilder,
+    artifacts,
+    options.projectRoot,
+  );
+  if (materialization.kind === 'failed') {
+    return { kind: 'invalid', errors: [materialization.error] };
+  }
+
+  // Filename collision guard first (defensive, FR-010).
+  const collisions = detectFilenameCollision(
+    materialization.resources.map(({ appId }) => ({
+      appId,
+      filename: `${appId}.ycsf.tf.json`,
+    })),
+  );
+  if (collisions.length > 0) {
+    return { kind: 'invalid', errors: collisions };
+  }
+
+  // Collect materialized resources into a flat array + per-app grouping.
+  // `keyToAppId` lets us remap patched resources back to their app after
+  // extensions reorder the list (F-EXT-SERIALIZATION).
+  const resources: TerraformResource[] = [];
+  const keyToAppId = new Map<string, string>();
+  const byApp = new Map<string, TerraformResource[]>();
+  for (const { resource, appId } of materialization.resources) {
+    resources.push(resource);
+    keyToAppId.set(`${resource.type}.${resource.name}`, appId);
+    const list = byApp.get(appId);
+    if (list === undefined) byApp.set(appId, [resource]);
+    else list.push(resource);
+  }
+
+  // F-EXT-SERIALIZATION: apply extension patches BEFORE serialization so they
+  // reach the emitted Terraform (spec 028 + spec 015). The pipeline threads
+  // `options.extensions` (loaded from `.ycsf/extensions.yaml`) into dispatch;
+  // absent/empty → no-op (thin callers / standalone materialize).
+  if (options.extensions !== undefined && options.extensions.extensions.length > 0) {
+    const applied = applyExtensions(resources, options.extensions);
+    if (applied.kind === 'invalid') {
+      return {
+        kind: 'invalid',
+        errors: applied.errors.map((e) => ({ code: e.code, message: e.message })),
+      };
+    }
+    // Rebuild per-app grouping from patched resources (order may change).
+    byApp.clear();
+    for (const patched of applied.resources) {
+      const appId = keyToAppId.get(`${patched.type}.${patched.name}`);
+      if (appId === undefined) continue;
+      const list = byApp.get(appId);
+      if (list === undefined) byApp.set(appId, [patched]);
+      else list.push(patched);
+    }
+    resources.length = 0;
+    resources.push(...applied.resources);
+  }
+
+  // Serialize per app: one artifact may yield several resources (e.g. a bucket
+  // plus its objects), all merged under one `resource` block in the app's
+  // single file (FR-008; addresses validated per resource, FR-011).
+  const generatedFiles: GeneratedTfFile[] = [];
+  for (const [appId, appResources] of byApp) {
+    const serialized = serializeAppFile(appId, appResources);
+    if (serialized.kind === 'invalid') {
+      return { kind: 'invalid', errors: serialized.errors };
+    }
+    generatedFiles.push(serialized.file);
+  }
+
+  // Outputs (spec 014, superseded by spec 016): materializer-level duplicate
+  // output names are still an error (FR-013; Assumption — collision detection
+  // lives here). The merged `99-ycsf-outputs.tf.json` is generated by
+  // `buildOutputs` (spec 016); dispatch no longer emits any outputs file.
+  const outputCollisions = outputCollisionDiagnostics(outputBuilder.duplicateNames);
+  if (outputCollisions.length > 0) {
+    return { kind: 'invalid', errors: outputCollisions };
+  }
+
+  return {
+    kind: 'ok',
+    resources,
+    generatedFiles,
+    materializerOutputs: outputBuilder.declared,
+  };
+}

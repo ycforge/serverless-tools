@@ -1,0 +1,28 @@
+# Runtime env (never committed)
+.env
+.env.*
+!.env.example
+sa-key.json
+
+# Terraform
+infra/.terraform/
+infra/*.ycsf.tf.json
+infra/*-ycsf-outputs.tf.json
+infra/*.tfplan
+infra/generated/
+*.tfstate
+*.tfstate.*
+
+# Toolchain-generated (never committed)
+.ycsf/artifacts/
+.ycsf/cache/
+generated/
+
+# .ycsf/*.ycsf.tf.json — committed generated-model snapshots (pattern from pilot
+# canonical fixture; needed for ycsf check to validate extensions/outputs targets
+# on a cold checkout; T033; pending D9 fix → T034). Do NOT gitignore.
+
+# Local app build outputs
+apps/*/dist/
+apps/*/node_modules/
+node_modules/

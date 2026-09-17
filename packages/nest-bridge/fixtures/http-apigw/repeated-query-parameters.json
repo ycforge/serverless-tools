@@ -1,0 +1,136 @@
+{
+  "timestamp": "2026-09-17T04:19:42.000Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "real Yandex API Gateway (cloud_functions integration) capture, spec 036"
+  },
+  "event": {
+    "httpMethod": "GET",
+    "path": "/users",
+    "url": "/users?limit=2&limit=3&offset=0&multi=a&multi=b",
+    "headers": {
+      "Accept": "*/*",
+      "Host": "conformance.gateway.apigw.yandexcloud.net",
+      "Traceparent": "00-0000000000000000ab12cd34ef567890-5bb6aa5c66657d30-01",
+      "Tracestate": "",
+      "Uber-Trace-Id": "ab12cd34ef567890:5bb6aa5c66657d30:06d027ab0322c8c9:1",
+      "User-Agent": "conformance-fixture/1.0",
+      "X-Api-Gateway-Function-Id": "fnconf00000000000001",
+      "X-Envoy-External-Address": "203.0.113.11",
+      "X-Envoy-Original-Path": "/users",
+      "X-Forwarded-For": "203.0.113.11",
+      "X-Forwarded-Proto": "https",
+      "X-Real-Remote-Address": "203.0.113.11:50003",
+      "X-Request-Id": "1c2f3a4b-5d6e-4f8a-9b01-c2d3e4f5a6b7",
+      "X-Serverless-Certificate-Ids": "{}",
+      "X-Serverless-Gateway-Id": "gwconf00000000000001",
+      "X-Trace-Id": "11111111-2222-4333-8444-555555555555"
+    },
+    "multiValueHeaders": {
+      "Accept": ["*/*"],
+      "Host": ["conformance.gateway.apigw.yandexcloud.net"],
+      "Traceparent": ["00-0000000000000000ab12cd34ef567890-5bb6aa5c66657d30-01"],
+      "Tracestate": [""],
+      "Uber-Trace-Id": ["ab12cd34ef567890:5bb6aa5c66657d30:06d027ab0322c8c9:1"],
+      "User-Agent": ["conformance-fixture/1.0"],
+      "X-Api-Gateway-Function-Id": ["fnconf00000000000001"],
+      "X-Envoy-External-Address": ["203.0.113.11"],
+      "X-Envoy-Original-Path": ["/users"],
+      "X-Forwarded-For": ["203.0.113.11"],
+      "X-Forwarded-Proto": ["https"],
+      "X-Real-Remote-Address": ["203.0.113.11:50003"],
+      "X-Request-Id": ["1c2f3a4b-5d6e-4f8a-9b01-c2d3e4f5a6b7"],
+      "X-Serverless-Certificate-Ids": ["{}"],
+      "X-Serverless-Gateway-Id": ["gwconf00000000000001"],
+      "X-Trace-Id": ["11111111-2222-4333-8444-555555555555"]
+    },
+    "queryStringParameters": {
+      "limit": "3",
+      "offset": "0",
+      "multi": "b"
+    },
+    "multiValueQueryStringParameters": {
+      "limit": ["2", "3"],
+      "offset": ["0"],
+      "multi": ["a", "b"]
+    },
+    "params": {},
+    "multiValueParams": {},
+    "pathParams": {},
+    "body": "",
+    "isBase64Encoded": true,
+    "requestContext": {
+      "identity": {
+        "sourceIp": "203.0.113.11",
+        "userAgent": "conformance-fixture/1.0"
+      },
+      "httpMethod": "GET",
+      "requestId": "1c2f3a4b-5d6e-4f8a-9b01-c2d3e4f5a6b7",
+      "requestTime": "17/Sep/2026:04:19:42 +0000",
+      "requestTimeEpoch": 1789618782
+    }
+  },
+  "context": {
+    "awsRequestId": "1c2f3a4b-5d6e-4f8a-9b01-c2d3e4f5a6b7",
+    "requestId": "1c2f3a4b-5d6e-4f8a-9b01-c2d3e4f5a6b7",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verv10000000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1789618782174,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "ab12cd34ef567890:04d85766c6bb6cc6:9e8d12364cba60d1:1",
+    "_data": {
+      "httpMethod": "GET",
+      "path": "/users",
+      "url": "/users?limit=2&limit=3&offset=0&multi=a&multi=b",
+      "headers": {
+        "Accept": "*/*",
+        "Host": "conformance.gateway.apigw.yandexcloud.net",
+        "Traceparent": "00-0000000000000000ab12cd34ef567890-5bb6aa5c66657d30-01",
+        "Tracestate": "",
+        "Uber-Trace-Id": "ab12cd34ef567890:5bb6aa5c66657d30:06d027ab0322c8c9:1",
+        "User-Agent": "conformance-fixture/1.0",
+        "X-Api-Gateway-Function-Id": "fnconf00000000000001",
+        "X-Envoy-External-Address": "203.0.113.11",
+        "X-Envoy-Original-Path": "/users",
+        "X-Forwarded-For": "203.0.113.11",
+        "X-Forwarded-Proto": "https",
+        "X-Real-Remote-Address": "203.0.113.11:50003",
+        "X-Request-Id": "1c2f3a4b-5d6e-4f8a-9b01-c2d3e4f5a6b7",
+        "X-Serverless-Certificate-Ids": "{}",
+        "X-Serverless-Gateway-Id": "gwconf00000000000001",
+        "X-Trace-Id": "11111111-2222-4333-8444-555555555555"
+      },
+      "queryStringParameters": {
+        "limit": "3",
+        "offset": "0",
+        "multi": "b"
+      },
+      "requestContext": {
+        "identity": {
+          "sourceIp": "203.0.113.11",
+          "userAgent": "conformance-fixture/1.0"
+        },
+        "httpMethod": "GET",
+        "requestId": "1c2f3a4b-5d6e-4f8a-9b01-c2d3e4f5a6b7",
+        "requestTime": "17/Sep/2026:04:19:42 +0000",
+        "requestTimeEpoch": 1789618782
+      },
+      "body": "",
+      "isBase64Encoded": true,
+      "multiValueParams": {},
+      "multiValueQueryStringParameters": {
+        "limit": ["2", "3"],
+        "offset": ["0"],
+        "multi": ["a", "b"]
+      },
+      "params": {},
+      "path": "/users",
+      "pathParams": {}
+    }
+  }
+}

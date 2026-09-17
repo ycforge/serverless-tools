@@ -1,0 +1,8 @@
+version: 1
+rules:
+  - op: replace
+    target:
+      kind: info
+    value:
+      title: local-add gateway
+      version: 1.0.0

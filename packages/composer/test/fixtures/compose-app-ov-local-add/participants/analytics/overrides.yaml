@@ -1,0 +1,12 @@
+version: 1
+rules:
+  - op: add
+    target:
+      kind: path
+      path: /analytics-extra
+    value:
+      get:
+        operationId: getAnalyticsExtra
+        responses:
+          "200":
+            description: extra

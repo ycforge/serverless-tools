@@ -1,0 +1,9 @@
+version: 1
+rules:
+  - op: replace
+    target:
+      kind: operation
+      path: /users
+      method: get
+    value:
+      summary: Updated list users

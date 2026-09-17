@@ -1,0 +1,10 @@
+{
+  "resource": {
+    "yandex_api_gateway": {
+      "openapi": {
+        "name": "openapi",
+        "spec": "${templatefile(\"${path.module}/generated/openapi-openapi.yaml\", { yandex_function_user_service_id = yandex_function.user_service.id, yandex_serverless_container_analytics_id = yandex_serverless_container.analytics.id })}"
+      }
+    }
+  }
+}

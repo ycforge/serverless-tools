@@ -10,7 +10,7 @@ Yandex Cloud Serverless for NestJS.
 
 | Пакет | Кодовое имя | Назначение |
 |-------|-------------|------------|
-| `packages/nest-bridge` | Project A | `@ycforge/nestjs-connector`: runtime/transport adapter между Yandex Cloud Function и обычным NestJS-приложением (историческое имя `@ycforge/ycsf-nestjs-connector`, мигрирует из [ycforge/ycsf-nestjs-connector](https://github.com/ycforge/ycsf-nestjs-connector)) |
+| `packages/nest-bridge` | Project A | `@ycforge/nestjs-connector`: runtime/transport adapter между Yandex Cloud Function и обычным NestJS-приложением (мигрирован из [ycforge/ycsf-nestjs-connector](https://github.com/ycforge/ycsf-nestjs-connector) v0.0.3; spec 003 добавил `@RequireAuth`, глобальный auth-guard и subpath exports `/auth`, `/queue`, `/context`) |
 | `packages/composer` | Project B | `@ycforge/composer`: API Gateway / OpenAPI Composition Builder — собирает единую API Gateway specification из нескольких приложений |
 | `packages/pilot` | Project C | `@ycforge/pilot`: Build/Deployment Orchestrator — сборка, builders, materializers, генерация Terraform; plugin contracts экспортируются через `@ycforge/pilot/contracts` |
 

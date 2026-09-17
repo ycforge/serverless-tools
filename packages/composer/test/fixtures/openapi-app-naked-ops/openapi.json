@@ -1,0 +1,9 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "openapi-app-naked-ops", "version": "1.0.0" },
+  "paths": {
+    "/a": { "get": {} },
+    "/b": { "post": { "security": [] } },
+    "/c": { "get": { "security": [{ "user": [] }] } }
+  }
+}

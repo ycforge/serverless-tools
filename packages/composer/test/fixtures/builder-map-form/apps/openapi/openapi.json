@@ -1,0 +1,61 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "builder-map-form",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/v1/hello": {
+      "get": {
+        "operationId": "getHello",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/v1/analytics": {
+      "get": {
+        "operationId": "getAnalytics",
+        "x-yc-apigateway-integration": {
+          "type": "serverless-containers",
+          "container_id": "${resources.containers.analytics.id}"
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/v1/assets": {
+      "get": {
+        "operationId": "getAssets",
+        "x-yc-apigateway-integration": {
+          "type": "object-storage",
+          "bucket": "${resources.buckets.frontend.name}"
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/v1/users": {
+      "get": {
+        "operationId": "getUsers",
+        "x-yc-apigateway-integration": {
+          "type": "cloud_functions",
+          "function_id": "${resources.functions.user_service.id}"
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    }
+  }
+}

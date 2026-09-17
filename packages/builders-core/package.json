@@ -1,0 +1,53 @@
+{
+  "name": "@ycforge/builders-core",
+  "version": "0.1.0",
+  "description": "Core builder plugins for the serverless-tools ecosystem (spec 018): nestjs-function (bundling), docker, vite. Registered via the spec-013 explicit mapping under subpath specifiers @ycforge/builders-core/{nestjs-function,docker,vite}.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./nestjs-function": {
+      "types": "./dist/nestjs-function/index.d.ts",
+      "import": "./dist/nestjs-function/index.js",
+      "require": "./dist/nestjs-function/index.cjs"
+    },
+    "./docker": {
+      "types": "./dist/docker/index.d.ts",
+      "import": "./dist/docker/index.js",
+      "require": "./dist/docker/index.cjs"
+    },
+    "./vite": {
+      "types": "./dist/vite/index.d.ts",
+      "import": "./dist/vite/index.js",
+      "require": "./dist/vite/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "tsup && vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "esbuild": "^0.27.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ycforge.github.io/serverless-tools/schemas/local-dev-server.json",
+  "title": "@ycforge/js-dev-tools — local dev server contract (spec 023)",
+  "description": "Machine-readable contract for createYcsfLocalServer (spec 023, S-1..S-3, FR-001..004, FR-029). Public surface of the @ycforge/js-dev-tools/server subpath. Fail-fast on configuration via JDT_* diagnostic codes (Constitution V, D-8/D-10). Event/context/response shapes are connector contracts (@ycforge/nestjs-connector RawHttpApiGatewayV2Event / YandexFunctionHttpResponse) and are not re-contracted here.",
+  "type": "object",
+
+  "definitions": {
+    "yandexContext": {
+      "$id": "#/definitions/yandexContext",
+      "title": "yandexContext",
+      "type": "object",
+      "description": "Input data for raw runtime-context synthesis (S-6, FR-016..018). Optional fields; unknown extra fields are merged over deterministic defaults (explicit override escape hatch).",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "IAM token written into the raw-context token key (FR-017). Secret: never logged, never echoed in banners/responses (FR-017, FR-028). When absent the raw context has no token key. Reads via connector @YandexContext() are a connector-side contract; over the HTTP dispatch path the connector does not fill them (boundary A-13), so the raw-context contract is verified at unit level (buildRawContext)."
+        },
+        "folderId": {
+          "type": "string",
+          "description": "Becomes functionFolderId in the raw context (FR-018)."
+        },
+        "cloudId": {
+          "type": "string",
+          "description": "Becomes cloudId in the raw context (escape-hatch key); no normalized typed field exists in YandexExecutionContext (Q-2, FR-018). Reading raw over HTTP via @YandexContext() is a connector boundary (A-13)."
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "ycsfLocalServerOptions": {
+      "$id": "#/definitions/ycsfLocalServerOptions",
+      "title": "YcsfLocalServerOptions",
+      "type": "object",
+      "description": "Options of createYcsfLocalServer (S-2, FR-002). All optional except entry.",
+      "properties": {
+        "entry": {
+          "type": "string",
+          "description": "Path to a module exporting the root NestJS module (relative resolved from cwd, or absolute). Loaded via host dynamic import without transpilation (S-3, FR-005)."
+        },
+        "apiGatewayV2": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable HTTP / API Gateway v2 (payload 2.0) emulation."
+        },
+        "messageQueue": {
+          "type": "boolean",
+          "default": false,
+          "description": "Message Queue trigger emulation. true → fail-fast JDT_MQ_UNSUPPORTED (out of v1, D-8)."
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "default": 3000,
+          "description": "TCP port for the HTTP server. 0 → OS-assigned (tests). Bind host fixed to 127.0.0.1 (A-3)."
+        },
+        "yandexContext": {
+          "$ref": "#/definitions/yandexContext"
+        }
+      },
+      "required": ["entry"],
+      "additionalProperties": false
+    },
+
+    "localDevServer": {
+      "$id": "#/definitions/localDevServer",
+      "title": "LocalDevServer",
+      "type": "object",
+      "description": "Handle returned by createYcsfLocalServer (S-2, FR-003). Promise resolves after the HTTP server actually listens.",
+      "properties": {
+        "port": {
+          "type": "integer",
+          "description": "Actual bound port (after listen; for port:0 the OS-assigned value)."
+        },
+        "baseUrl": {
+          "type": "string",
+          "pattern": "^http://127\\.0\\.0\\.1:\\d+$",
+          "description": "http://127.0.0.1:<port> — ready-to-fetch base URL."
+        },
+        "stop": {
+          "type": "object",
+          "description": "stop(): Promise<void> — idempotent; closes the HTTP listener and calls the connector handler close() (FR-009)."
+        }
+      },
+      "required": ["port", "baseUrl", "stop"],
+      "additionalProperties": false
+    },
+
+    "jdtDiagnosticCode": {
+      "$id": "#/definitions/jdtDiagnosticCode",
+      "title": "JdtDiagnosticCode",
+      "type": "string",
+      "description": "Diagnostic code family JDT_* (FR-029). Startup failures reject the returned promise with a LocalDevServerError carrying these codes; JDT_IAM_UNAVAILABLE is a warning, not a rejection (fail-open, D-10). JDT_INVALID_PORT is a documented additive code beyond the closed FR-029 catalog (port is a mandatory fail-fast configuration surface, S-2), raised by option validation before probe/bind.",
+      "enum": [
+        "JDT_MQ_UNSUPPORTED",
+        "JDT_NO_TRANSPORT",
+        "JDT_PORT_IN_USE",
+        "JDT_INVALID_PORT",
+        "JDT_ENTRY_RESOLVE_FAILED",
+        "JDT_ENTRY_MODULE_NOT_FOUND",
+        "JDT_ENTRY_MODULE_AMBIGUOUS",
+        "JDT_IAM_UNAVAILABLE"
+      ]
+    },
+
+    "localDevServerError": {
+      "$id": "#/definitions/localDevServerError",
+      "title": "LocalDevServerError",
+      "type": "object",
+      "description": "Rejection shape: Error subclass with .code and optional .cause.",
+      "properties": {
+        "name": { "type": "string", "const": "LocalDevServerError" },
+        "code": { "$ref": "#/definitions/jdtDiagnosticCode" },
+        "message": { "type": "string" },
+        "cause": { "description": "Original error (import failure, kernel EADDRINUSE, etc.); may be absent." }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    },
+
+    "failFastConditions": {
+      "$id": "#/definitions/failFastConditions",
+      "title": "Fail-fast conditions (FR-004, S-2)",
+      "type": "object",
+      "description": "None of these raises a listener or creates a connector handler.",
+      "properties": {
+        "JDT_MQ_UNSUPPORTED": {
+          "type": "string",
+          "description": "messageQueue: true → rejected before any side effect (D-8)."
+        },
+        "JDT_NO_TRANSPORT": {
+          "type": "string",
+          "description": "!apiGatewayV2 && !messageQueue → rejected (FR-004)."
+        },
+        "JDT_PORT_IN_USE": {
+          "type": "string",
+          "description": "Port already bound (EADDRINUSE) → rejected with the port in the message."
+        },
+        "JDT_INVALID_PORT": {
+          "type": "string",
+          "description": "port is not an integer in [0, 65535] → rejected before any probe/bind (additive code, S-2 option validation; see parent description)."
+        },
+        "JDT_ENTRY_RESOLVE_FAILED": {
+          "type": "string",
+          "description": "entry file missing or dynamic import threw (incl. unhandled TS extension under a plain Node host) → rejected."
+        },
+        "JDT_ENTRY_MODULE_NOT_FOUND": {
+          "type": "string",
+          "description": "No AppModule named export and no default export → rejected, message lists allowed exports (S-3, FR-006)."
+        },
+        "JDT_ENTRY_MODULE_AMBIGUOUS": {
+          "type": "string",
+          "description": "Both AppModule named export and a different class as default export → rejected (no guessing, FR-006)."
+        }
+      },
+      "required": [
+        "JDT_MQ_UNSUPPORTED",
+        "JDT_NO_TRANSPORT",
+        "JDT_PORT_IN_USE",
+        "JDT_INVALID_PORT",
+        "JDT_ENTRY_RESOLVE_FAILED",
+        "JDT_ENTRY_MODULE_NOT_FOUND",
+        "JDT_ENTRY_MODULE_AMBIGUOUS"
+      ],
+      "additionalProperties": false
+    },
+
+    "observability": {
+      "$id": "#/definitions/observability",
+      "title": "Observability (S-9, FR-026..028)",
+      "type": "object",
+      "description": "Startup banner and per-request log to stderr. Token value never appears (FR-028).",
+      "properties": {
+        "startupBanner": {
+          "type": "string",
+          "pattern": "^local-dev-server listening on http://127\\.0\\.0\\.1:\\d+ \\(apiGatewayV2\\) — IAM",
+          "description": "Contains URL, mode, IAM status; never the token value."
+        },
+        "perRequestLog": {
+          "type": "string",
+          "pattern": "→ \\d+ \\(\\d+ ms\\) trace_id=",
+          "description": "Example: GET /api/users → 200 (12 ms) trace_id=<id>. Grep-stable."
+        },
+        "iamWarning": {
+          "type": "string",
+          "pattern": "JDT_IAM_UNAVAILABLE",
+          "description": "Warning emitted once per start when token resolution failed (fail-open)."
+        }
+      },
+      "required": ["startupBanner", "perRequestLog", "iamWarning"],
+      "additionalProperties": false
+    }
+  },
+
+  "createYcsfLocalServer": {
+    "$id": "#/createYcsfLocalServer",
+    "title": "createYcsfLocalServer",
+    "type": "object",
+    "description": "Entry contract (S-2, FR-003): createYcsfLocalServer(options) → Promise<LocalDevServer>; resolves after bind, rejects with LocalDevServerError on any startup error (fail-fast) — except IAM which fails open with a warning.",
+    "properties": {
+      "options": { "$ref": "#/definitions/ycsfLocalServerOptions" },
+      "returns": { "$ref": "#/definitions/localDevServer" },
+      "rejections": { "$ref": "#/definitions/failFastConditions" }
+    },
+    "required": ["options", "returns", "rejections"]
+  }
+}

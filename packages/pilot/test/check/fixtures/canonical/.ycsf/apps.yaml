@@ -1,0 +1,8 @@
+version: 1
+apps:
+  user_service:
+    source_path: src/user_service
+    builder: nodejs-builder
+  analytics:
+    source_path: src/analytics
+    builder: nodejs-builder

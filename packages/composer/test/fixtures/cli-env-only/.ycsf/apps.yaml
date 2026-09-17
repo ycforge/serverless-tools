@@ -1,0 +1,6 @@
+version: 1
+apps:
+  - id: user_service
+    name: User Service
+    builder: yandex-api-gateway
+    path: ./apps/user_service

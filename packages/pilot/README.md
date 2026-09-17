@@ -30,6 +30,25 @@ IDEA.md §43):
 Плагин объявляет peer-зависимость на диапазон major-версий `@ycforge/pilot`;
 несовместимость отклоняется C при загрузке плагина, до запуска builders.
 
+## Artifact store (spec 028)
+
+`ycsf build` writes one store descriptor per app to
+`.ycsf/artifacts/<appId>/artifact.json` (`{ "version": 1, "type": "<package-scope>:<kind>", "value": ... }`,
+canonical `JSON.stringify`). Standalone `ycsf materialize` reads the store (or an
+explicit `--artifacts <dir>` root) instead of requiring an in-process build first;
+`.ycsf/artifacts/` is git-ignored and is not part of the build fingerprint (spec 022).
+
+## App identities (spec 028)
+
+Map-form app definitions whose builder key follows the artifact-type convention
+(`ycforge:function`, `ycforge:docker-image`, `ycforge:frontend`,
+`ycforge:api-gateway`) derive a resource identity from `@ycforge/pilot/contracts`
+(`ARTIFACT_TYPE_DOMAIN_MAP` → `functions|containers|buckets|gateways`). These
+identities are handed to Project B composers via `BuildContext.appIdentities`, so
+`${resources.<domain>.<app_id>.<property>}` references resolve **without** entries
+in `.ycsf/resources.yaml`; an app colliding with an explicit resource is a
+validation error, never a silent merge.
+
 ## Разработка
 
 ```bash

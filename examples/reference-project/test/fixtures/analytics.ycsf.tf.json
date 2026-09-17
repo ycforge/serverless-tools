@@ -1,0 +1,16 @@
+{
+  "resource": {
+    "yandex_serverless_container": {
+      "analytics": {
+        "image": [
+          {
+            "url": "cr.yandex/crps9jj0ui2e954vaj8m/analytics@sha256:85b68206325f6af4fc29f72b87ebcdbc94cf5c8fc086ef48a02abf40372e80f4"
+          }
+        ],
+        "memory": 128,
+        "name": "analytics",
+        "service_account_id": "ajefi3b58tak71g3ecp1"
+      }
+    }
+  }
+}

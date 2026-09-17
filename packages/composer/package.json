@@ -1,0 +1,63 @@
+{
+  "name": "@ycforge/composer",
+  "version": "0.1.0",
+  "description": "OpenAPI extraction for serverless-tools (Project B): safe metadata-only OpenAPI retrieval in an isolated runner subprocess.",
+  "author": "ycforge (https://github.com/ycforge)",
+  "license": "MIT",
+  "homepage": "https://github.com/ycforge/serverless-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ycforge/serverless-tools.git",
+    "directory": "packages/composer"
+  },
+  "keywords": [
+    "openapi",
+    "yandex-cloud",
+    "api-gateway",
+    "serverless",
+    "ycforge"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./builder": {
+      "types": "./dist/builder/index.d.ts",
+      "import": "./dist/builder/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "runner"
+  ],
+  "sideEffects": false,
+  "bin": {
+    "ycsf-api": "dist/cli/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "pretest": "pnpm --filter @ycforge/pilot build && pnpm build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ycforge/pilot": "workspace:*",
+    "commander": "^12.0.0",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@ycforge/materializers-core": "workspace:*",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

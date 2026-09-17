@@ -1,0 +1,243 @@
+import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+import {
+  validateAuthConfig,
+  validateAuthReferences,
+  type OpenApiDocument,
+} from '../index.js';
+import {
+  DEFAULT_SCHEME_VALIDATORS,
+  parseAuthYaml,
+  type RawAuthScheme,
+  type SchemeFieldValidator,
+} from './auth-yaml.js';
+import { AuthConfigError } from './auth-errors.js';
+
+function tempRoot(files: Record<string, string>): string {
+  const dir = mkdtempSync(join(tmpdir(), 'yc-composer-auth-config-'));
+  for (const [name, content] of Object.entries(files)) {
+    writeFileSync(join(dir, name), content);
+  }
+  return dir;
+}
+
+function docWithSecurity(scheme: string): OpenApiDocument {
+  return {
+    openapi: '3.0.0',
+    info: { title: 't', version: '1.0.0' },
+    paths: { '/x': { get: { security: [{ [scheme]: [] }] } } },
+  };
+}
+
+describe('validateAuthConfig — fixed pipeline order (SC-003)', () => {
+  const cases: Array<[string, Record<string, string>, OpenApiDocument, { functions?: string[] }, object]> =
+    [
+      [
+        'bad version wins over an undeclared security ref',
+        { 'auth.yaml': 'version: 2\ndefaultScheme: user\nschemes:\n  user:\n    type: none\n' },
+        docWithSecurity('ghost'),
+        {},
+        { code: 'AUTH_VERSION_UNSUPPORTED', field: 'version' },
+      ],
+      [
+        'missing defaultScheme wins over an undeclared security ref',
+        { 'auth.yaml': 'version: 1\nschemes:\n  user:\n    type: none\n' },
+        docWithSecurity('ghost'),
+        {},
+        { code: 'AUTH_DEFAULT_MISSING', field: 'defaultScheme' },
+      ],
+      [
+        'empty schemes wins over an unresolved defaultScheme',
+        { 'auth.yaml': 'version: 1\ndefaultScheme: ghost\nschemes: {}\n' },
+        docWithSecurity('ghost'),
+        {},
+        { code: 'AUTH_SCHEMES_EMPTY', field: 'schemes' },
+      ],
+      [
+        'unresolved defaultScheme wins over an unknown scheme type',
+        {
+          'auth.yaml':
+            'version: 1\ndefaultScheme: ghost\nschemes:\n  user:\n    type: oauth2\n',
+        },
+        docWithSecurity('ghost'),
+        {},
+        { code: 'AUTH_DEFAULT_UNRESOLVED', schemeName: 'ghost' },
+      ],
+      [
+        'missing jwt field wins over an undeclared security ref',
+        {
+          'auth.yaml':
+            'version: 1\ndefaultScheme: user\nschemes:\n  user:\n    type: jwt\n    jwksUri: u\n    issuer: i\n',
+        },
+        docWithSecurity('ghost'),
+        {},
+        { code: 'AUTH_MISSING_FIELD', schemeName: 'user', field: 'audience' },
+      ],
+      [
+        'unresolved function ref wins over an undeclared security ref',
+        {
+          'auth.yaml':
+            'version: 1\ndefaultScheme: internal\nschemes:\n  internal:\n    type: function\n    function: functions.nope\n',
+        },
+        docWithSecurity('ghost'),
+        { functions: ['internal_authorizer'] },
+        { code: 'AUTH_FUNCTION_UNRESOLVED', ref: 'functions.nope' },
+      ],
+      [
+        'invalid function grammar wins over a missing functions set',
+        {
+          'auth.yaml':
+            'version: 1\ndefaultScheme: internal\nschemes:\n  internal:\n    type: function\n    function: internal_authorizer\n',
+        },
+        docWithSecurity('ghost'),
+        {},
+        { code: 'AUTH_FUNCTION_INVALID_REF', ref: 'internal_authorizer' },
+      ],
+      [
+        'undeclared security ref is the final stage error',
+        {
+          'auth.yaml': 'version: 1\ndefaultScheme: user\nschemes:\n  user:\n    type: none\n',
+        },
+        docWithSecurity('ghost'),
+        {},
+        { code: 'AUTH_SECURITY_UNDECLARED', schemeName: 'ghost', route: 'GET /x' },
+      ],
+    ];
+
+  it.each(cases)('%s', async (_label, files, openApi, request, expected) => {
+    const root = tempRoot(files);
+    try {
+      await expect(
+        validateAuthConfig({ appRoot: root, openApi, ...request }),
+      ).rejects.toMatchObject(expected);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stops the pipeline at the first stage failure (SECURITY is never reached)', async () => {
+    const root = tempRoot({
+      'auth.yaml': 'version: 2\ndefaultScheme: ghost\nschemes: {}\n',
+    });
+    try {
+      await expect(
+        validateAuthConfig({
+          appRoot: root,
+          openApi: docWithSecurity('ghost'),
+        }),
+      ).rejects.toMatchObject({ code: 'AUTH_VERSION_UNSUPPORTED' });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('validateAuthReferences — standalone cross-validation against a validated authYaml', () => {
+  it('validates security references without re-reading auth.yaml', () => {
+    const result = validateAuthReferences(
+      docWithSecurity('user'),
+      {
+        version: 1,
+        defaultScheme: 'user',
+        schemes: { user: { type: 'none' } },
+      },
+    );
+    expect(result).toEqual({
+      authYaml: {
+        version: 1,
+        defaultScheme: 'user',
+        schemes: { user: { type: 'none' } },
+      },
+    });
+  });
+
+  it('rejects an undeclared security reference', () => {
+    expect(() =>
+      validateAuthReferences(
+        docWithSecurity('admin'),
+        { version: 1, defaultScheme: 'user', schemes: { user: { type: 'none' } } },
+      ),
+    ).toThrowError(
+      expect.objectContaining({ code: 'AUTH_SECURITY_UNDECLARED', schemeName: 'admin' }),
+    );
+  });
+});
+
+describe('extensibility — scheme-type validator registry (FR-005, SC-005)', () => {
+  const VALID_BASE_YAML = `version: 1
+defaultScheme: user
+schemes:
+  public:
+    type: none
+  user:
+    type: jwt
+    jwksUri: https://auth.example.com/jwks.json
+    issuer: https://auth.example.com
+    audience:
+      - my-api
+  internal:
+    type: function
+    function: functions.internal_authorizer
+`;
+
+  it('stays byte-for-byte unchanged through an extended registry', () => {
+    const extended: Readonly<Record<string, SchemeFieldValidator>> = {
+      ...DEFAULT_SCHEME_VALIDATORS,
+      basic: ((raw: RawAuthScheme, schemeName: string) => {
+        const realm = raw.realm;
+        if (typeof realm !== 'string' || realm === '') {
+          throw new AuthConfigError('AUTH_MISSING_FIELD', { schemeName, field: 'realm' });
+        }
+        return { type: 'basic', realm } as never;
+      }),
+    };
+    const base = parseAuthYaml(VALID_BASE_YAML, '/app/auth.yaml');
+    const viaExtended = parseAuthYaml(VALID_BASE_YAML, '/app/auth.yaml', extended);
+    expect(viaExtended).toEqual(base);
+  });
+
+  it('accepts a temporary custom scheme type and still fail-fasts on unknown types (SC-005, R1)', () => {
+    const extended: Readonly<Record<string, SchemeFieldValidator>> = {
+      ...DEFAULT_SCHEME_VALIDATORS,
+      basic: ((raw: RawAuthScheme, schemeName: string) => {
+        const realm = raw.realm;
+        if (typeof realm !== 'string' || realm === '') {
+          throw new AuthConfigError('AUTH_MISSING_FIELD', { schemeName, field: 'realm' });
+        }
+        return { type: 'basic', realm } as never;
+      }),
+    };
+    const withBasic = parseAuthYaml(
+      `version: 1
+defaultScheme: user
+schemes:
+  user:
+    type: none
+  basic:
+    type: basic
+    realm: example.com
+`,
+      '/app/auth.yaml',
+      extended,
+    );
+    expect(withBasic.schemes.basic).toEqual({ type: 'basic', realm: 'example.com' });
+
+    expect(() =>
+      parseAuthYaml(
+        `version: 1
+defaultScheme: user
+schemes:
+  user:
+    type: mystery
+`,
+        '/app/auth.yaml',
+        extended,
+      ),
+    ).toThrowError(
+      expect.objectContaining({ code: 'AUTH_UNKNOWN_SCHEME_TYPE', schemeName: 'user', type: 'mystery' }),
+    );
+  });
+});

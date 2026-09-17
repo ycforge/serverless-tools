@@ -1,0 +1,18 @@
+version: 1
+rules:
+  - op: replace
+    target:
+      kind: info
+    value:
+      title: compose-app gateway
+      version: 1.0.0
+  - op: add
+    target:
+      kind: path
+      path: /_health
+    value:
+      get:
+        operationId: health
+        responses:
+          "200":
+            description: ok

@@ -1,0 +1,2 @@
+version: 1
+openapi_entry: ./openapi.json

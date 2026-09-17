@@ -1,0 +1,18 @@
+{
+  "resource": {
+    "yandex_function": {
+      "user_service": {
+        "content": {
+          "zip_filename": "../.ycsf/artifacts/user_service/function.zip"
+        },
+        "entrypoint": "main.handler",
+        "execution_timeout": 5,
+        "memory": 128,
+        "name": "user-service",
+        "runtime": "nodejs22",
+        "service_account_id": "ajefi3b58tak71g3ecp1",
+        "user_hash": "6ba8923d20a98dfe1422e9d6b8816041011f40dd17aec846dcfef93347492cd0"
+      }
+    }
+  }
+}

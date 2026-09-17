@@ -1,0 +1,6 @@
+version: 1
+build_config:
+  image:
+    mode: registry-ref
+    ref: cr.yandex/crps9jj0ui2e954vaj8m/analytics@sha256:85b68206325f6af4fc29f72b87ebcdbc94cf5c8fc086ef48a02abf40372e80f4
+build_env: {}
