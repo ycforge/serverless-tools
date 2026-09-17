@@ -9,10 +9,12 @@ import type { TransportAdapter } from "./transport";
  *
  * This array is the single registration point for transports; application
  * code never adds to it. Order is detection-priority order and must stay
- * deterministic: the HTTP / API Gateway v2 adapter comes first, the Message
- * Queue trigger adapter second (issue #7). The two discriminators are
- * disjoint — `version === "2.0"` + canonical path fields vs a non-empty,
- * envelope-shaped `messages` array — so each event shape is claimed by exactly
+ * deterministic: the HTTP / API Gateway adapter comes first, the Message
+ * Queue trigger adapter second (issue #7). The discriminators are pairwise
+ * disjoint — `version === "2.0"` + canonical path fields for the v2/ALB
+ * frame, `httpMethod`/`path` with NO `version` for the API Gateway
+ * `cloud_functions` frame (spec 036), and a non-empty, envelope-shaped
+ * `messages` array for the queue — so each event shape is claimed by exactly
  * one transport regardless of position.
  *
  * Only the Message Queue transport currently accepts configuration (queue

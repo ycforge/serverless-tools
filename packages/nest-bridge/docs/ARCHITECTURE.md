@@ -35,7 +35,8 @@ Evidence levels used below, following AGENTS.md §2.3:
                               | implemented by
 +---------------------------------------------------------------+
 | Transport adapter layer (internal)                            |
-|   src/http — API Gateway v2 event <-> NestJS HTTP             |
+|   src/http — API Gateway/ALB event (v2 payload, plus v1        |
+|   cloud_functions via adapter) <-> NestJS HTTP                 |
 |   src/mq   — Message Queue trigger event -> handler dispatch  |
 |   Each transport is independent: no shared behavior,          |
 |   no knowledge of each other's semantics.                     |
@@ -75,6 +76,7 @@ Visibility tiers:
 | `src/core/transports.ts`                        | Internal   | Ordered built-in adapter registry; registration point                                        |
 | `src/http/raw-event.ts`                         | Public     | Raw API Gateway v2 event shape (**observed**)                                                |
 | `src/http/normalized-request.ts`                | Public     | Normalized HTTP request contract                                                             |
+| `src/http/yc-apigw-raw-event.ts`                | Public     | Raw API Gateway `cloud_functions` v1 event shape (**observed**, spec 036)                     |
 | `src/http/response.ts`                          | Public     | Function response envelope (**documented**)                                                  |
 | `src/mq/raw-event.ts`                           | Public     | Raw Message Queue trigger event shape (**observed**)                                         |
 | `src/mq/message.ts`                             | Public     | Normalized queue message/batch contracts + body strategy (#9)                                |
@@ -201,8 +203,18 @@ Policy:
 
 Discriminators (**observed**):
 
-- **HTTP**: `event.version === "2.0"` plus the presence of the canonical
-  fields `rawPath` / `rawQueryString` (full validation in the HTTP adapter).
+- **HTTP**: two pairwise-disjoint branches (spec 036):
+  - *API Gateway v2 / ALB frame*: `event.version === "2.0"` plus the
+    canonical fields `rawPath` / `rawQueryString` — full validation in the
+    HTTP adapter.
+  - *API Gateway `cloud_functions` (v1) frame*: `httpMethod`/`path` present
+    and **no** `version` key. A hybrid `version:"2.0"` + `httpMethod` +
+    `path` without `rawPath` claims **nothing** (UNKNOWN): `version` presence
+    beats optional v1 fields, so the two branches never overlap. The v1
+    branch adapts its event to the canonical v2 shape
+    (`adaptYcApiGatewayEventToV2`) and normalizes through the same pipeline
+    with `httpVersion: "1.0"`; the original v1 event stays reachable via
+    `NormalizedHttpRequest.raw`.
 - **Message Queue**: a validated `messages` array whose elements match the
   observed trigger structure (`event_metadata`, `details.queue_id`,
   `details.message.message_id`, ...). Validation must be cheap top-level

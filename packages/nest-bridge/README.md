@@ -3,7 +3,9 @@
 NestJS adapter for [Yandex Cloud Functions](https://yandex.cloud/en/services/functions).
 It lets a NestJS application run inside a Yandex Cloud Function behind two transports:
 
-- **HTTP / API Gateway** — Yandex API Gateway payload format `2.0`, synchronous
+- **HTTP / API Gateway** — Yandex API Gateway payload format `2.0` (ALB /
+  payload-format-2.0) **and** the API Gateway `cloud_functions` v1 event
+  (spec 036), both adapted into a single normalized HTTP request, synchronous
   request/response semantics, normal NestJS controllers.
 - **Message Queue** — Yandex Cloud Functions Message Queue trigger, asynchronous
   invocation semantics, message handlers built from NestJS abstractions.
@@ -131,10 +133,13 @@ Its IAM token (`executionContext.token`) is a secret: automatic serialization
 (`JSON.stringify`) redacts it to `REDACTED_TOKEN` and excludes the raw
 payloads, so accidental logging cannot leak credentials.
 
-The built-in registry currently ships with the HTTP / API Gateway v2 transport
-(#5, #6): `version: "2.0"` events are detected, structurally validated,
-normalized (canonical `rawPath`/`rawQueryString`, both query-parameter views,
-`isBase64Encoded`-driven body decoding) and published to the invocation scope.
+The built-in registry ships with the HTTP / API Gateway transport (#5, #6,
+spec 036): payload-format-`2.0`/ALB events (`version: "2.0"`) **and** the API
+Gateway `cloud_functions` v1 frame (`httpMethod`/`path`, no `version`) are
+detected, structurally validated, normalized through the same pipeline
+(canonical `rawPath`/`rawQueryString`, both query-parameter views,
+`isBase64Encoded`-driven body decoding; v1 is adapted first and reports the
+honest `httpVersion: "1.0"`) and published to the invocation scope.
 Controllers then dispatch through the warm Nest application: guards,
 interceptors, pipes, filters, `@Res()` escape hatches and standard
 `HttpException` mapping behave as on any other platform — the connector's
