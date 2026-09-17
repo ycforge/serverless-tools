@@ -166,6 +166,6 @@ export function readText(path: string): string {
 
 export function makeQueueUrl(valid: boolean): string {
   return valid
-    ? 'https://message-queue.api.cloud.yandex.net/b1g1/queues/my-queue'
+    ? 'https://message-queue.api.cloud.yandex.net/b1g1/dj600000010upn2504mi/my-queue'
     : 'https://message-queue.api.cloud.yandex.net/path-without-queues';
 }

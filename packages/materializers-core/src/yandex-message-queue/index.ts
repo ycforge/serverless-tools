@@ -21,13 +21,14 @@ const materializer: Materializer = {
       throw materializerError(YMT_INVALID_QUEUE_URL, `invalid queueUrl format: ${queueUrl}`);
     }
 
-    const queuesIdx = parsed.pathname.indexOf('/queues/');
-    if (queuesIdx === -1) {
-      throw materializerError(YMT_INVALID_QUEUE_URL, `invalid queueUrl format: ${queueUrl}`);
-    }
-
-    const afterQueues = parsed.pathname.slice(queuesIdx + '/queues/'.length);
-    const queueName = afterQueues.split('/')[0];
+    const segments = parsed.pathname.split('/').filter((segment) => segment.length > 0);
+    const queuesIdx = segments.lastIndexOf('queues');
+    const queueName =
+      queuesIdx !== -1 && queuesIdx < segments.length - 1
+        ? segments[queuesIdx + 1]
+        : segments.length >= 2
+          ? segments[segments.length - 1]
+          : undefined;
 
     if (!queueName) {
       throw materializerError(YMT_INVALID_QUEUE_URL, `invalid queueUrl format: ${queueUrl}`);

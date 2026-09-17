@@ -138,6 +138,7 @@ resource "yandex_message_queue" "<name>" {
 
 - **supports**: `artifact.type === 'ycforge:queue'`.
 - Парсит `value.queueUrl` для извлечения queue name и region. Security/visibility timeout — через extensions/spec 015.
+- **Correction (spec 037)**: реальный формат URL Yandex Message Queue — `https://message-queue.api.cloud.yandex.net/<cloud-id>/<queue-id>/<queue-name>` (без сегмента `/queues/`). Materializer извлекает `queue_name` как последний непустой path-сегмент; устаревший формат `.../queues/<name>` поддерживается для обратной совместимости. `region` — константа `ru-central1` (регион в URL не кодируется).
 - **Output**: `context.output.declare('<name>_queue_id', { value: 'yandex_message_queue.<name>.id' })`.
 
 ### Materializer `yandex-storage-bucket`
