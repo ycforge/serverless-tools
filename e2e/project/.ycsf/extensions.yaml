@@ -17,7 +17,7 @@ extensions:
     patch:
       service_account_id: "${var.service_account_id}"
       environment:
-        DLQ_QUEUE_ID: "${yandex_message_queue.e2e_worker_app_dlq.id}"
+        DLQ_QUEUE_ID: "${local.e2e_worker_app_dlq_queue_id}"
   - target: functions.e2e_rename_me
     patch:
       service_account_id: "${var.service_account_id}"

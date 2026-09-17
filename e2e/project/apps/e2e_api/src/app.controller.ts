@@ -1,6 +1,5 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { RequireAuth } from '@ycforge/nestjs-connector/auth';
-import { YandexContext, type YandexExecutionContext } from '@ycforge/nestjs-connector/context';
 import { YandexLogger } from '@ycforge/nestjs-connector/logger';
 import { E2eHeaderGuard } from './header.guard';
 
@@ -26,11 +25,6 @@ export class AppController {
   @Get('auth/function')
   authFunction(): { route: string } {
     return { route: 'function' };
-  }
-
-  @Get('context')
-  context(@YandexContext() ctx: YandexExecutionContext): { trace_id: string; functionName: string } {
-    return { trace_id: ctx.trace_id, functionName: ctx.functionName };
   }
 
   @Get('logged')

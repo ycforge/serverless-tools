@@ -6,8 +6,10 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { run, runOrThrow } from './exec.js';
@@ -129,6 +131,7 @@ export async function deployE2e(): Promise<DeployResult> {
     E2E_VITE_BIN: resolve(E2E_ROOT, 'node_modules', '.bin', 'vite'),
     VITE_NULL_RESOLVED: 'null-mode-value',
     DOCKER_CONFIG: workspace.dockerConfigDir,
+    DOCKER_BUILDKIT: '1',
     DOCKER_DEFAULT_PLATFORM: 'linux/amd64',
   };
 
@@ -161,7 +164,7 @@ export async function deployE2e(): Promise<DeployResult> {
     const staticBucket = outputValue(setupOutputs, 'static_bucket');
     const jwtBucket = outputValue(setupOutputs, 'jwt_bucket');
     const issuer = outputValue(setupOutputs, 'jwt_issuer');
-    const kmsKeyId = outputValue(setupOutputs, 'kms_key_id');
+    const kmsKeyId = process.env.E2E_KMS_KEY_ID ?? outputValue(setupOutputs, 'kms_key_id');
     buildEnv.E2E_STATIC_BUCKET = staticBucket;
 
     await dockerLogin(harness, workspace.dockerConfigDir);
@@ -181,12 +184,12 @@ export async function deployE2e(): Promise<DeployResult> {
       gatewayDomain: outputValue(outputs, 'e2e_gateway_domain'),
       containerUrl: outputValue(outputs, 'e2e_container_url'),
       workerEventsName: outputValue(outputs, 'e2e_worker_events_name'),
-      workerEventsDlqName: outputValue(outputs, 'e2e_worker_events_dlq_name'),
       workerDlqEventsName: outputValue(outputs, 'e2e_worker_dlq_events_name'),
       workerAppDlqName: outputValue(outputs, 'e2e_worker_app_dlq_name'),
       workerFunctionId: outputValue(outputs, 'e2e_worker_function_id'),
       workerDlqFunctionId: outputValue(outputs, 'e2e_worker_dlq_function_id'),
       apiFunctionId: outputValue(outputs, 'e2e_api_function_id'),
+      authorizerFunctionId: outputValue(outputs, 'e2e_authorizer_function_id'),
       renameFunctionId: outputValue(outputs, 'e2e_rename_me_function_id'),
       outputs,
       privateKeyPem: jwt.privateKeyPem,
@@ -237,6 +240,13 @@ async function runPipeline(projectDir: string, env: NodeJS.ProcessEnv): Promise<
 
 async function dockerLogin(harness: HarnessEnv, dockerConfigDir: string): Promise<void> {
   mkdirSync(dockerConfigDir, { recursive: true });
+  // DOCKER_CONFIG relocates the whole config dir, including cli-plugins — link
+  // the user's plugins back so `docker build` with BuildKit can find buildx.
+  const pluginsSource = join(homedir(), '.docker', 'cli-plugins');
+  const pluginsTarget = join(dockerConfigDir, 'cli-plugins');
+  if (existsSync(pluginsSource) && !existsSync(pluginsTarget)) {
+    symlinkSync(pluginsSource, pluginsTarget, 'dir');
+  }
   const token = await runOrThrow('yc', ['iam', 'create-token'], {
     env: { ...harness.child, YC_PROFILE: harness.ycProfile },
   });

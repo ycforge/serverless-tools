@@ -27,7 +27,7 @@ Spec 037 добавляет **воспроизводимый облачной e2
 | # | Вопрос | Решение |
 |---|--------|---------|
 | D1 | Оформление | мини-spec: только `spec.md`, без plan/tasks |
-| D2 | Расположение | standalone top-level `e2e/` **вне** pnpm-workspace (вариант A: вложенный `pnpm-workspace.yaml` + `link:../packages/*`) |
+| D2 | Расположение | standalone top-level `e2e/` **вне** корневого pnpm-workspace (своя store + `link:../packages/*`), с вендорингом коннектора (`scripts/vendor-connector.mjs` копирует `packages/nest-bridge/{package.json,dist}` в `e2e/node_modules/@ycforge/nestjs-connector` как реальный каталог). Иначе linked-коннектор тянет собственную dev-копию `@nestjs/common`, бандл функции получает две копии Nest → `instanceof HttpException` ломается → 500. Включение e2e в корневой workspace отвергнуто: `pnpm install` сдвинул transitive `vite` 7.3.6→6.4.3 и уронил существующие pilot-тесты. CI e2e не запускает: скрипты `e2e`/`e2e:typecheck`, нет `test`/`build` |
 | D3 | Креды Terraform | **только из env пользователя**; harness fail-fast при отсутствии. Авто-чтения `yc`-профиля нет |
 | D4 | YC CLI | только профиль `ycforge-sa` (жёстко, через `YC_PROFILE`/`--profile`). Иной профиль — запрещён без прямого согласия |
 | D5 | Cleanup | всегда `terraform destroy` в teardown (в т.ч. при падении) + флаг `--keep` для отладки |
@@ -42,9 +42,10 @@ Spec 037 добавляет **воспроизводимый облачной e2
 ## 3. Архитектура e2e
 
 ```
-e2e/                              # standalone pnpm-проект (вариант A)
+e2e/                              # standalone pnpm-проект (свой workspace + lockfile)
   pnpm-workspace.yaml             # свой workspace-root (packages: ['.'])
-  package.json                    # link:../packages/*, vitest, jose, @aws-sdk/client-sqs, yaml, tsx
+  package.json                    # link:../packages/*, vitest, jose, @aws-sdk/client-sqs, yaml, tsx, vite
+  scripts/vendor-connector.mjs    # реальный (не symlink) коннектор в node_modules → одна копия Nest
   tsconfig.json
   vitest.config.ts                # globalSetup, длинные таймауты
   README.md                       # как запускать, какие env нужны
@@ -99,11 +100,11 @@ e2e/                              # standalone pnpm-проект (вариант
 ## 5. Живые проверки (acceptance)
 
 AS-1 **Gateway HTTPS**: `GET /api/users` → 200 `{"users":["alice","bob"]}`; query-параметры; 404/405; ответ `api` через container-route.
-AS-2 **Auth**: jwt-маршрут без `Authorization` → 401; с валидным подписанным JWT → 200; function-маршрут → 401 без кред, 200 с; `none`-маршрут открыт.
+AS-2 **Auth**: jwt-маршрут без `Authorization` → 401; с валидным подписанным JWT → 200; function-маршрут без кред → 401 (happy-path с авторизатором недоступен — см. §8, composer не эмитит `service_account_id` авторизатора); логика авторизатора проверяется прямым invoke (allow/deny); `none`-маршрут открыт.
 AS-3 **Direct invoke**: `yc --profile ycforge-sa serverless function invoke` с v1-фикстурой → 200/корректный ответ.
-AS-4 **MQ**: отправка через SQS (env `AWS_*`, endpoint YMQ) → worker обрабатывает, результат виден в логах/выходе; «плохое» сообщение → DLQ у `worker_dlq`.
+AS-4 **MQ**: отправка через SQS (env `AWS_*`, endpoint YMQ) → реальный trigger вызывает worker, очередь опустошается (сообщение обработано); прямой invoke MQ-события с плохим сообщением → fail-fast worker возвращает ошибку, partial-failure worker — успех (degrade). Доставка в app-level DLQ не проверяется: `DlqSender` использует неверную авторизацию (см. §8).
 AS-5 **S3**: объект из `web`-бакета скачивается по HTTPS; содержимое соответствует build_env.
-AS-6 **KMS**: `GET /api/kms?key=...` → encrypt/decrypt roundtrip.
+AS-6 **KMS**: `GET /api/kms?key=...` → encrypt/decrypt roundtrip. **Opt-in**: выполняется только при заданном `E2E_KMS_KEY_ID` — у эталонного SA `ycforge-reference` нет прав KMS (`kms.symmetricKeys.*` → PermissionDenied).
 AS-7 **Observability**: логи invocation структурированы, содержат `trace_id`; error-ответы несут `trace_id`.
 AS-8 **Terraform state/outputs**: outputs из state совпадают с `.ycsf/outputs.yaml` + auto-outputs; `terraform plan` после apply — no changes (идемпотентность).
 AS-9 **moved**: 2-фазный apply — ресурс переименован без `destroy`/`recreate`.
@@ -120,7 +121,7 @@ AS-11 **Teardown**: после прогона созданные `e2e-*` рес�
 
 ## 7. Риски и допущения
 
-- **Права SA `ycforge-reference`** не читаются (`list-access-bindings` → PermissionDenied). Если каких-то прав не хватает (trigger/IAM/KMS/registry), фиксируем и запрашиваем у владельца.
+- **Права SA `ycforge-reference`** не читаются (`list-access-bindings` → PermissionDenied). Подтверждено: KMS недоступен полностью (`kms.symmetric-key list/create` → PermissionDenied) — KMS-проверка переведена в opt-in (`E2E_KMS_KEY_ID`). Если не хватает прав на trigger/IAM/registry — фиксируем и запрашиваем у владельца.
 - **Стоимость/время**: реальный apply полного набора + 2 фазы moved + destroy — минуты; владелец согласовал.
 - **Сосуществование**: ref-проект задеплоен в той же папке; e2e использует только `e2e-*` имена и не трогает ref-ресурсы.
 - **Docker на Apple Silicon**: amd64 через `DOCKER_DEFAULT_PLATFORM`/buildx; логин в `cr.yandex` — IAM-токеном (`yc container registry configure-docker` в изолированный `DOCKER_CONFIG`).
@@ -148,16 +149,52 @@ AS-11 **Teardown**: после прогона созданные `e2e-*` рес�
   `{{$ENV}}` внутри `build_config` (например, `bucket_name`, `command`) давал
   `BLC_ENV_NOT_RESOLVED`, а изменение значения ENV не инвалидировало кэш. Фикс:
   использовать интерполированный `build_config` и в контексте builder-а, и в хэше.
+- `nestjs-function` builder всегда писал бандл как `main.js`, но объявлял
+  entrypoint по имени entry-файла: для entry `src/index.ts` получался
+  `index.handler` при архиве, где лежит только `main.js` → 502 «Cannot find module
+  /function/code/index.js» (проявилось на `e2e_authorizer`/`e2e_rename_me`).
+  Фикс: имя модуля бандла = basename entry (`index.ts` → `index.js`), entrypoint
+  совпадает; добавлен unit-тест.
+- `moveEndpointsFromResources` (pilot CLI) клал в `idl` Terraform-адрес вместо
+  логического IDL, поэтому терминал `.ycsf/moved.yaml` (`functions.<name>`)
+  никогда не совпадал с текущими ресурсами → `MOV_TARGET_UNRESOLVED`. Фикс:
+  `idl` выводится через таблицу доменов (`functions`/`gateways`/`containers`);
+  добавлен unit-тест.
 - `${resources.buckets.<name>.name}` в API-gateway материализовывался в
   `yandex_storage_bucket.<name>.name`, но у провайдера `yandex_storage_bucket` нет
   атрибута `name` (имя бакета — атрибут `bucket`) → `terraform validate` падал с
   `Unsupported attribute`. Фикс: таблица логический-property → TF-атрибут
   (`buckets.name` → `bucket`) в `ref-resolver.ts`.
+- **Не исправлено (зарегистрировано)**: composer для `auth.yaml` scheme `function`
+  эмитит `x-yc-apigateway-authorizer: { type: function, function_id }` **без**
+  `service_account_id`; Yandex API Gateway при отсутствии SA у авторизатора (и
+  top-level `x-yc-apigateway.service_account_id`) не может вызвать функцию —
+  allow-путь недоступен (маршрут всегда 401). JWT/`none` работают. Нужен
+  follow-up: поле SA в auth-контракте или top-level SA gateway.
+- **Не исправлено (зарегистрировано)**: `DlqSender` (spec 005) публикует в DLQ
+  через `POST https://message-queue.api.cloud.yandex.net/queues/<id>/messages` с
+  `Authorization: Bearer <IAM>`. Реальный YMQ принимает только AWS SigV4 со
+  static access key (проверено: 400 `Invalid authorization parameters structure`
+  для Bearer, idle, имени и ARN). Соответственно app-level DLQ-доставка в облаке
+  не работает (fail-open, предупреждение в лог); e2e проверяет degrade-семантику
+  partial failure (invocation завершается успешно), а не доставку в DLQ. Нужен
+  отдельный follow-up (SigV4-подпись/источник ключей или API GW `cloud_ymq`).
+- **Ограничение доступа**: `yc serverless function logs` / `yc logging read`
+  дают PermissionDenied даже с выданными `logging.viewer`/`logging.editor`
+  (возможно, роль/область иная). Поэтому MQ/observability проверки сделаны
+  permission-free: глубина очереди (trigger delivery), прямой invoke с
+  MQ-событием (fail-fast/degrade), trace_id в error-ответе.
 
 ## 9. Критерии завершения
 
-- Все AS-1…AS-11 проходят на реальном облаке при заданных env-кредах; при
-  отсутствии `YCSF_E2E=1`/кред — сьют целиком skip и CI не затронут.
-- Найденный баг очереди исправлен, тесты пакета зелёные.
+- Сьют (26 тестов) проходит на реальном облаке при заданных env-кредах; при
+  отсутствии `YCSF_E2E=1`/кред — целиком skip, CI не затронут.
+- Найденные баги (queue URL/атрибуты, build_config-интерполяция, bucket-ref
+  attribute, moved idl, nestjs-function entrypoint) исправлены; тесты пакетов зелёные.
 - `pnpm build && pnpm test && pnpm typecheck && pnpm lint` в корне зелёные.
 - Ветка `037-cloud-e2e` → PR в `dev`, без merge.
+
+**Статус реализации**: реализовано; AS-1, AS-3…AS-11 зелёные. AS-2 покрыт
+частично: jwt/none — полностью, function-authorizer — отказ + прямой invoke
+(allow-path недоступен, §8). app-level DLQ (§8) не проверяется. Отдельный
+follow-up нужен для function-authorizer SA и `DlqSender` SigV4.

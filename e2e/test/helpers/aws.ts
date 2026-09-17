@@ -1,5 +1,6 @@
 import {
   DeleteMessageCommand,
+  GetQueueAttributesCommand,
   GetQueueUrlCommand,
   ListQueuesCommand,
   PurgeQueueCommand,
@@ -52,6 +53,21 @@ export async function sendMessage(name: string, body: unknown): Promise<void> {
   await client.send(
     new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: JSON.stringify(body) }),
   );
+}
+
+export async function queueMessageCount(name: string): Promise<{ visible: number; notVisible: number }> {
+  const client = sqsClient();
+  const queueUrl = await getQueueUrl(name);
+  const result = await client.send(
+    new GetQueueAttributesCommand({
+      QueueUrl: queueUrl,
+      AttributeNames: ['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible'],
+    }),
+  );
+  return {
+    visible: Number(result.Attributes?.ApproximateNumberOfMessages ?? '0'),
+    notVisible: Number(result.Attributes?.ApproximateNumberOfMessagesNotVisible ?? '0'),
+  };
 }
 
 export async function purgeQueue(name: string): Promise<void> {

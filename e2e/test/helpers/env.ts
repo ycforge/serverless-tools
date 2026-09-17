@@ -43,8 +43,8 @@ export function requireHarnessEnv(): HarnessEnv {
     );
   }
 
-  required('AWS_ACCESS_KEY_ID');
-  required('AWS_SECRET_ACCESS_KEY');
+  const awsAccessKeyId = required('AWS_ACCESS_KEY_ID');
+  const awsSecretAccessKey = required('AWS_SECRET_ACCESS_KEY');
 
   const runId = optional('E2E_RUN_ID') ?? randomBytes(4).toString('hex');
   const ycProfile = optional('YC_PROFILE') ?? 'ycforge-sa';
@@ -54,8 +54,14 @@ export function requireHarnessEnv(): HarnessEnv {
     ...process.env,
     YC_FOLDER_ID: folderId,
     ...(cloudId !== undefined ? { YC_CLOUD_ID: cloudId } : {}),
+    // Yandex Message Queue is managed over the S3-compatible API: the provider
+    // needs the SA static access key, not just IAM authentication.
+    YC_ACCESS_KEY: awsAccessKeyId,
+    YC_SECRET_KEY: awsSecretAccessKey,
     TF_VAR_service_account_id: serviceAccountId,
     TF_VAR_run_id: runId,
+    TF_VAR_message_queue_access_key: awsAccessKeyId,
+    TF_VAR_message_queue_secret_key: awsSecretAccessKey,
   };
 
   const child: NodeJS.ProcessEnv = {

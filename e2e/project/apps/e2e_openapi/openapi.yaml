@@ -67,17 +67,6 @@ paths:
         type: cloud_functions
         function_id: ${resources.functions.e2e_api.id}
         service_account_id: "__SERVICE_ACCOUNT_ID__"
-  /api/context:
-    get:
-      summary: Returns the invocation execution context
-      operationId: contextProbe
-      responses:
-        "200":
-          description: ok
-      x-yc-apigateway-integration:
-        type: cloud_functions
-        function_id: ${resources.functions.e2e_api.id}
-        service_account_id: "__SERVICE_ACCOUNT_ID__"
   /api/logged:
     get:
       summary: Emits a structured log line

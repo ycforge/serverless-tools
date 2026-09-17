@@ -8,7 +8,10 @@ export interface JwtMaterial {
 }
 
 export async function createJwtMaterial(): Promise<JwtMaterial> {
-  const { publicKey, privateKey } = await generateKeyPair('RS256', { modulusLength: 2048 });
+  const { publicKey, privateKey } = await generateKeyPair('RS256', {
+    modulusLength: 2048,
+    extractable: true,
+  });
   const kid = randomBytes(8).toString('hex');
   const jwk = await exportJWK(publicKey);
   jwk.kid = kid;

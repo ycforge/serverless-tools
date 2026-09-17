@@ -21,12 +21,12 @@ export interface E2eState {
   readonly gatewayDomain: string;
   readonly containerUrl: string;
   readonly workerEventsName: string;
-  readonly workerEventsDlqName: string;
   readonly workerDlqEventsName: string;
   readonly workerAppDlqName: string;
   readonly workerFunctionId: string;
   readonly workerDlqFunctionId: string;
   readonly apiFunctionId: string;
+  readonly authorizerFunctionId: string;
   readonly renameFunctionId: string;
   readonly outputs: Record<string, unknown>;
   readonly privateKeyPem: string;
