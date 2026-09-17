@@ -1889,10 +1889,10 @@ integration.
 
 # 38. Local development
 
-Локальная разработка реализуется в рамках `@ycforge/js-dev-tools`.
+Локальная разработка реализуется в рамках `@ycforge/serverless-dev-tools`.
 
 ```ts
-import { createYcsfLocalServer } from '@ycforge/js-dev-tools/server';
+import { createYcsfLocalServer } from '@ycforge/serverless-dev-tools/server';
 
 createYcsfLocalServer({
   entry: './src/main.ts',           // NestJS entry point
