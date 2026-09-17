@@ -44,8 +44,8 @@ const materializer: Materializer = {
       type: 'yandex_message_queue',
       name,
       configuration: {
-        queue_name: queueName,
-        region: 'ru-central1',
+        name: queueName,
+        region_id: 'ru-central1',
       },
     };
 

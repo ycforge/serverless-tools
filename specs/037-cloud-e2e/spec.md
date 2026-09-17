@@ -129,12 +129,18 @@ AS-11 **Teardown**: после прогона созданные `e2e-*` рес�
 
 ## 8. Найденные баги (исправляются здесь)
 
-- `yandex-message-queue` materializer требует `/queues/`, тогда как реальный YMQ URL —
-  `https://message-queue.api.cloud.yandex.net/<cloud-id>/<queue-id>/<queue-name>`.
-  Любой настоящий URL → `YMT_INVALID_QUEUE_URL`. Spec 019 FR-020 и тест DQ-9
-  закрепляют вымышленный формат. Фикс: парсить имя очереди как последний непустой
-  сегмент пути (с сохранением обратной совместимости для `/queues/<name>`) +
-  обновить тесты и отметить расхождение.
+`yandex-message-queue` materializer был непригоден по двум причинам (обе исправлены):
+
+1. **URL**: требование подстроки `/queues/`, тогда как реальный YMQ SQS URL —
+   `https://message-queue.api.cloud.yandex.net/<cloud-id>/<queue-id>/<queue-name>`.
+   Любой настоящий URL → `YMT_INVALID_QUEUE_URL`; spec 019 FR-020 и тест DQ-9
+   закрепляли вымышленный формат. Фикс: имя очереди — последний непустой
+   path-сегмент, с обратной совместимостью для `/queues/<name>`.
+2. **Terraform-атрибуты**: генерировались `queue_name`/`region`, которых нет в
+   провайдере `yandex_message_queue` (реальные — `name`/`region_id`; проверено
+   `terraform providers schema`), т.е. даже корректный URL давал бы
+   `terraform validate`-ошибку. Фикс: `name`/`region_id`; terraform-validate-тест
+   materializers-core расширен ресурсом очереди.
 
 ## 9. Критерии завершения
 
