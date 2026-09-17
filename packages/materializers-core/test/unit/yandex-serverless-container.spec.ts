@@ -30,14 +30,15 @@ describe('yandex-serverless-container materializer (US2, T060)', () => {
     expect(result.kind).toBe('resource');
     expect(result.type).toBe('yandex_serverless_container');
     expect(result.name).toBe('analytics');
-    expect(result.configuration).toEqual({ image: IMAGE, name: 'analytics' });
+    expect(result.configuration).toEqual({ image: [{ url: IMAGE }], name: 'analytics', memory: 128 });
   });
 
-  it('image is not transformed (FR-013)', async () => {
+  it('image url is not transformed (FR-013)', async () => {
     const ctx = createContext();
     const result = (await materializer.materialize(artifact as never, ctx)) as TerraformResource;
-    const config = result.configuration as { image: string };
-    expect(config.image).toBe(IMAGE);
+    const config = result.configuration as { image: Array<{ url: string }>; memory: number };
+    expect(config.image).toEqual([{ url: IMAGE }]);
+    expect(config.memory).toBe(128);
   });
 
   it('repeat-call is deterministic (SC-006)', async () => {

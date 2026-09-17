@@ -37,7 +37,7 @@ describe('yandex-function materializer (US1, T040)', () => {
     expect(result.name).toBe('user_service');
     expect(result.configuration).toEqual({
       runtime: 'nodejs22',
-      name: 'user_service',
+      name: 'user-service',
       memory: 128,
       entrypoint: 'index.handler',
       user_hash: archive.sha256,
@@ -76,7 +76,7 @@ describe('yandex-function materializer (US1, T040)', () => {
     const r2 = (await materializer.materialize(artifact as never, createContext())) as TerraformResource;
     const c1 = r1.configuration as { name: string; memory: number };
     const c2 = r2.configuration as { name: string; memory: number };
-    expect(c1.name).toBe('user_service');
+    expect(c1.name).toBe('user-service');
     expect(c1.memory).toBe(128);
     expect(c1).toEqual(c2);
     expect(ctx.output.declared.get('user_service_function_id')).toEqual({

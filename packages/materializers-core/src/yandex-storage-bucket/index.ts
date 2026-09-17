@@ -40,12 +40,17 @@ const materializer: Materializer = {
     const name = artifact.name;
     const resources: TerraformResource[] = [];
 
+    // `bucket` is the S3-style globally-unique bucket name. Explicit override
+    // (build_config.bucket_name via the artifact value) wins; otherwise falls
+    // back to the app id. Legacy artifacts without bucketName keep `name`.
+    const bucket = value.bucketName ?? name;
+
     resources.push({
       kind: 'resource',
       type: 'yandex_storage_bucket',
       name,
       configuration: {
-        bucket: name,
+        bucket,
         acl: 'public-read',
       },
     });
@@ -65,7 +70,7 @@ const materializer: Materializer = {
         type: 'yandex_storage_object',
         name: `${name}_${sanitized}`,
         configuration: {
-          bucket: `yandex_storage_bucket.${name}.id`,
+          bucket: `\${yandex_storage_bucket.${name}.id}`,
           key: relativePath,
           source: join(resolvedDir, relativePath),
         },

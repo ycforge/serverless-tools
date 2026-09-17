@@ -7,6 +7,7 @@ import { join } from 'node:path';
 
 import functionMaterializer from '../../src/yandex-function/index.js';
 import gatewayMaterializer from '../../src/yandex-api-gateway/index.js';
+import containerMaterializer from '../../src/yandex-serverless-container/index.js';
 import { createOutputBuilder } from '../../src/helpers/output-builder.js';
 import type { OutputBuilderWithCollection } from '../../src/helpers/output-builder.js';
 import type { MaterializationContext, TerraformResource } from '../../src/types.js';
@@ -54,7 +55,7 @@ describe('terraform validate on materialized configs (spec 028, T022)', () => {
     return { output: createOutputBuilder(), projectRoot };
   }
 
-  it('0 "Missing required argument" for yandex_function name/memory and yandex_api_gateway name',
+  it('0 "Missing required argument" for yandex_function name/memory, yandex_api_gateway name and yandex_serverless_container name/memory/image',
     { timeout: 180000 },
     async () => {
     try {
@@ -74,8 +75,11 @@ describe('terraform validate on materialized configs (spec 028, T022)', () => {
 
     process.chdir(root);
     const fnCtx = context(root);
+    // archivePath is relative to the terraform module dir infra/ (spec 035
+    // D1/D2) — '../dist/...' resolves to root/dist both for the hash and for
+    // terraform's content.zip_filename.
     const fnResource = (await functionMaterializer.materialize(
-      { type: 'ycforge:function', name: 'user_service', value: { archivePath: 'dist/user_service.zip', entryPoint: 'handler' } } as never,
+      { type: 'ycforge:function', name: 'user_service', value: { archivePath: '../dist/user_service.zip', entryPoint: 'handler' } } as never,
       fnCtx,
     )) as TerraformResource;
     const gwCtx = context(root);
@@ -83,15 +87,24 @@ describe('terraform validate on materialized configs (spec 028, T022)', () => {
       { type: 'ycforge:api-gateway', name: 'openapi', value: { specPath: openapiFile, resourceReferences: [] } } as never,
       gwCtx,
     )) as TerraformResource;
+    const ctCtx = context(root);
+    const ctResource = (await containerMaterializer.materialize(
+      { type: 'ycforge:docker-image', name: 'analytics', value: { image: 'cr.yandex/app@sha256:abc123def456' } } as never,
+      ctCtx,
+    )) as TerraformResource;
 
     // Structural form (unit effect — RED until materializers emit required attrs).
     const fnConfig = fnResource.configuration as { name: string; memory: number };
-    expect(fnConfig.name).toBe('user_service');
+    expect(fnConfig.name).toBe('user-service');
     expect(fnConfig.memory).toBe(128);
     const gwConfig = gwResource.configuration as { name: string };
     expect(gwConfig.name).toBe('openapi');
+    const ctConfig = ctResource.configuration as { image: Array<{ url: string }>; name: string; memory: number };
+    expect(ctConfig.name).toBe('analytics');
+    expect(ctConfig.memory).toBe(128);
+    expect(ctConfig.image).toEqual([{ url: 'cr.yandex/app@sha256:abc123def456' }]);
 
-    // Golden terraform project: required_providers + two resources as emitted.
+    // Golden terraform project: required_providers + three resources as emitted.
     const infra = join(root, 'infra');
     mkdirSync(infra, { recursive: true });
     writeFileSync(
@@ -111,6 +124,10 @@ describe('terraform validate on materialized configs (spec 028, T022)', () => {
     writeFileSync(
       join(infra, 'gateway.tf.json'),
       JSON.stringify({ resource: { yandex_api_gateway: { openapi: gwResource.configuration } } }),
+    );
+    writeFileSync(
+      join(infra, 'container.tf.json'),
+      JSON.stringify({ resource: { yandex_serverless_container: { analytics: ctResource.configuration } } }),
     );
 
     // Probe: init (needs network for the provider plugin); on failure keep the

@@ -1,6 +1,6 @@
 import type { DockerArtifactValue, MaterializationContext, Materializer, TerraformResource } from '../types.js';
 import { YMT_INVALID_ARTIFACT_VALUE, materializerError } from '../diagnostics.js';
-import { isTfAddress } from '../helpers/filename.js';
+import { isTfAddress, toYcResourceName } from '../helpers/filename.js';
 
 const materializer: Materializer = {
   supports(artifact, _context: MaterializationContext): boolean {
@@ -19,13 +19,16 @@ const materializer: Materializer = {
     }
     const name = artifact.name;
 
+    // YC Serverless Containers require memory >= 128 MB (aligned to 128 MB;
+    // the provider rejects anything below 134217728 bytes).
     const resource: TerraformResource = {
       kind: 'resource',
       type: 'yandex_serverless_container',
       name,
       configuration: {
-        image,
-        name,
+        image: [{ url: image }],
+        name: toYcResourceName(name),
+        memory: 128,
       },
     };
 
