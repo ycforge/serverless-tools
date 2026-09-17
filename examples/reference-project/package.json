@@ -30,7 +30,7 @@
     "@types/node": "^22.20.1",
     "@ycforge/builders-core": "workspace:*",
     "@ycforge/composer": "workspace:*",
-    "@ycforge/js-dev-tools": "workspace:*",
+    "@ycforge/serverless-dev-tools": "workspace:*",
     "@ycforge/materializers-core": "workspace:*",
     "@ycforge/nestjs-connector": "workspace:*",
     "@ycforge/pilot": "workspace:*",

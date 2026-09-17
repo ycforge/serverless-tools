@@ -1,7 +1,7 @@
 {
-  "name": "@ycforge/js-dev-tools",
+  "name": "@ycforge/serverless-dev-tools",
   "version": "0.1.0",
-  "description": "Local development tools for Yandex Cloud Functions — dev server, secrets management, project scaffolding.",
+  "description": "Local development server for Yandex Cloud Functions — emulates API Gateway v2 invocations for NestJS applications.",
   "author": "ycforge (https://github.com/ycforge)",
   "license": "MIT",
   "homepage": "https://github.com/ycforge/serverless-tools#readme",

@@ -1,4 +1,4 @@
-import { createYcsfLocalServer } from '@ycforge/js-dev-tools/server';
+import { createYcsfLocalServer } from '@ycforge/serverless-dev-tools/server';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
