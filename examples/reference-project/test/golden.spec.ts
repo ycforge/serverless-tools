@@ -10,7 +10,7 @@ const REPO = resolve(ROOT, '../..');
 const CLI = join(REPO, 'packages/pilot/dist/cli/index.js');
 const FIXTURES = join(ROOT, 'test/fixtures');
 
-const FUNCTION_HASH = '6ba8923d20a98dfe1422e9d6b8816041011f40dd17aec846dcfef93347492cd0';
+const FUNCTION_HASH = '7bde9ea828e4e5fc72ba5956260131643c0fa6ab8d4c08160aca35c56779c844';
 const ANALYTICS_IMAGE =
   'cr.yandex/crps9jj0ui2e954vaj8m/analytics@sha256:85b68206325f6af4fc29f72b87ebcdbc94cf5c8fc086ef48a02abf40372e80f4';
 const FRONTEND_JS = 'index-CII8GTtS.js';
