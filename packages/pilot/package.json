@@ -1,6 +1,6 @@
 {
   "name": "@ycforge/pilot",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Build/Deployment Orchestrator (Project C) for the serverless-tools ecosystem. Plugin contracts are exposed via the @ycforge/pilot/contracts subpath export.",
   "license": "MIT",
   "author": "ycforge (https://github.com/ycforge)",
