@@ -12,6 +12,7 @@ export interface ParsedViteConfig {
   readonly out_dir: string;
   readonly root: string;
   readonly command: string;
+  readonly bucket_name?: string;
 }
 
 function invalid(field: string): never {
@@ -36,5 +37,8 @@ export function parseViteConfig(raw: unknown): ParsedViteConfig {
   const command = record.command === undefined ? 'vite build' : record.command;
   if (!requireString(command)) invalid('command');
 
-  return { out_dir, root, command };
+  const bucket_name = record.bucket_name === undefined ? undefined : record.bucket_name;
+  if (bucket_name !== undefined && !requireString(bucket_name)) invalid('bucket_name');
+
+  return { out_dir, root, command, ...(bucket_name !== undefined ? { bucket_name } : {}) };
 }

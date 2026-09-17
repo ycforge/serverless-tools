@@ -188,4 +188,51 @@ describe('vite builder (US2, US5, D-RE-3/10)', () => {
     );
     expect(artifact.type).toBe('ycforge:frontend');
   });
+
+  it('bucket_name override flows into FrontendArtifactValue.bucketName (spec 035)', async () => {
+    const fixture = makeTempDir('bc-vite-');
+    dirs.push(fixture);
+    const binDir = join(fixture.root, 'node_modules', '.bin');
+    fakeVite(binDir, { captureEnv: [] });
+    const artifact = await viteBuilder.build(
+      ctx(fixture.root, { buildConfig: { bucket_name: 'frontend-my-deploy' } }),
+    );
+    const value = artifact.value as FrontendArtifactValue;
+    expect(value.bucketName).toBe('frontend-my-deploy');
+  });
+
+  it('absent bucket_name → appId slug default, persisted in .ycsf/state.json and reused (spec 035)', async () => {
+    const fixture = makeTempDir('bc-vite-');
+    dirs.push(fixture);
+    const binDir = join(fixture.root, 'node_modules', '.bin');
+    fakeVite(binDir, { captureEnv: [] });
+    const outputDir = join(fixture.root, '.ycsf', 'artifacts', 'frontend');
+
+    const first = await viteBuilder.build(ctx(fixture.root, { outputDir }));
+    const value1 = first.value as FrontendArtifactValue;
+    expect(value1.bucketName).toBeDefined();
+    expect(value1.bucketName).toMatch(/^frontend-[0-9a-f]{8}$/);
+
+    const stateFile = join(fixture.root, '.ycsf', 'state.json');
+    expect(existsSync(stateFile)).toBe(true);
+    const state = JSON.parse(readFileSync(stateFile, 'utf8')) as {
+      version: number;
+      bucketSlugs: Record<string, string>;
+    };
+    expect(state.version).toBe(1);
+    expect(state.bucketSlugs.frontend).toBe(value1.bucketName?.replace(/^frontend-/, ''));
+
+    const second = await viteBuilder.build(ctx(fixture.root, { outputDir }));
+    const value2 = second.value as FrontendArtifactValue;
+    expect(value2.bucketName).toBe(value1.bucketName);
+  });
+
+  it('BLC_INVALID_CONFIG: bucket_name not a string', async () => {
+    const fixture = makeTempDir('bc-vite-');
+    dirs.push(fixture);
+    await expectBLC(
+      viteBuilder.build(ctx(fixture.root, { buildConfig: { bucket_name: 42 } })),
+      BLC_INVALID_CONFIG,
+    );
+  });
 });

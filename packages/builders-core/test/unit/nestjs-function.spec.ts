@@ -11,7 +11,7 @@ import {
   BLC_MISSING_SOURCE,
 } from '../../src/diagnostics.js';
 import nestjsFunctionBuilder from '../../src/nestjs-function/index.js';
-import { nestjsFixture, unzipEntry, unzipTest, type TempDir } from '../helpers/fixture-project.js';
+import { nestjsFixture, unzipEntry, unzipList, unzipTest, makeTempDir, writeProject, type TempDir } from '../helpers/fixture-project.js';
 
 function ctx(sourcePath: string, overrides: Partial<BuildContext> = {}): BuildContext {
   return {
@@ -81,7 +81,7 @@ describe('nestjs-function builder (US1, US5, SC-001/003/006)', () => {
     expect(bundle).not.toMatch(/require\(\s*['"][a-z]/);
   });
 
-  it('US1-AC2 external: sharp import stays external, node_modules/sharp copied into the zip (SC-006/Sc2)', async () => {
+  it('US1-AC2 external: declared external stays a bare require, never vendored (Sc2, spec 028)', async () => {
     const fixture = nestjsFixture({ external: true });
     dirs.push(fixture);
     const outputDir = join(fixture.root, 'build-out');
@@ -91,8 +91,35 @@ describe('nestjs-function builder (US1, US5, SC-001/003/006)', () => {
     const bundle = unzipEntry(artifact.archivePath, 'main.js').toString('utf8');
     expect(bundle).toContain('require("sharp")');
     expect(bundle).not.toContain('SHARP_NATIVE_MARKER');
-    const sharpPkg = unzipEntry(artifact.archivePath, 'node_modules/sharp/package.json').toString('utf8');
-    expect(sharpPkg).toContain('"name": "sharp"');
+    // The spec-028 toolchain fix removed node_modules vendoring: the archive is
+    // self-contained-only, declared externals are the deployment's concern.
+    expect(unzipList(artifact.archivePath)).toEqual(['main.js']);
+    unzipTest(artifact.archivePath);
+  });
+
+  it('hoisted external: resolvable from a parent node_modules, still not vendored (Sc2/hoisting)', async () => {
+    const dir = makeTempDir('bc-nestjs-hoist-');
+    dirs.push(dir);
+    writeProject(dir.root, {
+      'apps/user_service/package.json': '{"name":"user_service","version":"0.0.0"}\n',
+      'apps/user_service/src/main.ts':
+        "import sharp from 'sharp';\nexport function handler(): string { return 'sharp:' + typeof sharp; }\n",
+      'node_modules/sharp/package.json': JSON.stringify(
+        { name: 'sharp', version: '9.0.0', main: 'index.js' },
+        null,
+        2,
+      ),
+      'node_modules/sharp/index.js': 'module.exports = function() { return 1; };\n',
+    });
+    const appPath = join(dir.root, 'apps', 'user_service');
+    const outputDir = join(dir.root, 'build-out');
+    const artifact = (await nestjsFunctionBuilder.build(
+      ctx(appPath, { buildConfig: { entry: 'src/main.ts', runtime: 'nodejs20', external: ['sharp'] }, outputDir }),
+    )).value as FunctionArtifactValue;
+    // The spec-028 fix dropped the `cp(dereference)` vendoring that used to walk
+    // pnpm's hoisted store: the bundle keeps the bare require, the zip stays clean.
+    expect(unzipEntry(artifact.archivePath, 'main.js').toString('utf8')).toContain('require("sharp")');
+    expect(unzipList(artifact.archivePath)).toEqual(['main.js']);
     unzipTest(artifact.archivePath);
   });
 

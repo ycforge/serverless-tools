@@ -1,7 +1,8 @@
 /**
  * nestjs-function builder: bundles a NestJS app into one self-contained CJS
- * file (esbuild), copies declared external native modules, zips the result
- * into `outputDir`, returns `ycforge:function` (spec 018 §Scope, D-RE-8).
+ * file (esbuild), zips it into `outputDir`, returns `ycforge:function`
+ * (spec 018 §Scope, D-RE-8; self-contained-only since the spec-028 toolchain
+ * fix — declared `external` stays a bare runtime `require`, never vendored).
  */
 
 import { assertNoResidualEnv, requireSourcePath } from '../preflight.js';

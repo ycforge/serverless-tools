@@ -8,6 +8,8 @@
  * forwards image.host as DOCKER_HOST and digests via {{.Id}} on that daemon.
  */
 
+import { isAbsolute, resolve } from 'node:path';
+
 import { assertNoResidualEnv, requireSourcePath } from '../preflight.js';
 import type { Artifact, Builder, BuildContext, DockerArtifactValue } from '../types.js';
 import { buildAndPush } from './cli.js';
@@ -22,8 +24,12 @@ const builder = {
     }
     const sourcePath = requireSourcePath(context, 'docker');
     assertNoResidualEnv(context, 'docker');
+    // sourcePath may arrive relative to projectRoot (pilot passes it verbatim);
+    // resolve it before use — the docker CLI runs with cwd = sourcePath, so a
+    // relative context would double up (D10: apps/x/apps/x).
+    const absoluteSourcePath = isAbsolute(sourcePath) ? sourcePath : resolve(context.projectRoot, sourcePath);
     const digest = await buildAndPush({
-      sourcePath,
+      sourcePath: absoluteSourcePath,
       repository: config.repository as string,
       tag: config.tag as string,
       dockerfile: config.dockerfile as string,

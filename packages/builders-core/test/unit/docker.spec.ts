@@ -14,7 +14,7 @@ import {
   BLC_MISSING_SOURCE,
 } from '../../src/diagnostics.js';
 import dockerBuilder from '../../src/docker/index.js';
-import { dockerFixture, makeTempDir, type TempDir } from '../helpers/fixture-project.js';
+import { dockerFixture, makeTempDir, writeProject, type TempDir } from '../helpers/fixture-project.js';
 import { fakeDocker, withPath } from '../helpers/fake-bins.js';
 
 const SHA_256_A = 'a'.repeat(64);
@@ -83,6 +83,27 @@ describe('docker builder (US3, US5, SC-004, DQ-6)', () => {
     const pushIdx = args.indexOf('ARG push');
     expect(pushIdx).toBeGreaterThan(-1);
     expect(args[pushIdx + 1]).toBe('ARG test.local/app:v1');
+  });
+
+  it('D10: RELATIVE source_path is resolved against projectRoot (no apps/x/apps/x double-up)', async () => {
+    const fixture = dockerFixture();
+    dirs.push(fixture);
+    writeProject(fixture.root, {
+      'apps/analytics/Dockerfile': 'FROM node:22-alpine\n',
+      'apps/analytics/index.js': 'console.log("analytics");\n',
+    });
+    const bins = fakeDocker(join(fixture.root, 'fake-bin'), { digest: SHA_256_A });
+    dirs.push({ root: bins.binDir, remove: () => {} });
+    await withPath(bins.binDir, async () => {
+      const artifact = await dockerBuilder.build(
+        ctx(fixture.root, { sourcePath: 'apps/analytics' }),
+      );
+      expect((artifact.value as DockerArtifactValue).image).toBe(`test.local/app@sha256:${SHA_256_A}`);
+    });
+    const args = readLogLines(bins.logFile);
+    // docker build context = projectRoot-joined absolute path, never the relative verbatim.
+    expect(args).toContain(`ARG ${join(fixture.root, 'apps/analytics')}`);
+    expect(args).not.toContain('ARG apps/analytics');
   });
 
   it('dockerfile and tag defaults apply: -f Dockerfile, tag not set → :latest', async () => {
