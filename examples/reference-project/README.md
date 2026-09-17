@@ -160,8 +160,8 @@ pnpm --filter @ycforge/reference-project test   # hermetic vitest: golden, plan,
 ## Локальная разработка (US-7)
 
 ```bash
-pnpm --filter @ycforge/reference-project dev:user_service   # http://127.0.0.1:3000, через @ycforge/js-dev-tools/server
-pnpm --filter @ycforge/reference-project dev:analytics       # http://127.0.0.1:8080, analytics через @ycforge/js-dev-tools/server
+pnpm --filter @ycforge/reference-project dev:user_service   # http://127.0.0.1:3000, через @ycforge/serverless-dev-tools/server
+pnpm --filter @ycforge/reference-project dev:analytics       # http://127.0.0.1:8080, analytics через @ycforge/serverless-dev-tools/server
 ```
 
 Обе команды fail-open без IAM-токена (`JDT_IAM_UNAVAILABLE` в логе, запросы
