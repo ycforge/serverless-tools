@@ -73,16 +73,27 @@ export const REFERENCE_BEARER_FIELDS: readonly ReferenceBearerField[] = [
     property: 'id',
   },
   {
-    // spec 028, T010/T012 (plan D-1): serverless-container integration —
-    // sibling map-form app identities referenced as `${resources.containers.*.id}`
-    path: ['paths', '*', '*', 'x-yc-apigateway-integration', 'serverless-containers', 'container_id'],
+    // spec 028, T010/T012 (plan D-1) + spec 035: serverless-containers
+    // integration. The real YC API Gateway schema is FLAT — `type:
+    // serverless-containers` and `container_id` are siblings inside
+    // `x-yc-apigateway-integration` (NOT nested under a `serverless-containers`
+    // key). The property field name is unique per integration type, so the leaf
+    // path is anchored on the property + domain, no discriminator needed.
+    path: ['paths', '*', '*', 'x-yc-apigateway-integration', 'container_id'],
     domain: 'containers',
     property: 'id',
   },
   {
-    // spec 028, T010/T012 (plan D-1): object-storage integration —
-    // sibling map-form app identities referenced as `${resources.buckets.*.name}`
-    path: ['paths', '*', '*', 'x-yc-apigateway-integration', 'object-storage', 'bucket'],
+    // spec 035: cloud_functions integration — flat `type: cloud_functions` +
+    // `function_id` siblings (see serverless-containers note).
+    path: ['paths', '*', '*', 'x-yc-apigateway-integration', 'function_id'],
+    domain: 'functions',
+    property: 'id',
+  },
+  {
+    // spec 028, T010/T012 (plan D-1) + spec 035: object-storage integration —
+    // flat `type: object-storage` + `bucket` siblings.
+    path: ['paths', '*', '*', 'x-yc-apigateway-integration', 'bucket'],
     domain: 'buckets',
     property: 'name',
   },

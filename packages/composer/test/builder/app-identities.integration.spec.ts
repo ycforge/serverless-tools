@@ -80,19 +80,22 @@ describe('builder app-identities integration (spec 028, T010)', () => {
       document.components.securitySchemes.authorizer!['x-yc-apigateway-authorizer']!.function_id,
     ).toBe('${resources.functions.user_service.id}');
     expect(
-      document.paths['/v1/analytics']!.get!['x-yc-apigateway-integration']!['serverless-containers']!
-        .container_id,
+      document.paths['/v1/analytics']!.get!['x-yc-apigateway-integration']!['container_id'],
     ).toBe('${resources.containers.analytics.id}');
-    expect(
-      document.paths['/v1/assets']!.get!['x-yc-apigateway-integration']!['object-storage']!.bucket,
-    ).toBe('${resources.buckets.frontend.name}');
+    expect(document.paths['/v1/assets']!.get!['x-yc-apigateway-integration']!.bucket).toBe(
+      '${resources.buckets.frontend.name}',
+    );
+    expect(document.paths['/v1/users']!.get!['x-yc-apigateway-integration']!['function_id']).toBe(
+      '${resources.functions.user_service.id}',
+    );
 
-    // IDT table (D-4/D-7): deduplicated by logical ref, ordered by the
-    // RESOURCE_DOMAINS rank then name — functions → buckets → containers.
+    // IDT table (D-4/D-7): deduplicated by logical ref + property, ordered by
+    // the RESOURCE_DOMAINS rank then name — functions → buckets → containers.
+    // The cloud_functions path-level ref dedups into the securityScheme one.
     expect(value.resourceReferences).toEqual([
-      { logical: 'functions.user_service', terraformType: 'yandex_function' },
-      { logical: 'buckets.frontend', terraformType: 'yandex_storage_bucket' },
-      { logical: 'containers.analytics', terraformType: 'yandex_serverless_container' },
+      { logical: 'functions.user_service', terraformType: 'yandex_function', property: 'id' },
+      { logical: 'buckets.frontend', terraformType: 'yandex_storage_bucket', property: 'name' },
+      { logical: 'containers.analytics', terraformType: 'yandex_serverless_container', property: 'id' },
     ]);
   });
 });
