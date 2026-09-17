@@ -1,0 +1,26 @@
+version: 1
+extensions:
+  - target: functions.e2e_api
+    patch:
+      memory: 256
+      execution_timeout: 10
+      service_account_id: "${var.service_account_id}"
+      environment:
+        E2E_EXTENSION_MARKER: api-patched
+  - target: functions.e2e_authorizer
+    patch:
+      service_account_id: "${var.service_account_id}"
+  - target: functions.e2e_worker
+    patch:
+      service_account_id: "${var.service_account_id}"
+  - target: functions.e2e_worker_dlq
+    patch:
+      service_account_id: "${var.service_account_id}"
+      environment:
+        DLQ_QUEUE_ID: "${yandex_message_queue.e2e_worker_app_dlq.id}"
+  - target: functions.e2e_rename_me
+    patch:
+      service_account_id: "${var.service_account_id}"
+  - target: containers.e2e_container
+    patch:
+      service_account_id: "${var.service_account_id}"

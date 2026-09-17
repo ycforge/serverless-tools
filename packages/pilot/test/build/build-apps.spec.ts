@@ -142,4 +142,28 @@ describe('buildApps (T026)', () => {
     if (result.kind !== 'ok') throw new Error('expected ok');
     expect(result.artifacts).toHaveLength(0);
   });
+
+  it('passes the interpolated build_config to the builder (spec 037 regression)', async () => {
+    const project = fakeProject(['app1']);
+    project.build_configs.set('app1', {
+      build_config: { bucket_name: '{{$E2E_RUN_ID}}' } as unknown as Record<string, unknown>,
+      build_env: {},
+    });
+    mockLoadProjectModel.mockReturnValue({ kind: 'ok', model: project });
+    mockPrepareBuildEnv.mockReturnValue({
+      kind: 'ok',
+      resolvedEnv: {},
+      buildConfig: { bucket_name: 'resolved-run-id' },
+    });
+    mockLoadRegistry.mockResolvedValue({ kind: 'ok', registry: fakeRegistry(['nodejs-builder']) });
+    const build = vi.fn().mockResolvedValue({ type: 't', value: {} });
+    mockGetBuilder.mockImplementation(() => ({ build }) as never);
+
+    const result = await buildApps('/root');
+    expect(result.kind).toBe('ok');
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(build.mock.calls[0]?.[0]).toMatchObject({
+      buildConfig: { bucket_name: 'resolved-run-id' },
+    });
+  });
 });

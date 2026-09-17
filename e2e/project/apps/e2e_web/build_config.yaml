@@ -1,0 +1,11 @@
+version: 1
+build_config:
+  out_dir: dist
+  root: .
+  command: "{{$E2E_VITE_BIN}} build"
+  bucket_name: "e2e-web-{{$E2E_RUN_ID}}"
+build_env:
+  VITE_ENV: e2e-literal
+  VITE_API_BASE: /api
+  VITE_RUN_ID: "{{$E2E_RUN_ID}}"
+  VITE_NULL_RESOLVED:

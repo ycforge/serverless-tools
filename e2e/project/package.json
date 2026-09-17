@@ -1,0 +1,7 @@
+{
+  "name": "@ycforge/cloud-e2e-project",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloud-deployable test project for spec 037 (deployed by the e2e harness, not published)."
+}

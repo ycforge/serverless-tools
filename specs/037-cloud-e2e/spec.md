@@ -142,6 +142,18 @@ AS-11 **Teardown**: после прогона созданные `e2e-*` рес�
    `terraform validate`-ошибку. Фикс: `name`/`region_id`; terraform-validate-тест
    materializers-core расширен ресурсом очереди.
 
+- `ycsf build` игнорировал интерполяцию `build_config`: `prepareBuildEnv` возвращал
+  и `resolvedEnv`, и интерполированный `buildConfig`, но `packages/pilot/src/build/index.ts`
+  клал в `BuildContext.buildConfig` и в cache-fingerprint **сырой** конфиг, поэтому
+  `{{$ENV}}` внутри `build_config` (например, `bucket_name`, `command`) давал
+  `BLC_ENV_NOT_RESOLVED`, а изменение значения ENV не инвалидировало кэш. Фикс:
+  использовать интерполированный `build_config` и в контексте builder-а, и в хэше.
+- `${resources.buckets.<name>.name}` в API-gateway материализовывался в
+  `yandex_storage_bucket.<name>.name`, но у провайдера `yandex_storage_bucket` нет
+  атрибута `name` (имя бакета — атрибут `bucket`) → `terraform validate` падал с
+  `Unsupported attribute`. Фикс: таблица логический-property → TF-атрибут
+  (`buckets.name` → `bucket`) в `ref-resolver.ts`.
+
 ## 9. Критерии завершения
 
 - Все AS-1…AS-11 проходят на реальном облаке при заданных env-кредах; при

@@ -1,0 +1,34 @@
+version: 1
+apps:
+  e2e_api:
+    source_path: apps/e2e_api
+    builder: ycforge:function
+    depends_on: []
+  e2e_authorizer:
+    source_path: apps/e2e_authorizer
+    builder: ycforge:function
+    depends_on: []
+  e2e_worker:
+    source_path: apps/e2e_worker
+    builder: ycforge:function
+    depends_on: []
+  e2e_worker_dlq:
+    source_path: apps/e2e_worker_dlq
+    builder: ycforge:function
+    depends_on: []
+  e2e_web:
+    source_path: apps/e2e_web
+    builder: ycforge:frontend
+    depends_on: []
+  e2e_container:
+    source_path: apps/e2e_container
+    builder: ycforge:docker-image
+    depends_on: []
+  e2e_rename_me:
+    source_path: apps/e2e_rename_me
+    builder: ycforge:function
+    depends_on: []
+  e2e_openapi:
+    source_path: apps/e2e_openapi
+    builder: ycforge:api-gateway
+    depends_on: [e2e_api, e2e_authorizer, e2e_web, e2e_container]
