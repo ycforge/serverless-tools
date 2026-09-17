@@ -1,6 +1,6 @@
 {
   "name": "@ycforge/pilot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Build/Deployment Orchestrator (Project C) for the serverless-tools ecosystem. Plugin contracts are exposed via the @ycforge/pilot/contracts subpath export.",
   "license": "MIT",
   "author": "ycforge (https://github.com/ycforge)",
@@ -39,6 +39,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "pretest": "pnpm --filter @ycforge/builders-core build && pnpm --filter @ycforge/materializers-core build && pnpm build && pnpm --filter @ycforge/composer build",
