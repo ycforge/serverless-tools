@@ -3,6 +3,26 @@
   "version": "0.1.0",
   "description": "Core builder plugins for the serverless-tools ecosystem (spec 018): nestjs-function (bundling), docker, vite. Registered via the spec-013 explicit mapping under subpath specifiers @ycforge/builders-core/{nestjs-function,docker,vite}.",
   "license": "MIT",
+  "author": "ycforge (https://github.com/ycforge)",
+  "homepage": "https://github.com/ycforge/serverless-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ycforge/serverless-tools.git",
+    "directory": "packages/builders-core"
+  },
+  "bugs": {
+    "url": "https://github.com/ycforge/serverless-tools/issues"
+  },
+  "keywords": [
+    "yandex-cloud",
+    "cloud-functions",
+    "serverless",
+    "builders",
+    "esbuild",
+    "vite",
+    "docker",
+    "ycforge"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22"

@@ -3,6 +3,26 @@
   "version": "1.0.0",
   "description": "Build/Deployment Orchestrator (Project C) for the serverless-tools ecosystem. Plugin contracts are exposed via the @ycforge/pilot/contracts subpath export.",
   "license": "MIT",
+  "author": "ycforge (https://github.com/ycforge)",
+  "homepage": "https://github.com/ycforge/serverless-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ycforge/serverless-tools.git",
+    "directory": "packages/pilot"
+  },
+  "bugs": {
+    "url": "https://github.com/ycforge/serverless-tools/issues"
+  },
+  "keywords": [
+    "yandex-cloud",
+    "serverless",
+    "deployment",
+    "orchestrator",
+    "terraform",
+    "build",
+    "cli",
+    "ycforge"
+  ],
   "type": "module",
   "exports": {
     ".": {
