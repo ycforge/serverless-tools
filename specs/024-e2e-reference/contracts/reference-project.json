@@ -77,11 +77,11 @@
       }
     },
     "infra/frontend.ycsf.tf.json": {
-      "description": "yandex_storage_bucket.frontend (bucket=frontend, acl=public-read) + yandex_storage_object.frontend_<sanitized-file> на каждый файл dist (bucket=«yandex_storage_bucket.frontend.id», key=<relative>, source=<abs-artifact-path>)",
+      "description": "yandex_storage_bucket.frontend (bucket=frontend-a31c4d4c, acl=public-read; appId-slug из .ycsf/state.json, spec 035) + yandex_storage_object.frontend_<sanitized-file> на каждый файл dist (bucket=«yandex_storage_bucket.frontend.id», key=<relative>, source=<abs-artifact-path>)",
       "resource": {
         "yandex_storage_bucket": {
           "frontend": {
-            "bucket": "frontend",
+            "bucket": "frontend-a31c4d4c",
             "acl": "public-read"
           }
         },

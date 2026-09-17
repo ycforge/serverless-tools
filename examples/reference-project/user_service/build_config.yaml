@@ -2,18 +2,4 @@ version: 1
 build_config:
   entry: src/main.ts
   runtime: nodejs22
-  external:
-    - "@nestjs/websockets"
-    - "@nestjs/microservices"
-    - "@nestjs/platform-express"
-    - "@nestjs/mapped-types"
-    - "@grpc/grpc-js"
-    - "@grpc/proto-loader"
-    - kafkajs
-    - mqtt
-    - nats
-    - amqplib
-    - amqp-connection-manager
-    - ioredis
-  out_filename: function.zip
 build_env: {}

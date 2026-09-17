@@ -79,19 +79,21 @@ describe('ycsf-модель эталона', () => {
     ]);
   });
 
-  it('nested build_config: внешние модули NestJS, docker no_push, vite command, openapi entry', () => {
+  it('nested build_config: self-contained function, docker no_push, vite command, openapi entry', () => {
     const us = buildCfg('user_service');
     expect(us.entry).toBe('src/main.ts');
     expect(us.runtime).toBe('nodejs22');
-    expect(us.out_filename).toBe('function.zip');
-    expect(us.external).toContain('@nestjs/websockets');
-    expect(us.external).toContain('@nestjs/microservices');
-    expect(us.external).toContain('@grpc/grpc-js');
-    expect(us.external).toContain('ioredis');
+    // Self-contained-only since the spec-028 toolchain fix: no declared
+    // externals (the bundle inlines everything); out_filename defaults to
+    // function.zip inside the builder.
+    expect(us.external ?? []).toEqual([]);
+    expect(us.out_filename ?? 'function.zip').toBe('function.zip');
 
     const an = buildCfg('analytics');
-    expect(an.image.mode).toBe('registry-ref');
-    expect(an.image.ref).toMatch(/^cr\.yandex\/ycforge\/analytics@sha256:[0-9a-f]{64}$/);
+    const image = an.image as Record<string, unknown>;
+    expect(image.repository).toMatch(/^cr\.yandex\/.+\/analytics$/);
+    expect(image.tag).toBe('latest');
+    expect(image.no_push).toBe(true);
     expect(an.dockerfile).toBeUndefined();
 
     const fe = yaml('frontend/build_config.yaml');
@@ -134,6 +136,7 @@ describe('ycsf-модель эталона', () => {
       const text = readFileSync(join(ROOT, f), 'utf8');
       expect(text).not.toMatch(/\{\{\$ENV\}\}/);
     }
-    expect(readFileSync(join(ROOT, '.ycsf/extensions.yaml'), 'utf8')).toContain('connectivity_type');
+    expect(readFileSync(join(ROOT, '.ycsf/extensions.yaml'), 'utf8')).toContain('containers.analytics');
+    expect(readFileSync(join(ROOT, '.ycsf/extensions.yaml'), 'utf8')).toContain('service_account_id');
   });
 });

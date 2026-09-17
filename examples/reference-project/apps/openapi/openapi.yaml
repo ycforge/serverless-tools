@@ -11,16 +11,16 @@ paths:
         "200":
           description: ok
       x-yc-apigateway-integration:
-        type: mock
-        content:
-          application/json: '{"users":[]}'
-  /analytics/report:
+        type: cloud_functions
+        function_id: ${resources.functions.user_service.id}
+        service_account_id: ajefi3b58tak71g3ecp1
+  /analytics:
     get:
-      summary: Analytics report (analytics API)
+      summary: Analytics health (analytics container API)
       responses:
         "200":
           description: ok
       x-yc-apigateway-integration:
-        type: mock
-        content:
-          application/json: '{"report":{"status":"ok"}}'
+        type: serverless_containers
+        container_id: ${resources.containers.analytics.id}
+        service_account_id: ajefi3b58tak71g3ecp1

@@ -87,6 +87,15 @@ Per-app `build_config.yaml` лежит на корне эталона рядом
 (`<root>/<appId>/build_config.yaml`, читается моделью Project C), исходники — в
 `apps/<appId>/`.
 
+Имя бакета Object Storage глобально-уникально (S3-парадигма), поэтому эталон
+использует схему `<appId>-<slug>`: slug — 8-hex, сгенерирован на первой сборке и
+закреплён в `.ycsf/state.json` (коммитится в эталоне для детерминизма golden;
+обычный проект может gitignore-ать его — каждая среда получит свой бакет).
+Пользовательский override — `build_config.bucket_name` (vite builder, spec 035):
+тогда имя бакета ровно `bucket_name`, без slug. Materializer получает это значение
+в `FrontendArtifactValue.bucketName`; при его отсутствии
+materializer падает на app id (обратная совместимость).
+
 ## Генерируемые файлы
 
 `infra/*.ycsf.tf.json` (по файлу на приложение) + `infra/99-ycsf-outputs.tf.json`

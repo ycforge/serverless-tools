@@ -7,9 +7,9 @@
         },
         "entrypoint": "main.handler",
         "memory": 128,
-        "name": "user_service",
+        "name": "user-service",
         "runtime": "nodejs22",
-        "user_hash": "5e2dbc98b7d6351b613ade1944fab5228d59709a1989674cbfd55ff9cb00b493"
+        "user_hash": "a016d97df69edd3d67bb4bb5de3b15a323d38214f1d530fbac5905212e0add34"
       }
     }
   }

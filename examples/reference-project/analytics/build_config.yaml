@@ -1,6 +1,7 @@
 version: 1
 build_config:
   image:
-    mode: registry-ref
-    ref: cr.yandex/ycforge/analytics@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    repository: cr.yandex/crps9jj0ui2e954vaj8m/analytics
+    tag: latest
+    no_push: true
 build_env: {}

@@ -2,7 +2,7 @@
   "resource": {
     "yandex_storage_bucket": {
       "frontend": {
-        "bucket": "frontend",
+        "bucket": "frontend-a31c4d4c",
         "acl": "public-read"
       }
     },

@@ -3,7 +3,7 @@
     "yandex_storage_bucket": {
       "frontend": {
         "acl": "public-read",
-        "bucket": "frontend"
+        "bucket": "frontend-a31c4d4c"
       }
     },
     "yandex_storage_object": {

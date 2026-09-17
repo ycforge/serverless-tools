@@ -10,7 +10,7 @@ const REPO = resolve(ROOT, '../..');
 const CLI = join(REPO, 'packages/pilot/dist/cli/index.js');
 const FIXTURES = join(ROOT, 'test/fixtures');
 
-const FUNCTION_HASH = '5e2dbc98b7d6351b613ade1944fab5228d59709a1989674cbfd55ff9cb00b493';
+const FUNCTION_HASH = 'a016d97df69edd3d67bb4bb5de3b15a323d38214f1d530fbac5905212e0add34';
 const ANALYTICS_IMAGE =
   'cr.yandex/ycforge/analytics@sha256:c16dea4fac51b380fee77eef61fc6344dfde1b306629bb02b4f1b3dbad8ce7f0';
 const FRONTEND_JS = 'index-CII8GTtS.js';
@@ -104,7 +104,7 @@ describe('golden fixtures', () => {
   it('frontend: bucket + ровно 2 объекта с корректными именами и key', () => {
     const doc = read('frontend.ycsf.tf.json') as TfResourceDoc;
     const b = doc.resource.yandex_storage_bucket.frontend as unknown as BucketResource;
-    expect(b.bucket).toBe('frontend');
+    expect(b.bucket).toBe('frontend-a31c4d4c');
     expect(b.acl).toBe('public-read');
     const objects = doc.resource.yandex_storage_object as unknown as Record<
       string,
