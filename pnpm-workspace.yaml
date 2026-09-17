@@ -6,3 +6,4 @@ allowBuilds:
   '@scarf/scarf': false
   '@swc/core': false
   esbuild: true
+  protobufjs: true
