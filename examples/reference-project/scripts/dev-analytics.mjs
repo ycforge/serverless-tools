@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { createYcsfLocalServer } from '@ycforge/js-dev-tools/server';
+import { createYcsfLocalServer } from '@ycforge/serverless-dev-tools/server';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = resolve(ROOT, 'apps/analytics/dist/app.module.js');
