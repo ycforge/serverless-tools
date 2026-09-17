@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { check } from '../check/index.js';
+import { resolveProjectRoot } from './project-dir.js';
 import { CLI_UNEXPECTED_ERROR, CLI_MISSING_PROJECT_DIR } from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
 import type { Diagnostic } from '../contracts/index.js';
@@ -19,7 +20,7 @@ function diagToCLI(d: Diagnostic): CLIDiagnostic {
 
 export async function checkAction(cmd: Command): Promise<void> {
   const opts = cmd.optsWithGlobals();
-  const rootDir = String(opts.projectDir ?? process.cwd());
+  const rootDir = resolveProjectRoot(opts.projectDir);
   const json = Boolean(opts.json);
   const validateTf = Boolean(opts.validateTf);
 

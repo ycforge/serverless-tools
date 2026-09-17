@@ -118,7 +118,7 @@ describe('builder.build — project-model consumption via BuildContext only (T02
     expect(document.info.title).not.toBe('builder-openapi-convention');
     expect(spawnCalls).toHaveLength(0);
     expect(value.resourceReferences).toEqual([
-      { logical: 'functions.user_service', terraformType: 'yandex_function' },
+      { logical: 'functions.user_service', terraformType: 'yandex_function', property: 'id' },
     ]);
   });
 
@@ -219,7 +219,7 @@ describe('builder.build — fail-fast contract + artifact (T024)', () => {
     const context = await makeContext();
     const { value } = await builder.build(context);
     expect(value.resourceReferences).toEqual([
-      { logical: 'functions.user_service', terraformType: 'yandex_function' },
+      { logical: 'functions.user_service', terraformType: 'yandex_function', property: 'id' },
     ]);
 
     const document = JSON.parse(await (await import('node:fs/promises')).readFile(value.specPath as string, 'utf8'));

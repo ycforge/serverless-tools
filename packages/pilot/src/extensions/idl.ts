@@ -2,14 +2,15 @@
 import type { TerraformResource } from '../contracts/index.js';
 
 /**
- * The only two domain types that are IDL-addressable by extensions
- * (data-model.md, research.md; quickstart uses `functions.*` and `gateways.*`).
+ * The domain types that are IDL-addressable by extensions (data-model.md,
+ * research.md; quickstart uses `functions.*` and `gateways.*`).
  * Frozen so the table cannot be mutated at runtime. Non-listed types are
  * never addressable and never produce errors.
  */
 export const IDL_DOMAIN_BY_TF_TYPE: Readonly<Record<string, string>> = Object.freeze({
   yandex_function: 'functions',
   yandex_api_gateway: 'gateways',
+  yandex_serverless_container: 'containers',
 });
 
 /** IDL grammar: `<domain>.<name>` — both segments `[a-z][a-z0-9_]*` (FR-004). */

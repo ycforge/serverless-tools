@@ -38,7 +38,7 @@ export async function check(rootDir: string, options?: CheckOptions): Promise<Ch
 
   // 3. C2–C3: build ENV validation
   for (const [appId, buildConfig] of model.build_configs) {
-    const file = `${appId}/build_config.yaml`;
+    const file = `${model.apps.get(appId)?.source_path ?? appId}/build_config.yaml`;
     const { errors } = checkEnvRequirements(appId, buildConfig, file);
     diagnostics.push(...errors);
   }

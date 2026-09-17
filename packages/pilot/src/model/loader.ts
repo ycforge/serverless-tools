@@ -58,7 +58,7 @@ export function loadProjectModel(rootDir: string): ProjectModelLoadResult {
 
   const buildConfigs = new Map<string, BuildConfig>();
   for (const app of apps) {
-    const config = loadAppBuildConfig(rootDir, app.app_id);
+    const config = loadAppBuildConfig(rootDir, app.source_path);
     if (config.kind === 'ok') {
       buildConfigs.set(app.app_id, config.build_config);
     } else {
@@ -73,7 +73,7 @@ export function loadProjectModel(rootDir: string): ProjectModelLoadResult {
     const { requirements, errors: envErrors } = checkEnvRequirements(
       app.app_id,
       config,
-      `${app.app_id}/build_config.yaml`,
+      `${app.source_path}/build_config.yaml`,
     );
     for (const requirement of requirements) {
       envRequirements.set(requirement.name, requirement);

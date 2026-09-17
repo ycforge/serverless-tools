@@ -7,13 +7,14 @@ import {
   runTerraformApply,
 } from './pipeline.js';
 import { CLIError, CLI_UNEXPECTED_ERROR } from './errors.js';
+import { resolveProjectRoot } from './project-dir.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
 import { formatCacheLine } from './cache-helpers.js';
 import type { CacheCheckResult } from '../contracts/cache.js';
 
 export async function applyAction(cmd: Command): Promise<void> {
   const opts = cmd.optsWithGlobals();
-  const rootDir = String(opts.projectDir ?? process.cwd());
+  const rootDir = resolveProjectRoot(opts.projectDir);
   const json = Boolean(opts.json);
   const noCache = Boolean(opts.noCache || opts.force || opts.cache === false);
   const cacheDir = opts.cacheDir as string | undefined;

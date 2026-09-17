@@ -12,7 +12,7 @@ function yaml(file: string): Record<string, unknown> {
   return (doc.toJS() ?? {}) as Record<string, unknown>;
 }
 function buildCfg(app: string): Record<string, unknown> {
-  return yaml(join(app, 'build_config.yaml')).build_config as Record<string, unknown>;
+  return yaml(join('apps', app, 'build_config.yaml')).build_config as Record<string, unknown>;
 }
 interface AppEntry {
   builder?: string;
@@ -31,7 +31,7 @@ describe('ycsf-модель эталона', () => {
     }
     for (const app of ['user_service', 'analytics', 'frontend', 'openapi']) {
       const cfg = parseDocument(
-        readFileSync(join(ROOT, app, 'build_config.yaml'), 'utf8'),
+        readFileSync(join(ROOT, 'apps', app, 'build_config.yaml'), 'utf8'),
       ).toJS() as unknown as BuildConfig;
       expect(cfg.version).toBe(1);
       expect(cfg.build_config).toBeTruthy();
@@ -79,22 +79,27 @@ describe('ycsf-модель эталона', () => {
     ]);
   });
 
-  it('nested build_config: внешние модули NestJS, docker no_push, vite command, openapi entry', () => {
+  it('nested build_config: self-contained function, docker registry-ref, vite command, openapi entry', () => {
     const us = buildCfg('user_service');
     expect(us.entry).toBe('src/main.ts');
     expect(us.runtime).toBe('nodejs22');
-    expect(us.out_filename).toBe('function.zip');
-    expect(us.external).toContain('@nestjs/websockets');
-    expect(us.external).toContain('@nestjs/microservices');
-    expect(us.external).toContain('@grpc/grpc-js');
-    expect(us.external).toContain('ioredis');
+    // Self-contained-only since the spec-028 toolchain fix: no declared
+    // externals (the bundle inlines everything); out_filename defaults to
+    // function.zip inside the builder.
+    expect(us.external ?? []).toEqual([]);
+    expect(us.out_filename ?? 'function.zip').toBe('function.zip');
 
     const an = buildCfg('analytics');
-    expect(an.image.mode).toBe('registry-ref');
-    expect(an.image.ref).toMatch(/^cr\.yandex\/ycforge\/analytics@sha256:[0-9a-f]{64}$/);
+    const image = an.image as Record<string, unknown>;
+    // spec 028 dev-mode: the reference project pins the already-pushed amd64
+    // image (cr.yandex host, immutable digest) instead of building locally —
+    // a local `docker build` on Apple Silicon yields arm64, which the YC
+    // x86_64 container runtime cannot run (revision deploy → Internal error).
+    expect(image.mode).toBe('registry-ref');
+    expect(image.ref).toMatch(/^cr\.yandex\/.+\/analytics@sha256:[0-9a-f]{64}$/);
     expect(an.dockerfile).toBeUndefined();
 
-    const fe = yaml('frontend/build_config.yaml');
+    const fe = yaml('apps/frontend/build_config.yaml');
     const feCfg = fe.build_config as Record<string, unknown>;
     expect(feCfg.out_dir).toBe('dist');
     expect(feCfg.command).toContain('vite build');
@@ -103,7 +108,7 @@ describe('ycsf-модель эталона', () => {
     const oa = buildCfg('openapi');
     expect(oa.openapi_entry).toBe('openapi.yaml');
     for (const app of ['user_service', 'analytics', 'frontend', 'openapi']) {
-      expect(yaml(`${app}/build_config.yaml`).build_env ?? {}).not.toContain('TOKEN');
+      expect(yaml(`apps/${app}/build_config.yaml`).build_env ?? {}).not.toContain('TOKEN');
     }
   });
 
@@ -125,15 +130,16 @@ describe('ycsf-модель эталона', () => {
       '.ycsf/builders.yaml',
       '.ycsf/extensions.yaml',
       '.ycsf/outputs.yaml',
-      'user_service/build_config.yaml',
-      'analytics/build_config.yaml',
-      'frontend/build_config.yaml',
-      'openapi/build_config.yaml',
+      'apps/user_service/build_config.yaml',
+      'apps/analytics/build_config.yaml',
+      'apps/frontend/build_config.yaml',
+      'apps/openapi/build_config.yaml',
     ];
     for (const f of files) {
       const text = readFileSync(join(ROOT, f), 'utf8');
       expect(text).not.toMatch(/\{\{\$ENV\}\}/);
     }
-    expect(readFileSync(join(ROOT, '.ycsf/extensions.yaml'), 'utf8')).toContain('connectivity_type');
+    expect(readFileSync(join(ROOT, '.ycsf/extensions.yaml'), 'utf8')).toContain('containers.analytics');
+    expect(readFileSync(join(ROOT, '.ycsf/extensions.yaml'), 'utf8')).toContain('service_account_id');
   });
 });

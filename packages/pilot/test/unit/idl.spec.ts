@@ -21,6 +21,7 @@ describe('idl (T015–T017)', () => {
     expect(IDL_DOMAIN_BY_TF_TYPE).toEqual({
       yandex_function: 'functions',
       yandex_api_gateway: 'gateways',
+      yandex_serverless_container: 'containers',
     });
     expect(Object.isFrozen(IDL_DOMAIN_BY_TF_TYPE)).toBe(true);
 

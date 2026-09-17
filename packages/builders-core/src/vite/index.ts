@@ -5,13 +5,14 @@
  */
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { BLC_BUILD_FAILED, builderError } from '../diagnostics.js';
 import { assertNoResidualEnv, requireSourcePath } from '../preflight.js';
 import type { Artifact, Builder, BuildContext, FrontendArtifactValue } from '../types.js';
 import { parseViteConfig } from './config.js';
 import { runViteBuild } from './run.js';
+import { bucketNameFor } from './slug.js';
 
 function copyDirContents(src: string, dest: string): void {
   mkdirSync(dest, { recursive: true });
@@ -43,7 +44,14 @@ const builder = {
       );
     }
     copyDirContents(builtDir, context.outputDir);
-    return { type: 'ycforge:frontend', value: { directory: context.outputDir } };
+
+    // Bucket name: explicit build_config.bucket_name wins; otherwise resolve
+    // an appId-slug default persisted in <root>/.ycsf/state.json. `appId` is
+    // the basename of pilot's artifact outputDir (<root>/.ycsf/artifacts/<appId>).
+    const appId = basename(context.outputDir);
+    const { bucketName } = bucketNameFor(context.projectRoot, appId, config.bucket_name);
+
+    return { type: 'ycforge:frontend', value: { directory: context.outputDir, bucketName } };
   },
 } satisfies Builder;
 

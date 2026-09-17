@@ -8,7 +8,7 @@ import {
   type TempProject,
 } from '../helpers/temp-project.js';
 
-// US-1 AC3 / US-5 / FR-003 / FR-011: <app>/build_config.yaml → BuildConfig.
+// US-1 AC3 / US-5 / FR-003 / FR-011: <source_path>/build_config.yaml → BuildConfig.
 // `build_config` is opaque to C (builder validates internals, FR-011);
 // `build_env` is string | null. Missing file → empty BuildConfig.
 
@@ -27,9 +27,9 @@ function makeProject(files: Record<string, string>): string {
 }
 
 describe('loadAppBuildConfig (US-1, FR-003/FR-011)', () => {
-  it('reads build_config (opaque) + build_env (string | null)', () => {
+  it('reads build_config (opaque) + build_env (string | null) from source_path', () => {
     const root = makeProject({
-      'analytics/build_config.yaml': `version: 1
+      'apps/analytics/build_config.yaml': `version: 1
 build_config:
   dockerfile: Dockerfile
   meta:
@@ -40,7 +40,7 @@ build_env:
   IMAGE_TAG: "latest"
 `,
     });
-    const result = loadAppBuildConfig(root, 'analytics');
+    const result = loadAppBuildConfig(root, 'apps/analytics');
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.build_config.build_config).toEqual({
@@ -50,24 +50,34 @@ build_env:
     expect(result.build_config.build_env).toEqual({ NPM_TOKEN: null, IMAGE_TAG: 'latest' });
   });
 
+  it('does NOT read <appId>/build_config.yaml when source_path differs from app_id', () => {
+    const root = makeProject({
+      'analytics/build_config.yaml': 'version: 1\nbuild_config:\n  dockerfile: Dockerfile\n',
+    });
+    const result = loadAppBuildConfig(root, 'apps/analytics');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.build_config).toEqual({ build_config: {}, build_env: {} });
+  });
+
   it('ignores arbitrary builder-specific build_config internals (FR-011)', () => {
     const root = makeProject({
-      'analytics/build_config.yaml': `version: 1
+      'apps/analytics/build_config.yaml': `version: 1
 build_config:
   whatever_the_builder_wants:
     - list
   other: { deep: [1, 2, 3] }
 `,
     });
-    const result = loadAppBuildConfig(root, 'analytics');
+    const result = loadAppBuildConfig(root, 'apps/analytics');
     expect(result.kind).toBe('ok');
   });
 });
 
 describe('loadAppBuildConfig — missing file / partial config (US-5, FR-003, spec Edge Case)', () => {
-  it('returns { build_config: {}, build_env: {} } when <app>/build_config.yaml is absent', () => {
+  it('returns { build_config: {}, build_env: {} } when <source_path>/build_config.yaml is absent', () => {
     const root = makeProject({});
-    const result = loadAppBuildConfig(root, 'simple_app');
+    const result = loadAppBuildConfig(root, 'apps/simple_app');
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.build_config).toEqual({ build_config: {}, build_env: {} });
@@ -75,9 +85,9 @@ describe('loadAppBuildConfig — missing file / partial config (US-5, FR-003, sp
 
   it('accepts a file with only build_env (build_config defaults to {})', () => {
     const root = makeProject({
-      'simple_app/build_config.yaml': 'version: 1\nbuild_env:\n  TOKEN: "abc"\n',
+      'apps/simple_app/build_config.yaml': 'version: 1\nbuild_env:\n  TOKEN: "abc"\n',
     });
-    const result = loadAppBuildConfig(root, 'simple_app');
+    const result = loadAppBuildConfig(root, 'apps/simple_app');
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.build_config).toEqual({
@@ -90,9 +100,9 @@ describe('loadAppBuildConfig — missing file / partial config (US-5, FR-003, sp
 describe('loadAppBuildConfig — shape validation (data-model validation rules)', () => {
   it('rejects a non-mapping build_config with PML_INVALID', () => {
     const root = makeProject({
-      'a/build_config.yaml': 'version: 1\nbuild_config: [1, 2]\n',
+      'apps/a/build_config.yaml': 'version: 1\nbuild_config: [1, 2]\n',
     });
-    const result = loadAppBuildConfig(root, 'a');
+    const result = loadAppBuildConfig(root, 'apps/a');
     expect(result.kind).toBe('invalid');
     if (result.kind !== 'invalid') return;
     expect(result.errors[0]?.code).toBe(PML_INVALID);
@@ -100,9 +110,9 @@ describe('loadAppBuildConfig — shape validation (data-model validation rules)'
 
   it('rejects a non-string/non-null build_env value with PML_INVALID', () => {
     const root = makeProject({
-      'a/build_config.yaml': 'version: 1\nbuild_env:\n  TOKEN: 42\n',
+      'apps/a/build_config.yaml': 'version: 1\nbuild_env:\n  TOKEN: 42\n',
     });
-    const result = loadAppBuildConfig(root, 'a');
+    const result = loadAppBuildConfig(root, 'apps/a');
     expect(result.kind).toBe('invalid');
     if (result.kind !== 'invalid') return;
     expect(result.errors[0]?.code).toBe(PML_INVALID);

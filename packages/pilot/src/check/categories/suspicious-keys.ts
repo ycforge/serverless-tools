@@ -23,7 +23,7 @@ const SUFFIX = new Set<string>([
   'secretkey', 'clientsecret', 'privatekey',
 ]);
 
-// Files scanned in FR-012 order, then `<appId>/build_config.yaml` per app.
+// Files scanned in FR-012 order, then `<source_path>/build_config.yaml` per app.
 const YCSF_FILES = [
   '.ycsf/apps.yaml',
   '.ycsf/builders.yaml',
@@ -34,7 +34,7 @@ const YCSF_FILES = [
 ] as const;
 
 export interface SuspiciousScanModel {
-  readonly apps: ReadonlyMap<string, unknown>;
+  readonly apps: ReadonlyMap<string, { readonly source_path: string }>;
 }
 
 function normalizeKey(key: string): string {
@@ -90,7 +90,7 @@ export function scanSuspiciousKeys(rootDir: string, model: SuspiciousScanModel):
 
   const files: string[] = [...YCSF_FILES];
   for (const appId of [...model.apps.keys()].sort()) {
-    files.push(`${appId}/build_config.yaml`);
+    files.push(`${model.apps.get(appId)!.source_path}/build_config.yaml`);
   }
 
   // Each file is opened exactly once; unreadable or syntactically broken files

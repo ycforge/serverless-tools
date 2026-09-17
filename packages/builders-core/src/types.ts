@@ -51,6 +51,8 @@ export interface DockerArtifactValue {
 /** `Artifact.value` of `ycforge:frontend` — absolute path to static output. */
 export interface FrontendArtifactValue {
   readonly directory: string;
+  /** Explicit bucket name override (build_config `bucket_name`). Absent → slug-based default. */
+  readonly bucketName?: string;
 }
 
 /** App-level `build_config` for builder `nestjs-function` (versionless, spec 011). */
@@ -95,4 +97,6 @@ export interface ViteBuildConfig {
   readonly out_dir?: string; // default "dist"
   readonly root?: string; // default "."
   readonly command?: string; // default "vite build"
+  /** Explicit bucket name. Absent → auto-generated `<appId>-<slug>` from .ycsf/state.yaml. */
+  readonly bucket_name?: string;
 }

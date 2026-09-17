@@ -20,20 +20,20 @@ import { createTempProject, removeTempProject, type TempProject } from '../helpe
 const DEFAULT_APPS_YAML = `version: 1
 apps:
   user_service:
-    source_path: user_service
+    source_path: apps/user_service
     builder: nestjs-function
   analytics:
-    source_path: analytics
+    source_path: apps/analytics
     builder: docker
     depends_on:
       - user_service
   frontend:
-    source_path: frontend
+    source_path: apps/frontend
     builder: vite
     depends_on:
       - user_service
   openapi:
-    source_path: openapi
+    source_path: apps/openapi
     builder: yandex-api-gateway
     depends_on:
       - user_service
@@ -84,16 +84,16 @@ functions:
 `,
     );
     project.write(
-      'user_service/build_config.yaml',
+      'apps/user_service/build_config.yaml',
       'version: 1\nbuild_config:\n  runtime: nodejs22\n',
     );
     // analytics build_config references no env vars so Sc1 stays env-free
     project.write(
-      'analytics/build_config.yaml',
+      'apps/analytics/build_config.yaml',
       'version: 1\nbuild_config:\n  image: ghcr.io/example/analytics\n  port: 8080\n',
     );
     project.write(
-      'openapi/build_config.yaml',
+      'apps/openapi/build_config.yaml',
       'version: 1\nbuild_config:\n  spec: ./openapi.yaml\n',
     );
 
@@ -103,7 +103,7 @@ functions:
 
     expect(result.model.apps).toHaveLength(4);
     const userService = result.model.apps.get('user_service');
-    expect(userService).toMatchObject({ source_path: 'user_service', builder: 'nestjs-function' });
+    expect(userService).toMatchObject({ source_path: 'apps/user_service', builder: 'nestjs-function' });
     expect(userService?.depends_on).toEqual([]);
     expect(result.model.apps.get('analytics')?.depends_on).toEqual(['user_service']);
     expect(result.model.apps.get('frontend')?.depends_on).toEqual(['user_service']);
@@ -232,9 +232,9 @@ apps:
   it('Sc7: missing ENV → PML_ENV_NOT_SET for BOTH names (collect-all) (US-4 AC1)', () => {
     vi.stubEnv('ANALYTICS_DOCKERFILE', '');
     vi.stubEnv('NPM_TOKEN', '');
-    project.write('.ycsf/apps.yaml', 'version: 1\napps:\n  analytics: { source_path: analytics, builder: docker }\n');
+    project.write('.ycsf/apps.yaml', 'version: 1\napps:\n  analytics: { source_path: apps/analytics, builder: docker }\n');
     project.write(
-      'analytics/build_config.yaml',
+      'apps/analytics/build_config.yaml',
       `version: 1
 build_config:
   dockerfile: "{{$ANALYTICS_DOCKERFILE}}"
@@ -254,9 +254,9 @@ build_env:
   it('Sc8: ENV present → { kind: "ok" }, env_requirements record both with isSet true (US-4 AC2)', () => {
     vi.stubEnv('ANALYTICS_DOCKERFILE', 'Dockerfile');
     vi.stubEnv('NPM_TOKEN', 's3cr3t');
-    project.write('.ycsf/apps.yaml', 'version: 1\napps:\n  analytics: { source_path: analytics, builder: docker }\n');
+    project.write('.ycsf/apps.yaml', 'version: 1\napps:\n  analytics: { source_path: apps/analytics, builder: docker }\n');
     project.write(
-      'analytics/build_config.yaml',
+      'apps/analytics/build_config.yaml',
       `version: 1
 build_config:
   dockerfile: "{{$ANALYTICS_DOCKERFILE}}"

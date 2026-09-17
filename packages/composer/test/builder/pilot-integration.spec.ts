@@ -125,12 +125,14 @@ describe('pilot integration (spec 026, P4 / T041-T044): real builder via buildAp
       const gateway = tfJson.resource.yandex_api_gateway.openapi!;
       expect(gateway).toBeDefined();
       // name = artifact.name = appId ('openapi'); TF address stamped by C-dispatch
-      expect(gateway.spec).toBe('file("${path.module}/generated/openapi-openapi.yaml")');
+      expect(gateway.spec).toBe(
+        '${templatefile("${path.module}/generated/openapi-openapi.yaml", { yandex_function_user_service_id = yandex_function.user_service.id })}',
+      );
 
       // NG-3 companion file landed under the temp cwd with the resources refs
-      // rewritten to real Terraform references (FR-014 / SC-002)
+      // rewritten to Terraform template variables (FR-014 / SC-002)
       const companion = readFileSync(join(materializeCwd, 'generated', 'openapi-openapi.yaml'), 'utf8');
-      expect(companion).toContain('${yandex_function.user_service.id}');
+      expect(companion).toContain('${yandex_function_user_service_id}');
       expect(companion).not.toContain('${resources.functions.user_service.id}');
     } finally {
       chdir(previousCwd);

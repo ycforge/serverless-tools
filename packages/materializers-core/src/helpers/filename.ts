@@ -23,3 +23,15 @@ export function sanitizeFilename(filename: string): string {
 export function isTfAddress(value: string): boolean {
   return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value);
 }
+
+/**
+ * YC service resource-name pattern (functions/containers/gateways):
+ * `[a-z][-a-z0-9]{1,61}[a-z0-9]` — no underscores. The TF-address `app id`
+ * (underscores allowed) is mapped to a deployable YC name by `_` → `-`; the
+ * stable identity stays the app id (`artifact.name`), only the provider-facing
+ * `name` attribute is sanitized.
+ */
+export function toYcResourceName(appId: string): string {
+  return appId.replace(/_/g, '-');
+}
+export const YC_RESOURCE_NAME_RE = /^[a-z][-a-z0-9]{1,61}[a-z0-9]$/;

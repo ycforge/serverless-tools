@@ -55,7 +55,7 @@ NestJS queue handler
 A должен:
 
 * запускать/reuse NestJS application в Cloud Function;
-* адаптировать HTTP invocation из API Gateway payload 2.0 к NestJS;
+* адаптировать HTTP invocation из API Gateway payload (v2.0 для ALB/payload-format-2.0, v1 `cloud_functions` event для API Gateway — обе ветки нормализуются через единый canonical v2-поток, спека 036) к NestJS;
 * адаптировать Message Queue invocation;
 * поддерживать queue handlers;
 * поддерживать `@QueueHandler()` и `@QueueMessage()`;
@@ -257,7 +257,7 @@ C учитывает `depends_on` при планировании build graph.
 Каждый app имеет собственный:
 
 ```text
-<app>/build_config.yaml
+<source_path>/build_config.yaml
 ```
 
 C автоматически загружает его.
@@ -2152,7 +2152,7 @@ Terraform остаётся источником истины для infrastructu
 
 16. **Все builders получают `projectRoot` и сами работают со своим project scope.**
 
-17. **App-specific configuration находится рядом с app в `build_config.yaml`.**
+17. **App-specific configuration находится в `source_path` app-а в `build_config.yaml`.**
 
 18. **`{{$ENV}}` — единый serverless-tools build-time ENV interpolation syntax.**
 

@@ -8,9 +8,10 @@
         "entrypoint": "main.handler",
         "execution_timeout": 5,
         "memory": 128,
-        "name": "user_service",
+        "name": "user-service",
         "runtime": "nodejs22",
-        "user_hash": "738f20665cb986b860947757f564ad8edc6326ec56e4db46cdf6f897e274b486"
+        "service_account_id": "ajefi3b58tak71g3ecp1",
+        "user_hash": "6ba8923d20a98dfe1422e9d6b8816041011f40dd17aec846dcfef93347492cd0"
       }
     }
   }

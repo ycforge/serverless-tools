@@ -72,6 +72,8 @@ export interface DockerArtifactValue {
 /** `Artifact.value` of `ycforge:frontend` — static build output directory (spec 018). */
 export interface FrontendArtifactValue {
   readonly directory: string;
+  /** Explicit bucket name override (build_config `bucket_name`). Absent → `name` (app id) fallback. */
+  readonly bucketName?: string;
 }
 
 /** Resource reference (IDEA §33; forward contract, spec 019 D-3). */
@@ -80,6 +82,12 @@ export interface ResourceReference {
   readonly logical: string;
   /** Terraform resource type, e.g. `yandex_function`. */
   readonly terraformType: string;
+  /**
+   * Referenced resource property, e.g. `id` or `name`. Optional for backward
+   * compatibility with producers that only ever reference `.id`; the resolver
+   * defaults to `id` when absent.
+   */
+  readonly property?: string;
 }
 
 /** `Artifact.value` of `ycforge:api-gateway` (spec 019 D-3, forward contract; producer = Project B). */

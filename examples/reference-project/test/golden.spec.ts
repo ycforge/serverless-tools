@@ -10,9 +10,9 @@ const REPO = resolve(ROOT, '../..');
 const CLI = join(REPO, 'packages/pilot/dist/cli/index.js');
 const FIXTURES = join(ROOT, 'test/fixtures');
 
-const FUNCTION_HASH = '5e2dbc98b7d6351b613ade1944fab5228d59709a1989674cbfd55ff9cb00b493';
+const FUNCTION_HASH = '6ba8923d20a98dfe1422e9d6b8816041011f40dd17aec846dcfef93347492cd0';
 const ANALYTICS_IMAGE =
-  'cr.yandex/ycforge/analytics@sha256:c16dea4fac51b380fee77eef61fc6344dfde1b306629bb02b4f1b3dbad8ce7f0';
+  'cr.yandex/crps9jj0ui2e954vaj8m/analytics@sha256:85b68206325f6af4fc29f72b87ebcdbc94cf5c8fc086ef48a02abf40372e80f4';
 const FRONTEND_JS = 'index-CII8GTtS.js';
 
 interface TfResourceDoc {
@@ -22,11 +22,17 @@ interface FunctionResource {
   runtime: string;
   entrypoint: string;
   user_hash: string;
+  name: string;
+  memory: number;
+  execution_timeout: number;
+  service_account_id: string;
   content: { zip_filename: string };
 }
 interface ContainerResource {
-  image: string;
+  image: Array<{ url: string }>;
   name: string;
+  memory: number;
+  service_account_id: string;
 }
 interface BucketResource {
   bucket: string;
@@ -41,7 +47,14 @@ interface SpecResource {
   spec: string;
 }
 interface PlainPath {
-  get: { 'x-yc-apigateway-integration': { type: string } };
+  get: {
+    'x-yc-apigateway-integration': {
+      type: string;
+      function_id?: string;
+      container_id?: string;
+      service_account_id?: string;
+    };
+  };
 }
 interface OpenApiCompanion {
   openapi: string;
@@ -83,28 +96,35 @@ describe('golden fixtures', () => {
     }
   });
 
-  it('user_service: nodejs22, hash-константа, относительный zip_filename', () => {
+  it('user_service: nodejs22, hash-константа, относительный zip_filename, extension-патчи', () => {
     const doc = read('user_service.ycsf.tf.json') as TfResourceDoc;
     const fn = doc.resource.yandex_function.user_service as unknown as FunctionResource;
     expect(fn.runtime).toBe('nodejs22');
     expect(fn.entrypoint).toBe('main.handler');
+    expect(fn.name).toBe('user-service');
     expect(fn.user_hash).toBe(FUNCTION_HASH);
     expect(fn.content.zip_filename).toBe('../.ycsf/artifacts/user_service/function.zip');
+    // extensions.yaml: memory/timeout/service_account патчи применены materializer-ом
+    expect(fn.memory).toBe(128);
+    expect(fn.execution_timeout).toBe(5);
+    expect(fn.service_account_id).toBe('ajefi3b58tak71g3ecp1');
     expect(JSON.stringify(doc)).not.toContain('<ROOT>');
     expect(JSON.stringify(doc)).not.toContain(ROOT);
   });
 
-  it('analytics: image и name зафиксированы (золотая форма materializer-а)', () => {
+  it('analytics: provider-форма image-блока, name/memory, SA (золотая форма materializer-а)', () => {
     const doc = read('analytics.ycsf.tf.json') as TfResourceDoc;
     const c = doc.resource.yandex_serverless_container.analytics as unknown as ContainerResource;
-    expect(c.image).toBe(ANALYTICS_IMAGE);
+    expect(c.image).toEqual([{ url: ANALYTICS_IMAGE }]);
     expect(c.name).toBe('analytics');
+    expect(c.memory).toBe(128);
+    expect(c.service_account_id).toBe('ajefi3b58tak71g3ecp1');
   });
 
   it('frontend: bucket + ровно 2 объекта с корректными именами и key', () => {
     const doc = read('frontend.ycsf.tf.json') as TfResourceDoc;
     const b = doc.resource.yandex_storage_bucket.frontend as unknown as BucketResource;
-    expect(b.bucket).toBe('frontend');
+    expect(b.bucket).toBe('frontend-a31c4d4c');
     expect(b.acl).toBe('public-read');
     const objects = doc.resource.yandex_storage_object as unknown as Record<
       string,
@@ -116,30 +136,38 @@ describe('golden fixtures', () => {
       'frontend_index_html',
     ]);
     for (const o of Object.values(objects)) {
-      expect(o.bucket).toBe('yandex_storage_bucket.frontend.id');
+      expect(o.bucket).toBe('${yandex_storage_bucket.frontend.id}');
       expect(o.source).toMatch(/^<ROOT>\/\.ycsf\/artifacts\/frontend\/.+\.(json|html|js)$/);
     }
     expect(objects.frontend_index_html.key).toBe('index.html');
     expect(objects.frontend_assets_index_CII8GTtS_js.key).toBe(`assets/${FRONTEND_JS}`);
   });
 
-  it('openapi: spec-шаблон + companion (mock, securitySchemes пустой, без рефов)', () => {
+  it('openapi: templatefile-спека + companion (реальные интеграции, flat refs)', () => {
     const doc = read('openapi.ycsf.tf.json') as TfResourceDoc;
     const gateway = doc.resource.yandex_api_gateway.openapi as unknown as SpecResource;
     expect(gateway.spec).toBe(
-      'file("${path.module}/generated/openapi-openapi.yaml")',
+      '${templatefile("${path.module}/generated/openapi-openapi.yaml", { yandex_function_user_service_id = yandex_function.user_service.id, yandex_serverless_container_analytics_id = yandex_serverless_container.analytics.id })}',
     );
     const companion = JSON.parse(
       readFileSync(join(FIXTURES, 'openapi-openapi.yaml'), 'utf8'),
     ) as OpenApiCompanion;
     expect(companion.openapi).toBe('3.0.0');
     expect(companion.info.title).toBe('Reference API Gateway');
-    expect(Object.keys(companion.paths).sort()).toEqual(['/analytics/report', '/users']);
-    for (const p of Object.values(companion.paths)) {
-      expect(p.get['x-yc-apigateway-integration'].type).toBe('mock');
+    expect(Object.keys(companion.paths).sort()).toEqual(['/analytics', '/analytics/kms', '/users']);
+    expect(companion.paths['/users'].get['x-yc-apigateway-integration']).toEqual({
+      type: 'cloud_functions',
+      function_id: '${yandex_function_user_service_id}',
+      service_account_id: 'ajefi3b58tak71g3ecp1',
+    });
+    for (const p of ['/analytics', '/analytics/kms']) {
+      expect(companion.paths[p].get['x-yc-apigateway-integration']).toEqual({
+        type: 'serverless_containers',
+        container_id: '${yandex_serverless_container_analytics_id}',
+        service_account_id: 'ajefi3b58tak71g3ecp1',
+      });
     }
     expect(companion.components.securitySchemes).toEqual({});
-    expect(JSON.stringify(companion)).not.toContain('function_id');
   });
 
   it('99-ycsf-outputs: 6 выходов, сортировка ключей, user-описания', () => {

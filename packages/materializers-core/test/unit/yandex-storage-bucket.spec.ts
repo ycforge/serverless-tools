@@ -50,7 +50,7 @@ describe('yandex-storage-bucket materializer (US2, T061)', () => {
     )) as readonly TerraformResource[];
     const objects = result.filter((r) => r.type === 'yandex_storage_object');
     for (const obj of objects) {
-      expect(obj.configuration).toMatchObject({ bucket: 'yandex_storage_bucket.frontend.id' });
+      expect(obj.configuration).toMatchObject({ bucket: '${yandex_storage_bucket.frontend.id}' });
       expect(typeof (obj.configuration as Record<string, unknown>).key).toBe('string');
       expect(typeof (obj.configuration as Record<string, unknown>).source).toBe('string');
     }
@@ -95,6 +95,24 @@ describe('yandex-storage-bucket materializer (US2, T061)', () => {
       ctx2,
     )) as readonly TerraformResource[];
     expect(r1).toEqual(r2);
+  });
+
+  it('explicit bucketName overrides the bucket name, app id stays the TF resource name (spec 035)', async () => {
+    const ctx = createContext();
+    const result = (await materializer.materialize(
+      {
+        type: 'ycforge:frontend',
+        name: 'frontend',
+        value: { directory: staticDir, bucketName: 'frontend-my-deploy-7f3a2b9c' },
+      } as never,
+      ctx,
+    )) as readonly TerraformResource[];
+    const bucket = result[0]!;
+    expect(bucket.name).toBe('frontend');
+    expect(bucket.configuration).toEqual({
+      bucket: 'frontend-my-deploy-7f3a2b9c',
+      acl: 'public-read',
+    });
   });
 
   it('declares output bucket_id (FR-005)', async () => {

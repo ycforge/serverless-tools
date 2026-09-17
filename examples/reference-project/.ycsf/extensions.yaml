@@ -4,6 +4,7 @@ extensions:
     patch:
       memory: 128
       execution_timeout: 5
-  - target: gateways.openapi
+      service_account_id: ajefi3b58tak71g3ecp1
+  - target: containers.analytics
     patch:
-      connectivity_type: PRIVATE
+      service_account_id: ajefi3b58tak71g3ecp1

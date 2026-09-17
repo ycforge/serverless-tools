@@ -11,8 +11,12 @@ import type { RawHttpApiGatewayV2Event } from "./raw-event";
  * sections 4.2–4.4).
  */
 export interface NormalizedHttpRequest extends HasRaw<RawHttpApiGatewayV2Event> {
-  /** Always `"2.0"` for events claimed by the HTTP transport (observed). */
-  readonly httpVersion: "2.0";
+  /**
+   * Wire format of the frame the event arrived in: `"2.0"` for API Gateway
+   * v2/ALB events (rawPath/rawQueryString), `"1.0"` for API Gateway
+   * `cloud_functions` events (httpMethod/path) — honest, never coerced.
+   */
+  readonly httpVersion: "1.0" | "2.0";
 
   /** HTTP method exactly as received from the gateway; no case coercion. */
   readonly method: string;

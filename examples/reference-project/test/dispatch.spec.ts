@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, it, expect, afterAll } from 'vitest';
+import { existsSync, readFileSync, mkdtempSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadProjectModel, dispatch, loadExtensions, applyExtensions, loadOutputs, buildOutputs } from '@ycforge/pilot';
@@ -7,7 +8,6 @@ import type { PluginRegistry } from '@ycforge/pilot/contracts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = join(ROOT, 'test/fixtures');
-const infraDir = join(ROOT, 'infra');
 
 const cliReady = existsSync(join(ROOT, '../../packages/pilot/dist/index.js'));
 const artifactsReady =
@@ -35,7 +35,16 @@ async function buildRegistry(): Promise<PluginRegistry> {
 }
 
 // archivePath resolves relative to process.cwd() — materialize CLI runs from infra/.
+// The api-gateway materializer writes the companion spec (generated/openapi-openapi.yaml)
+// to disk as a side effect of dispatch; with `resourceReferences: []` below that file
+// would clobber the real infra/ output. So dispatch tests run in a sandbox that
+// mirrors the `infra/` + `../.ycsf` layout via a symlink.
 const SAVED_CWD = process.cwd();
+const SANDBOX = mkdtempSync(join(tmpdir(), 'ref-dispatch-'));
+const infraDir = join(SANDBOX, 'infra');
+mkdirSync(infraDir, { recursive: true });
+symlinkSync(join(ROOT, '.ycsf'), join(SANDBOX, '.ycsf'), 'dir');
+afterAll(() => rmSync(SANDBOX, { recursive: true, force: true }));
 
 const ARTIFACTS = () =>
   new Map<string, { type: string; value: unknown }>([
@@ -44,7 +53,7 @@ const ARTIFACTS = () =>
       'analytics',
       {
         type: 'ycforge:docker-image',
-        value: { image: 'cr.yandex/ycforge/analytics@sha256:c16dea4fac51b380fee77eef61fc6344dfde1b306629bb02b4f1b3dbad8ce7f0' },
+        value: { image: 'cr.yandex/crps9jj0ui2e954vaj8m/analytics@sha256:85b68206325f6af4fc29f72b87ebcdbc94cf5c8fc086ef48a02abf40372e80f4' },
       },
     ],
     ['frontend', { type: 'ycforge:frontend', value: { directory: join(ROOT, '.ycsf/artifacts/frontend') } }],
@@ -119,7 +128,7 @@ describe
       }
     });
 
-    it('golden user_service byte-for-byte совпадает с реальным serialization-выходом (T039)', async () => {
+    it('golden user_service: конфигурация после applyExtensions совпадает с фикстурой (T039)', async () => {
       process.chdir(infraDir);
       try {
         const modelR = loadProjectModel(ROOT);
@@ -127,9 +136,17 @@ describe
         const registry = await buildRegistry();
         const d = await dispatch(modelR.model, registry, { artifacts: ARTIFACTS() });
         if (d.kind !== 'ok') return;
-        const generated = d.generatedFiles.find((f) => f.filename === 'user_service.ycsf.tf.json');
-        const golden = readFileSync(join(FIXTURES, 'user_service.ycsf.tf.json'), 'utf8');
-        expect(generated?.content).toBe(golden);
+        // materialize-пайплайн применяет extensions до сериализации — golden
+        // отражает финальный выход, поэтому сравниваем после applyExtensions.
+        const ext = loadExtensions(ROOT);
+        if (ext.kind !== 'ok') return;
+        const applied = applyExtensions(d.resources, ext.data);
+        if (applied.kind !== 'ok') return;
+        const us = applied.resources.find((r) => r.type === 'yandex_function' && r.name === 'user_service');
+        const golden = JSON.parse(readFileSync(join(FIXTURES, 'user_service.ycsf.tf.json'), 'utf8')) as {
+          resource: { yandex_function: { user_service: unknown } };
+        };
+        expect(us?.configuration).toEqual(golden.resource.yandex_function.user_service);
       } finally {
         process.chdir(SAVED_CWD);
       }

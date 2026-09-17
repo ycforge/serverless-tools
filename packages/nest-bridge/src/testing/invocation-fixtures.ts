@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RawHttpApiGatewayV2Event } from "../http/raw-event";
+import type { YcApiGatewayEvent } from "../http/yc-apigw-raw-event";
 import type { RawQueueEvent } from "../mq/raw-event";
 
 /**
@@ -56,6 +57,7 @@ export interface InvocationFixture<TEvent> {
 }
 
 export type HttpInvocationFixture = InvocationFixture<RawHttpApiGatewayV2Event>;
+export type YcApiGatewayInvocationFixture = InvocationFixture<YcApiGatewayEvent>;
 export type QueueInvocationFixture = InvocationFixture<RawQueueEvent>;
 
 const FIXTURES_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "fixtures");
@@ -111,6 +113,28 @@ export async function loadHttpFixture(name: string): Promise<HttpInvocationFixtu
   return loadInvocationFixture<RawHttpApiGatewayV2Event>("http", name, (event) => {
     if (!isPlainObject(event) || event.version !== "2.0") {
       throw new Error(`HTTP fixture "${name}" does not carry event.version "2.0".`);
+    }
+  });
+}
+
+/**
+ * Loads one API Gateway `cloud_functions` (v1) fixture by fixture name (file
+ * stem). The `httpMethod`/`path` + absent `version` transport discriminator
+ * is verified here; everything else is validated by the adapter under replay.
+ */
+export async function loadYcApiGatewayFixture(
+  name: string,
+): Promise<YcApiGatewayInvocationFixture> {
+  return loadInvocationFixture<YcApiGatewayEvent>("http-apigw", name, (event) => {
+    if (
+      !isPlainObject(event) ||
+      typeof event.httpMethod !== "string" ||
+      typeof event.path !== "string" ||
+      "version" in event
+    ) {
+      throw new Error(
+        `API Gateway fixture "${name}" must carry the v1 discriminator (httpMethod + path, no version).`,
+      );
     }
   });
 }

@@ -2,23 +2,23 @@
   "resource": {
     "yandex_storage_bucket": {
       "frontend": {
-        "bucket": "frontend",
-        "acl": "public-read"
+        "acl": "public-read",
+        "bucket": "frontend-a31c4d4c"
       }
     },
     "yandex_storage_object": {
       "frontend_artifact_json": {
-        "bucket": "yandex_storage_bucket.frontend.id",
+        "bucket": "${yandex_storage_bucket.frontend.id}",
         "key": "artifact.json",
         "source": "<ROOT>/.ycsf/artifacts/frontend/artifact.json"
       },
       "frontend_assets_index_CII8GTtS_js": {
-        "bucket": "yandex_storage_bucket.frontend.id",
+        "bucket": "${yandex_storage_bucket.frontend.id}",
         "key": "assets/index-CII8GTtS.js",
         "source": "<ROOT>/.ycsf/artifacts/frontend/assets/index-CII8GTtS.js"
       },
       "frontend_index_html": {
-        "bucket": "yandex_storage_bucket.frontend.id",
+        "bucket": "${yandex_storage_bucket.frontend.id}",
         "key": "index.html",
         "source": "<ROOT>/.ycsf/artifacts/frontend/index.html"
       }

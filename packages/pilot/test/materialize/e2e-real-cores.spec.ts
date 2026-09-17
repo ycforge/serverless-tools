@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import yandexApiGateway from '@ycforge/materializers-core/yandex-api-gateway';
@@ -9,16 +11,21 @@ import yandexFunction from '@ycforge/materializers-core/yandex-function';
 import yandexStorageBucket from '@ycforge/materializers-core/yandex-storage-bucket';
 
 import type { ArtifactDescriptor, Materializer, PluginEntry, TerraformResource } from '../../src/contracts/index.js';
+import { buildApps } from '../../src/build/index.js';
+import { runBuildAndMaterialize } from '../../src/cli/pipeline.js';
 import { dispatch } from '../../src/materialize/dispatch.js';
 import { makeRegistry, loadModel } from '../helpers/materialize-fixtures.js';
+import { writeFixtureModule } from '../helpers/registry-fixtures.js';
 import { createTempProject, removeTempProject, type TempProject } from '../helpers/temp-project.js';
 
 // Phase 6 (spec 025): E2E over the REAL @ycforge/materializers-core plugins.
 // Verifies dispatch reaches real supports/materialize, descriptors carry the
 // built `value` into selection, per-app files merge multiple resources yielded
 // by one materializer (yandex-storage-bucket), declared outputs appear in
-// `materializerOutputs`, and the NG-3 absolute-path defect on the
-// yandex-function side is pinned from pilot.
+// `materializerOutputs`, and (spec 035, D1/D2) the absolute archivePath the
+// build pipeline produces is normalized to the infra-relative form before
+// materialize — while a raw absolute path handed straight to the materializer
+// is still rejected per contract.
 
 type AnyCoreMaterializer = {
   readonly supports: (...args: readonly unknown[]) => boolean;
@@ -52,6 +59,45 @@ apps:
   const zipBytes = Buffer.from('ycsf-e2e-function-artifact', 'utf8');
   mkdirSync(join(project.root, 'dist'), { recursive: true });
   writeFileSync(join(project.root, 'dist', 'user_service.zip'), zipBytes);
+  return { ...project, zipBytes, expectedHash: createHash('sha256').update(zipBytes).digest('hex') };
+}
+
+/**
+ * Project whose fixture builder mimics builders-core (spec 035 D1/D2): writes
+ * the zip into `context.outputDir` and returns an ABSOLUTE archivePath.
+ */
+function absBuilderProject(): TempProject & { zipBytes: Buffer; expectedHash: string } {
+  const project = createTempProject({
+    '.ycsf/apps.yaml': `version: 1
+apps:
+  user_service: { source_path: user_service, builder: ycforge:function }
+`,
+  });
+  const zipBytes = Buffer.from('ycsf-e2e-function-artifact', 'utf8');
+  const builderPath = writeFixtureModule(
+    join(project.root, '.ycsf'),
+    'abs-builder.mjs',
+    `import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+export default {
+  build: async (context) => {
+    mkdirSync(context.outputDir, { recursive: true });
+    const zipPath = join(context.outputDir, 'user_service.zip');
+    writeFileSync(zipPath, ${JSON.stringify(zipBytes.toString('utf8'))});
+    return { type: 'ycforge:function', value: { archivePath: zipPath, entryPoint: 'handler' } };
+  },
+};
+`,
+  );
+  // builders.yaml relative specifiers resolve against pilot's own module dir
+  // (plain import() semantics) — reference the fixture by absolute path.
+  writeFileSync(
+    join(project.root, '.ycsf', 'builders.yaml'),
+    `version: 1
+builders:
+  "ycforge:function": ${JSON.stringify(builderPath)}
+`,
+  );
   return { ...project, zipBytes, expectedHash: createHash('sha256').update(zipBytes).digest('hex') };
 }
 
@@ -100,7 +146,7 @@ describe('e2e real materializers-core (spec 025, Phase 6)', () => {
       expect(parsed.resource.yandex_function.user_service.entrypoint).toBe('handler');
       expect(parsed.resource.yandex_function.user_service.user_hash).toBe(project.expectedHash);
       // spec 028 T021: required attrs emitted (FR-010).
-      expect(parsed.resource.yandex_function.user_service.name).toBe('user_service');
+      expect(parsed.resource.yandex_function.user_service.name).toBe('user-service');
       expect(parsed.resource.yandex_function.user_service.memory).toBe(128);
 
       expect(result.materializerOutputs.get('user_service_function_id')).toEqual({
@@ -118,7 +164,52 @@ describe('e2e real materializers-core (spec 025, Phase 6)', () => {
     }
   });
 
-  it('T032(b): NG-3 pinned — absolute archivePath → MTL_MATERIALIZE_FAILED with YMT_INVALID_ARTIFACT_VALUE in message', async () => {
+  it('T032(b): flipped (spec 035 D1/D2) — absolute archivePath from the build pipeline is normalized to infra-relative, materialize succeeds', async () => {
+    const project = absBuilderProject();
+    const seen: ArtifactDescriptor[] = [];
+    const entry = wrapReal('yandex-function', yandexFunction as unknown as AnyCoreMaterializer, seen);
+    const model = loadModel(project);
+    try {
+      const buildResult = await buildApps(project.root, { noCache: true });
+      expect(buildResult.kind).toBe('ok');
+      if (buildResult.kind !== 'ok') throw new Error(`expected ok, got: ${JSON.stringify(buildResult.errors)}`);
+
+      const built = buildResult.artifacts[0]?.artifact;
+      const builtValue = built?.value as { archivePath?: string; entryPoint?: string } | undefined;
+      // Normalized once, right after build: relative to the terraform module
+      // dir infra/, exactly as terraform resolves content.zip_filename.
+      expect(builtValue?.archivePath).toBe('../.ycsf/artifacts/user_service/user_service.zip');
+
+      // The persisted store descriptor carries the relative form too, so
+      // standalone `ycsf materialize` gets the fix for free (spec 028 store).
+      const descriptor = JSON.parse(
+        readFileSync(join(project.root, '.ycsf', 'artifacts', 'user_service', 'artifact.json'), 'utf8'),
+      ) as { value: { archivePath: string } };
+      expect(descriptor.value.archivePath).toBe('../.ycsf/artifacts/user_service/user_service.zip');
+
+      const result = await dispatch(model, makeRegistry([entry]), {
+        projectRoot: project.root,
+        artifacts: new Map([['user_service', { type: built!.type, value: built!.value }]]),
+      });
+
+      expect(result.kind).toBe('ok');
+      if (result.kind !== 'ok') return;
+      const file = result.generatedFiles[0];
+      const parsed = JSON.parse(file?.content ?? '{}') as {
+        resource: { yandex_function: { user_service: { user_hash: string; content: { zip_filename: string } } } };
+      };
+      expect(parsed.resource.yandex_function.user_service.content.zip_filename).toBe(
+        '../.ycsf/artifacts/user_service/user_service.zip',
+      );
+      // user_hash resolved from the same base terraform uses (root/infra) —
+      // proves the spec 035 hash-base fix, not a cwd coincidence.
+      expect(parsed.resource.yandex_function.user_service.user_hash).toBe(project.expectedHash);
+    } finally {
+      removeTempProject(project);
+    }
+  });
+
+  it('T032(b)-contract: a genuinely absolute archivePath handed straight to dispatch is still rejected (YMT_INVALID_ARTIFACT_VALUE)', async () => {
     const project = functionProject();
     const seen: ArtifactDescriptor[] = [];
     const entry = wrapReal('yandex-function', yandexFunction as unknown as AnyCoreMaterializer, seen);
@@ -146,6 +237,45 @@ describe('e2e real materializers-core (spec 025, Phase 6)', () => {
     }
   });
 
+  it('regression (spec 035): runBuildAndMaterialize with an absolute-path builder writes an infra-relative zip_filename and a correct user_hash', async () => {
+    const project = absBuilderProject();
+    // Register the REAL yandex-function materializer in builders.yaml via a
+    // thin re-export fixture (bare specifiers would not resolve from the
+    // temp-project graph). Mirrors the .cjs → ESM-twin swap of
+    // src/registry/index.ts.
+    const require = createRequire(import.meta.url);
+    const resolved = require.resolve('@ycforge/materializers-core/yandex-function');
+    const esm = resolved.endsWith('.cjs') ? `${resolved.slice(0, -4)}.js` : resolved;
+    writeFixtureModule(
+      join(project.root, '.ycsf'),
+      'yandex-function.mjs',
+      `export { default } from ${JSON.stringify(pathToFileURL(esm).href)};\n`,
+    );
+    writeFileSync(
+      join(project.root, '.ycsf', 'builders.yaml'),
+      `version: 1
+builders:
+  "ycforge:function": ${JSON.stringify(join(project.root, '.ycsf', 'abs-builder.mjs'))}
+materializers:
+  yandex-function: ${JSON.stringify(join(project.root, '.ycsf', 'yandex-function.mjs'))}
+`,
+    );
+    try {
+      await runBuildAndMaterialize(project.root, { noCache: true });
+
+      const content = readFileSync(join(project.root, 'infra', 'user_service.ycsf.tf.json'), 'utf8');
+      const parsed = JSON.parse(content) as {
+        resource: { yandex_function: { user_service: { user_hash: string; content: { zip_filename: string } } } };
+      };
+      expect(parsed.resource.yandex_function.user_service.content.zip_filename).toBe(
+        '../.ycsf/artifacts/user_service/user_service.zip',
+      );
+      expect(parsed.resource.yandex_function.user_service.user_hash).toBe(project.expectedHash);
+    } finally {
+      removeTempProject(project);
+    }
+  });
+
   it('T032(c): all 4 real shapes dispatch ok — function, docker-image, frontend (multi-resource bucket merge), api-gateway', async () => {
     const project = createTempProject({
       '.ycsf/apps.yaml': `version: 1
@@ -158,8 +288,10 @@ apps:
     });
 
     const zipBytes = Buffer.from('ycsf-e2e-function-artifact', 'utf8');
-    mkdirSync(join(project.root, 'dist'), { recursive: true });
-    writeFileSync(join(project.root, 'dist', 'user_service.zip'), zipBytes);
+    // archivePath 'dist/user_service.zip' is relative to the terraform module
+    // dir infra/ (spec 035 D1/D2) — the zip lives under infra/dist.
+    mkdirSync(join(project.root, 'infra', 'dist'), { recursive: true });
+    writeFileSync(join(project.root, 'infra', 'dist', 'user_service.zip'), zipBytes);
 
     mkdirSync(join(project.root, 'frontend-build', 'assets'), { recursive: true });
     writeFileSync(join(project.root, 'frontend-build', 'index.html'), '<html></html>');
@@ -242,7 +374,7 @@ apps:
       const userParsed = JSON.parse(userFile?.content ?? '{}') as {
         resource: { yandex_function: { user_service: { name: string; memory: number } } };
       };
-      expect(userParsed.resource.yandex_function.user_service.name).toBe('user_service');
+      expect(userParsed.resource.yandex_function.user_service.name).toBe('user-service');
       expect(userParsed.resource.yandex_function.user_service.memory).toBe(128);
       const openapiFile = result.generatedFiles.find((f) => f.filename === 'openapi.ycsf.tf.json');
       const openapiParsed = JSON.parse(openapiFile?.content ?? '{}') as {

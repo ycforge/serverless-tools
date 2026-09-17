@@ -282,7 +282,7 @@ C его не читает/пишет; `terraform init` пишет `infra/.terra
 {
   "resource": {
     "yandex_storage_bucket": {
-      "frontend": { "bucket": "frontend", "acl": "public-read" }
+      "frontend": { "bucket": "frontend-a31c4d4c", "acl": "public-read" }
     },
     "yandex_storage_object": {
       "frontend_<sanitized-file>": {

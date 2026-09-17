@@ -52,12 +52,13 @@ describe('yandex-api-gateway materializer (US3, T081)', () => {
     expect(result.name).toBe('openapi');
     expect(result.configuration).toEqual({
       name: 'openapi',
-      spec: 'file("${path.module}/generated/openapi-openapi.yaml")',
+      spec:
+        '${templatefile("${path.module}/generated/openapi-openapi.yaml", { yandex_function_user_service_id = yandex_function.user_service.id })}',
     });
 
     const companionPath = join(tmpDir, 'infra', 'generated', 'openapi-openapi.yaml');
     const content = readFileSync(companionPath, 'utf8');
-    expect(content).toContain('${yandex_function.user_service.id}');
+    expect(content).toContain('${yandex_function_user_service_id}');
     expect(content).not.toContain('${resources.functions.user_service.id}');
   });
 
@@ -145,7 +146,7 @@ describe('yandex-api-gateway materializer (US3, T081)', () => {
       ctx,
     )) as TerraformResource;
     const config = result.configuration as { spec: string };
-    expect(config.spec).toBe('file("${path.module}/generated/openapi-openapi.yaml")');
+    expect(config.spec).toBe('${file("${path.module}/generated/openapi-openapi.yaml")}');
   });
 
   it('TF address grammar (FR-004)', async () => {

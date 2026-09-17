@@ -19,9 +19,8 @@
       "get": {
         "operationId": "getAnalytics",
         "x-yc-apigateway-integration": {
-          "serverless-containers": {
-            "container_id": "${resources.containers.analytics.id}"
-          }
+          "type": "serverless-containers",
+          "container_id": "${resources.containers.analytics.id}"
         },
         "responses": {
           "200": {
@@ -34,9 +33,22 @@
       "get": {
         "operationId": "getAssets",
         "x-yc-apigateway-integration": {
-          "object-storage": {
-            "bucket": "${resources.buckets.frontend.name}"
+          "type": "object-storage",
+          "bucket": "${resources.buckets.frontend.name}"
+        },
+        "responses": {
+          "200": {
+            "description": "ok"
           }
+        }
+      }
+    },
+    "/v1/users": {
+      "get": {
+        "operationId": "getUsers",
+        "x-yc-apigateway-integration": {
+          "type": "cloud_functions",
+          "function_id": "${resources.functions.user_service.id}"
         },
         "responses": {
           "200": {

@@ -95,3 +95,4 @@ Specs создаются **перед реализацией соответст�
 | 032 | materializer-provider-shapes — **закрыто в 028 (Fix-3)**: `yandex_function` += `name`/`memory`, `yandex_api_gateway` += `name`, companion → `<rootDir>/infra/generated/` | §22, §27 | ✅ | 019, 028 |
 | 033 | registry-workspace-resolution — **закрыто в 028 (Fix-5)**: consumer-graph резолюция из корня проекта, pnpm-aware subpath exports | §21 | ✅ | 013, 028 |
 | 034 | composer-path-level-refs — **закрыто в 028 (Fix-1)**: ресурсный индекс объединяет app-identities C-модели, `${resources.<domain>.<app_id>.<property>}` валиден без resources.yaml | §23, §27 | ✅ | 016, 028 |
+| 036 | apigw-http-transport — HTTP transport для события Yandex API Gateway `cloud_functions` (v1): расширение `http`-транспорта nest-bridge, закрытие 502-гэпа reference e2e | §2 | ✅ | 024, 003 |

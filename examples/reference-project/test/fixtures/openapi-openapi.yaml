@@ -6,19 +6,33 @@
     "description": "Composed entry point over the user_service and analytics reference APIs."
   },
   "paths": {
-    "/analytics/report": {
+    "/analytics": {
       "get": {
-        "summary": "Analytics report (analytics API)",
+        "summary": "Analytics health (analytics container API)",
         "responses": {
           "200": {
             "description": "ok"
           }
         },
         "x-yc-apigateway-integration": {
-          "type": "mock",
-          "content": {
-            "application/json": "{\"report\":{\"status\":\"ok\"}}"
+          "type": "serverless_containers",
+          "container_id": "${yandex_serverless_container_analytics_id}",
+          "service_account_id": "ajefi3b58tak71g3ecp1"
+        }
+      }
+    },
+    "/analytics/kms": {
+      "get": {
+        "summary": "KMS SA-access probe (analytics container)",
+        "responses": {
+          "200": {
+            "description": "ok"
           }
+        },
+        "x-yc-apigateway-integration": {
+          "type": "serverless_containers",
+          "container_id": "${yandex_serverless_container_analytics_id}",
+          "service_account_id": "ajefi3b58tak71g3ecp1"
         }
       }
     },
@@ -31,10 +45,9 @@
           }
         },
         "x-yc-apigateway-integration": {
-          "type": "mock",
-          "content": {
-            "application/json": "{\"users\":[]}"
-          }
+          "type": "cloud_functions",
+          "function_id": "${yandex_function_user_service_id}",
+          "service_account_id": "ajefi3b58tak71g3ecp1"
         }
       }
     }

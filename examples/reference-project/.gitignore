@@ -2,10 +2,13 @@
 .env
 .env.*
 !.env.example
+sa-key.json
 
 # Terraform
 infra/.terraform/
 infra/*.ycsf.tf.json
+infra/*-ycsf-outputs.tf.json
+infra/*.tfplan
 infra/generated/
 *.tfstate
 *.tfstate.*

@@ -1,7 +1,7 @@
-import { isAbsolute } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import type { FunctionArtifactValue, MaterializationContext, Materializer, TerraformResource } from '../types.js';
 import { YMT_INVALID_ARTIFACT_VALUE, materializerError } from '../diagnostics.js';
-import { isTfAddress } from '../helpers/filename.js';
+import { isTfAddress, toYcResourceName } from '../helpers/filename.js';
 import { sha256Hex } from './hash.js';
 
 const materializer: Materializer = {
@@ -31,7 +31,11 @@ const materializer: Materializer = {
     }
     const name = artifact.name;
 
-    const userHash = await sha256Hex(archivePath);
+    // archivePath is relative to the terraform module dir `infra/` — resolve
+    // the hash from the same base terraform uses (projectRoot handed down by
+    // the pipeline, spec 028), not from the CLI process cwd.
+    const hashBase = context.projectRoot !== undefined ? join(context.projectRoot, 'infra') : process.cwd();
+    const userHash = await sha256Hex(archivePath, hashBase);
 
     const resource: TerraformResource = {
       kind: 'resource',
@@ -41,7 +45,7 @@ const materializer: Materializer = {
         // Configuration field order mirrors the terraform provider schema.
         // `memory` is a provider-default constant — deterministic, no env input.
         runtime: 'nodejs22',
-        name,
+        name: toYcResourceName(name),
         memory: 128,
         entrypoint: entryPoint,
         user_hash: userHash,
