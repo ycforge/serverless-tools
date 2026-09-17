@@ -3,7 +3,7 @@
 // by the dev server. The dev server does not detect side effects — it only
 // rejects entries that export no module (FR-005, JDT_ENTRY_MODULE_NOT_FOUND).
 import path from 'node:path';
-import { createYcsfLocalServer } from '@ycforge/js-dev-tools/server';
+import { createYcsfLocalServer } from '@ycforge/serverless-dev-tools/server';
 
 const isMain =
   process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]));

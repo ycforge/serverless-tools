@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm typecheck
+
+  publish:
+    name: Publish to npm
+    needs: ci
+    runs-on: ubuntu-latest
+    # write-права (GitHub Release) и id-token (npm provenance) действуют только
+    # в этом job, а не на CI-gate. Секрет NPM_TOKEN — org-level.
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            echo "tag=beta" >> "$GITHUB_OUTPUT"
+            echo "prerelease=--prerelease" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `pnpm pack` rewrites `workspace:*` to concrete versions and produces one
+      # tarball per workspace package (including private ones, filtered below).
+      - name: Pack workspace packages
+        run: pnpm -r pack --pack-destination "$RUNNER_TEMP/tarballs"
+
+      # Publish each non-private tarball with the npm CLI, mirroring the ycforge
+      # org convention. We deliberately avoid `pnpm -r publish`: pnpm's
+      # OIDC/provenance publish path is known to wedge versions in the registry
+      # as phantom "staged" versions with no stage id to reject (npm/cli#9889).
+      - name: Publish workspace packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ steps.npm-tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for tarball in "$RUNNER_TEMP"/tarballs/*.tgz; do
+            tmp=$(mktemp -d)
+            tar -xzf "$tarball" -C "$tmp" package/package.json
+            name=$(node -p "require('$tmp/package/package.json').name")
+            version=$(node -p "require('$tmp/package/package.json').version")
+            private=$(node -p "String(require('$tmp/package/package.json').private === true)")
+            rm -rf "$tmp"
+            if [[ "$private" == "true" ]]; then
+              echo "skip $name@$version (private)"
+              continue
+            fi
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "skip $name@$version (already published)"
+              continue
+            fi
+            echo "publishing $name@$version"
+            npm publish "$tarball" --access public --tag "$NPM_TAG" --provenance
+          done
+
+      - name: Create GitHub Release
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes ${{ steps.npm-tag.outputs.prerelease }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -56,9 +56,6 @@ importers:
       '@ycforge/composer':
         specifier: workspace:*
         version: link:../../packages/composer
-      '@ycforge/js-dev-tools':
-        specifier: workspace:*
-        version: link:../../packages/js-dev-tools
       '@ycforge/materializers-core':
         specifier: workspace:*
         version: link:../../packages/materializers-core
@@ -68,6 +65,9 @@ importers:
       '@ycforge/pilot':
         specifier: workspace:*
         version: link:../../packages/pilot
+      '@ycforge/serverless-dev-tools':
+        specifier: workspace:*
+        version: link:../../packages/js-dev-tools
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1

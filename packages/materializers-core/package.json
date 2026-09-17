@@ -3,6 +3,24 @@
   "version": "0.1.0",
   "description": "Core Terraform materializer plugins for the serverless-tools ecosystem (spec 019): yandex-function, yandex-serverless-container, yandex-api-gateway, yandex-message-queue, yandex-storage-bucket. Registered via the spec-013/014 explicit mapping under subpath specifiers @ycforge/materializers-core/*.",
   "license": "MIT",
+  "author": "ycforge (https://github.com/ycforge)",
+  "homepage": "https://github.com/ycforge/serverless-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ycforge/serverless-tools.git",
+    "directory": "packages/materializers-core"
+  },
+  "bugs": {
+    "url": "https://github.com/ycforge/serverless-tools/issues"
+  },
+  "keywords": [
+    "yandex-cloud",
+    "terraform",
+    "serverless",
+    "materializers",
+    "infrastructure",
+    "ycforge"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22"
