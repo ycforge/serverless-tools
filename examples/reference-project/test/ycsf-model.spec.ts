@@ -79,7 +79,7 @@ describe('ycsf-модель эталона', () => {
     ]);
   });
 
-  it('nested build_config: self-contained function, docker no_push, vite command, openapi entry', () => {
+  it('nested build_config: self-contained function, docker registry-ref, vite command, openapi entry', () => {
     const us = buildCfg('user_service');
     expect(us.entry).toBe('src/main.ts');
     expect(us.runtime).toBe('nodejs22');
@@ -91,9 +91,12 @@ describe('ycsf-модель эталона', () => {
 
     const an = buildCfg('analytics');
     const image = an.image as Record<string, unknown>;
-    expect(image.repository).toMatch(/^cr\.yandex\/.+\/analytics$/);
-    expect(image.tag).toBe('latest');
-    expect(image.no_push).toBe(true);
+    // spec 028 dev-mode: the reference project pins the already-pushed amd64
+    // image (cr.yandex host, immutable digest) instead of building locally —
+    // a local `docker build` on Apple Silicon yields arm64, which the YC
+    // x86_64 container runtime cannot run (revision deploy → Internal error).
+    expect(image.mode).toBe('registry-ref');
+    expect(image.ref).toMatch(/^cr\.yandex\/.+\/analytics@sha256:[0-9a-f]{64}$/);
     expect(an.dockerfile).toBeUndefined();
 
     const fe = yaml('frontend/build_config.yaml');

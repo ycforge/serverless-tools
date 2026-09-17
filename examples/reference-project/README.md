@@ -9,14 +9,15 @@ registry и секретов — единственная сетевая акт�
 | App | Builder | Materializer | Terraform address |
 |-----|---------|--------------|-------------------|
 | `user_service` | `ycforge:function` (nestjs-function) | `yandex-function` | `yandex_function.user_service` |
-| `analytics` | `ycforge:docker-image` (docker, `no_push`) | `yandex-serverless-container` | `yandex_serverless_container.analytics` |
+| `analytics` | `ycforge:docker-image` (docker, `registry-ref`) | `yandex-serverless-container` | `yandex_serverless_container.analytics` |
 | `frontend` | `ycforge:frontend` (vite) | `yandex-storage-bucket` | `yandex_storage_bucket.frontend` + `yandex_storage_object.frontend_*` |
 | `openapi` | `ycforge:api-gateway` (composer builder) | `yandex-api-gateway` | `yandex_api_gateway.openapi` |
 
 ## Требования
 
 - Node ≥ 22, pnpm (workspace-monorepo), Terraform ≥ 1.5
-- Docker daemon — только для полного пути `analytics` (локальная сборка без push)
+- Docker daemon — только для пути `analytics`, требующего локальной сборки образа
+  без родного amd64 (см. ниже); базовый `plan`-путь без docker
 
 ## Запуск от clone до плана
 
@@ -95,6 +96,14 @@ Per-app `build_config.yaml` лежит на корне эталона рядом
 тогда имя бакета ровно `bucket_name`, без slug. Materializer получает это значение
 в `FrontendArtifactValue.bucketName`; при его отсутствии
 materializer падает на app id (обратная совместимость).
+
+Контейнер `analytics` в эталоне закреплён за уже запушенным amd64-образом через
+`image.mode: registry-ref` (spec 028): деплой ревизии контейнера в YC-рантайм
+требует x86_64, тогда как локальная `docker build` на Apple Silicon даёт arm64 и
+`yandex_serverless_container` падает с Internal error на стадии деплоя ревизии.
+`registry-ref` делает `ycsf build` детерминированным (без docker-демона); чтобы
+пересобрать образ из исходников, выполните кросс-сборку
+(`docker buildx build --platform linux/amd64 --push`) и обновите `analytics/build_config.yaml`.
 
 ## Генерируемые файлы
 
