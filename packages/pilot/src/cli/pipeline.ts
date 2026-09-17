@@ -1,6 +1,6 @@
 // spec 021 ycsf-cli — shared pipeline functions (D-RE-6).
 import { buildApps } from '../build/index.js';
-import { loadExtensions, applyExtensions } from '../extensions/index.js';
+import { loadExtensions } from '../extensions/index.js';
 import { loadMoves, buildMoves, buildMovedFile } from '../moves/index.js';
 import { loadOutputs, buildOutputs } from '../outputs/index.js';
 import { dispatch } from '../materialize/dispatch.js';
@@ -13,6 +13,7 @@ import type {
   PluginRegistry,
   ProjectModel,
 } from '../contracts/index.js';
+import type { ExtensionsYaml } from '../contracts/index.js';
 import { spawnTerraform } from './terraform.js';
 import {
   RuntimeError,
@@ -49,11 +50,35 @@ export async function runMaterializeGeneration(
   const target = opts?.target;
 
   stderr('Materializing artifacts...', json);
+  // Extensions are loaded up-front and applied INSIDE dispatch, before the
+  // per-app files are serialized — otherwise extension patches (execution_timeout,
+  // connectivity_type, …) would be validated but never reach the emitted
+  // Terraform (F-EXT-SERIALIZATION). Missing file → optional (undefined);
+  // structural error → fail-fast.
+  stderr('Loading extensions...', json);
+  let extensionsData: ExtensionsYaml | undefined;
+  try {
+    const extensions = loadExtensions(rootDir);
+    if (extensions.kind === 'invalid') {
+      throw new RuntimeError(
+        extensions.errors[0]?.message ?? 'extensions invalid',
+        String(extensions.errors[0]?.code ?? 'EXT_INVALID'),
+      );
+    }
+    extensionsData = extensions.data;
+  } catch (err) {
+    // extensions.yaml missing (EXT_MISSING_FILE, plain Error) — optional step, skip.
+    // Real load/validation failures are RuntimeError → fail-fast.
+    if (err instanceof RuntimeError) throw err;
+  }
+  const extensionsApplied = extensionsData?.extensions.length ?? 0;
+
   // spec 028 (T024): the pipeline hands its rootDir down so materializers emit
   // companion files into <root>/infra/generated instead of the process cwd.
   const dispatchOptions: DispatchOptions = {
     ...(artifacts !== undefined ? { artifacts } : {}),
     projectRoot: rootDir,
+    ...(extensionsData !== undefined ? { extensions: extensionsData } : {}),
   };
   const dispatchResult = await dispatch(projectModel, registry, dispatchOptions);
   if (dispatchResult.kind === 'invalid') {
@@ -64,28 +89,6 @@ export async function runMaterializeGeneration(
     );
   }
   const resources = dispatchResult.resources;
-
-  // Extensions (validation + deep-merge; fail-fast on error).
-  stderr('Applying extensions...', json);
-  let extensionsApplied = 0;
-  try {
-    const extensions = loadExtensions(rootDir);
-    if (extensions.kind === 'ok') {
-      const applied = applyExtensions(resources, extensions.data);
-      if (applied.kind === 'invalid') {
-        const first = applied.errors[0];
-        throw new RuntimeError(
-          first?.message ?? 'extensions failed',
-          String(first?.code ?? 'EXT_ERROR'),
-        );
-      }
-      extensionsApplied = extensions.data.extensions.length;
-    }
-  } catch (err) {
-    // extensions.yaml missing (EXT_MISSING_FILE, plain Error) — optional step, skip.
-    // Real apply failures are RuntimeError → fail-fast.
-    if (err instanceof RuntimeError) throw err;
-  }
 
   // Moves (optional .ycsf/moved.yaml).
   const currentResources = moveEndpointsFromResources(resources);

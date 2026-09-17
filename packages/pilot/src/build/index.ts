@@ -1,4 +1,5 @@
 // spec 021 ycsf-cli — buildApps orchestrator (D-RE-1, D-RE-11, D-RE-12) + spec 022 cache.
+import { isAbsolute, join, relative } from 'node:path';
 import type { BuildAppsOptions, BuildAppsResult, BuiltArtifact } from '../contracts/build.js';
 import type { Artifact } from '../contracts/builder.js';
 import type { AppIdentity } from '../contracts/resource-domain.js';
@@ -40,6 +41,20 @@ function writeStoreDescriptorBestEffort(outputDir: string, artifact: Artifact): 
 
 function isPluginLoadError(err: RegistryError): err is PluginLoadError {
   return (err as PluginLoadError).packageName !== undefined;
+}
+
+// spec 035 (D1/D2): builders return an absolute `archivePath`
+// (<root>/.ycsf/artifacts/<appId>/...), but the materializer contract requires
+// a path relative to the terraform module dir `infra/`. Normalize once, right
+// after build, so both the in-memory artifacts and the persisted store
+// descriptor carry the relative form ('../.ycsf/artifacts/...').
+function normalizeArchivePath(artifact: Artifact, rootDir: string): Artifact {
+  const value = artifact.value as { archivePath?: unknown } | null | undefined;
+  if (value == null || typeof value.archivePath !== 'string' || !isAbsolute(value.archivePath)) {
+    return artifact;
+  }
+  const relativeToInfra = relative(join(rootDir, 'infra'), value.archivePath);
+  return { ...artifact, value: { ...value, archivePath: relativeToInfra } };
 }
 
 export async function buildApps(
@@ -260,10 +275,13 @@ export async function buildApps(
         const outputDir = `${rootDir}/.ycsf/artifacts/${appId}`;
         const restored = await restoreBlob(cacheDir, effective, outputDir);
         if (restored) {
-          artifacts.push({ appId, artifact: restored });
+          // normalize too: blobs written before the spec 035 fix may still
+          // carry an absolute archivePath.
+          const normalized = normalizeArchivePath(restored, rootDir);
+          artifacts.push({ appId, artifact: normalized });
           // spec 028 (plan D-2 / T018): exactly one store descriptor per app,
           // also on the cache-hit path (restore re-writes it).
-          writeStoreDescriptorBestEffort(outputDir, restored);
+          writeStoreDescriptorBestEffort(outputDir, normalized);
           cacheResults.push(result);
           options?.onCacheProgress?.(result);
           continue;
@@ -329,7 +347,10 @@ export async function buildApps(
           ],
         };
       }
-      const resolvedArtifact = artifact ?? ({ type: 'test:type', value: {} } as unknown as typeof artifact);
+      const resolvedArtifact = normalizeArchivePath(
+        artifact ?? ({ type: 'test:type', value: {} } as unknown as typeof artifact),
+        rootDir,
+      );
       artifacts.push({ appId, artifact: resolvedArtifact });
       // spec 028 (plan D-2 / T018): persist exactly one store descriptor per
       // app on the miss/noCache path so standalone `ycsf materialize` can

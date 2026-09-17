@@ -12,6 +12,7 @@ import {
   CLI_MISSING_PROJECT_DIR,
 } from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
+import { resolveProjectRoot } from './project-dir.js';
 
 async function cleanGeneratedFiles(rootDir: string): Promise<number> {
   // Generated Terraform files live in <root>/infra/ (materialize target),
@@ -41,7 +42,7 @@ async function cleanGeneratedFiles(rootDir: string): Promise<number> {
 
 export async function destroyAction(cmd: Command): Promise<void> {
   const opts = cmd.optsWithGlobals();
-  const rootDir = String(opts.projectDir ?? process.cwd());
+  const rootDir = resolveProjectRoot(opts.projectDir);
   const json = Boolean(opts.json);
   const yes = Boolean(opts.yes);
   const cleanup = Boolean(opts.cleanup);

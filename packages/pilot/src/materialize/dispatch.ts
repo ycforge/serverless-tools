@@ -6,6 +6,7 @@ import type {
   ProjectModel,
   TerraformResource,
 } from '../contracts/index.js';
+import { applyExtensions } from '../extensions/index.js';
 import { createOutputBuilder } from './context.js';
 import { materializeAll } from './materialize.js';
 import {
@@ -27,6 +28,11 @@ import { selectArtifacts } from './select.js';
  *  carry no `value` (US-5 backward compatibility).
  *  SERIALIZE: address guard + filename per app → files.
  *  RESULT: ok carries `materializerOutputs` (declared outputs, FR-004).
+ *
+ *  Phase 3 (F-EXT-SERIALIZATION) — EXTENSIONS: when `options.extensions` is
+ *  present, `applyExtensions` deep-merges `.ycsf/extensions.yaml` patches onto
+ *  the materialized resources BEFORE serialization, so patches (execution_timeout,
+ *  memory, …) reach the emitted Terraform. All-or-nothing: any error → invalid.
  */
 export async function dispatch(
   projectModel: ProjectModel,
@@ -67,19 +73,49 @@ export async function dispatch(
     return { kind: 'invalid', errors: collisions };
   }
 
-  // Serialize per app: one artifact may yield several resources (e.g. a bucket
-  // plus its objects), all merged under one `resource` block in the app's
-  // single file (FR-008; addresses validated per resource, FR-011).
+  // Collect materialized resources into a flat array + per-app grouping.
+  // `keyToAppId` lets us remap patched resources back to their app after
+  // extensions reorder the list (F-EXT-SERIALIZATION).
   const resources: TerraformResource[] = [];
-  const generatedFiles: GeneratedTfFile[] = [];
+  const keyToAppId = new Map<string, string>();
   const byApp = new Map<string, TerraformResource[]>();
   for (const { resource, appId } of materialization.resources) {
     resources.push(resource);
+    keyToAppId.set(`${resource.type}.${resource.name}`, appId);
     const list = byApp.get(appId);
     if (list === undefined) byApp.set(appId, [resource]);
     else list.push(resource);
   }
 
+  // F-EXT-SERIALIZATION: apply extension patches BEFORE serialization so they
+  // reach the emitted Terraform (spec 028 + spec 015). The pipeline threads
+  // `options.extensions` (loaded from `.ycsf/extensions.yaml`) into dispatch;
+  // absent/empty → no-op (thin callers / standalone materialize).
+  if (options.extensions !== undefined && options.extensions.extensions.length > 0) {
+    const applied = applyExtensions(resources, options.extensions);
+    if (applied.kind === 'invalid') {
+      return {
+        kind: 'invalid',
+        errors: applied.errors.map((e) => ({ code: e.code, message: e.message })),
+      };
+    }
+    // Rebuild per-app grouping from patched resources (order may change).
+    byApp.clear();
+    for (const patched of applied.resources) {
+      const appId = keyToAppId.get(`${patched.type}.${patched.name}`);
+      if (appId === undefined) continue;
+      const list = byApp.get(appId);
+      if (list === undefined) byApp.set(appId, [patched]);
+      else list.push(patched);
+    }
+    resources.length = 0;
+    resources.push(...applied.resources);
+  }
+
+  // Serialize per app: one artifact may yield several resources (e.g. a bucket
+  // plus its objects), all merged under one `resource` block in the app's
+  // single file (FR-008; addresses validated per resource, FR-011).
+  const generatedFiles: GeneratedTfFile[] = [];
   for (const [appId, appResources] of byApp) {
     const serialized = serializeAppFile(appId, appResources);
     if (serialized.kind === 'invalid') {

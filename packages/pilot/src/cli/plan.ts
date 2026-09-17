@@ -1,6 +1,7 @@
 // spec 021 ycsf-cli — ycsf plan command action (US4, FR-018..022) + spec 022 cache.
 import type { Command } from 'commander';
 import { runBuildAndMaterialize, runTerraformInit, runTerraformPlan } from './pipeline.js';
+import { resolveProjectRoot } from './project-dir.js';
 import { CLIError, CLI_UNEXPECTED_ERROR } from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
 import { formatCacheLine } from './cache-helpers.js';
@@ -8,7 +9,7 @@ import type { CacheCheckResult } from '../contracts/cache.js';
 
 export async function planAction(cmd: Command): Promise<void> {
   const opts = cmd.optsWithGlobals();
-  const rootDir = String(opts.projectDir ?? process.cwd());
+  const rootDir = resolveProjectRoot(opts.projectDir);
   const json = Boolean(opts.json);
   const noCache = Boolean(opts.noCache || opts.force || opts.cache === false);
   const cacheDir = opts.cacheDir as string | undefined;

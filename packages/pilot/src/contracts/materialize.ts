@@ -12,6 +12,7 @@
 import type { Artifact } from './builder.js';
 import type { OutputValue } from './outputs.js';
 import type { TerraformResource } from './terraform.js';
+import type { ExtensionsYaml } from './extensions.js';
 
 /**
  * Flat descriptor of the artifact being dispatched (data-model.md).
@@ -52,6 +53,13 @@ export interface DispatchOptions {
    * additive: absent for thin/non-pipeline callers ⇒ legacy cwd-relative I/O.
    */
   readonly projectRoot?: string;
+  /**
+   * spec 015 + spec 035 (F-EXT-SERIALIZATION): parsed `.ycsf/extensions.yaml`
+   * applied to the materialized resources BEFORE per-app serialization, so
+   * extension patches reach the emitted Terraform. Absent ⇒ no extensions
+   * (thin callers / `ycsf materialize` without the file).
+   */
+  readonly extensions?: ExtensionsYaml;
 }
 
 /**

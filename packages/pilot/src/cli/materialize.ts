@@ -4,12 +4,13 @@ import { loadProjectModel } from '../model/loader.js';
 import { loadRegistry } from '../registry/index.js';
 import { readStoreDescriptors, readStoreDescriptorsFrom } from '../build/store.js';
 import { runMaterializeGeneration } from './pipeline.js';
+import { resolveProjectRoot } from './project-dir.js';
 import { CLIError, CLI_BUILD_FAILED, CLI_MISSING_PROJECT_DIR, CLI_APP_NOT_FOUND } from './errors.js';
 import type { CLIResult, CLIDiagnostic } from './result.js';
 
 export async function materializeAction(cmd: Command): Promise<void> {
   const opts = cmd.optsWithGlobals();
-  const rootDir = String(opts.projectDir ?? process.cwd());
+  const rootDir = resolveProjectRoot(opts.projectDir);
   const json = Boolean(opts.json);
   const target = opts.target as string | undefined;
   const artifactsDir = opts.artifacts as string | undefined;
