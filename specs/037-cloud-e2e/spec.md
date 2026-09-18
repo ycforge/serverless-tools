@@ -100,9 +100,9 @@ e2e/                              # standalone pnpm-проект (свой works
 ## 5. Живые проверки (acceptance)
 
 AS-1 **Gateway HTTPS**: `GET /api/users` → 200 `{"users":["alice","bob"]}`; query-параметры; 404/405; ответ `api` через container-route.
-AS-2 **Auth**: jwt-маршрут без `Authorization` → 401; с валидным подписанным JWT → 200; function-маршрут без кред → 401 (happy-path с авторизатором недоступен — см. §8, composer не эмитит `service_account_id` авторизатора); логика авторизатора проверяется прямым invoke (allow/deny); `none`-маршрут открыт.
+AS-2 **Auth**: jwt-маршрут без `Authorization` → 401; с валидным JWT → 200; с чужим `iss`, чужим `aud`, истёкшим — 401; function-маршрут без `Authorization` → 401 (gateway не вызывает авторизатор для `http bearer` без заголовка), с `Authorization: Bearer ...` и allow-сигналом (`?auth=allow`) → 200, с заголовком но без allow-сигнала (авторизатор отказал) → 403; composer эмитит `service_account_id` авторизатора из `auth.yaml serviceAccount`; `none`-маршрут открыт.
 AS-3 **Direct invoke**: `yc --profile ycforge-sa serverless function invoke` с v1-фикстурой → 200/корректный ответ.
-AS-4 **MQ**: отправка через SQS (env `AWS_*`, endpoint YMQ) → реальный trigger вызывает worker, очередь опустошается (сообщение обработано); прямой invoke MQ-события с плохим сообщением → fail-fast worker возвращает ошибку, partial-failure worker — успех (degrade). Доставка в app-level DLQ не проверяется: `DlqSender` использует неверную авторизацию (см. §8).
+AS-4 **MQ**: отправка через SQS (env `AWS_*`, endpoint YMQ) → реальный trigger вызывает worker, очередь опустошается, в логах — маркер обработки и `traceId`; fail-fast worker на плохом сообщении возвращает ошибку, сообщение редоставляется (реальный trigger); partial-failure worker деградирует и **перепубликует** плохое сообщение в app-level DLQ через SigV4 (проверяется receive-message из DLQ).
 AS-5 **S3**: объект из `web`-бакета скачивается по HTTPS; содержимое соответствует build_env.
 AS-6 **KMS**: `GET /api/kms?key=...` → encrypt/decrypt roundtrip. **Opt-in**: выполняется только при заданном `E2E_KMS_KEY_ID` — у эталонного SA `ycforge-reference` нет прав KMS (`kms.symmetricKeys.*` → PermissionDenied).
 AS-7 **Observability**: логи invocation структурированы, содержат `trace_id`; error-ответы несут `trace_id`.
@@ -155,6 +155,10 @@ AS-11 **Teardown**: после прогона созданные `e2e-*` рес�
   /function/code/index.js» (проявилось на `e2e_authorizer`/`e2e_rename_me`).
   Фикс: имя модуля бандла = basename entry (`index.ts` → `index.js`), entrypoint
   совпадает; добавлен unit-тест.
+- `buildMoves` (pilot) для multi-hop цепочки эмитил **каждый** переход сразу в
+  терминальный адрес (`A→C`, `B→C`) → Terraform: «Ambiguous move statements»
+  (у одного ресурса несколько источников). Фикс: per-hop блоки (`A→B`, `B→C`),
+  Terraform резолвит цепочку транзитивно; обновлён unit-тест T082.
 - `moveEndpointsFromResources` (pilot CLI) клал в `idl` Terraform-адрес вместо
   логического IDL, поэтому терминал `.ycsf/moved.yaml` (`functions.<name>`)
   никогда не совпадал с текущими ресурсами → `MOV_TARGET_UNRESOLVED`. Фикс:
@@ -165,36 +169,35 @@ AS-11 **Teardown**: после прогона созданные `e2e-*` рес�
   атрибута `name` (имя бакета — атрибут `bucket`) → `terraform validate` падал с
   `Unsupported attribute`. Фикс: таблица логический-property → TF-атрибут
   (`buckets.name` → `bucket`) в `ref-resolver.ts`.
-- **Не исправлено (зарегистрировано)**: composer для `auth.yaml` scheme `function`
-  эмитит `x-yc-apigateway-authorizer: { type: function, function_id }` **без**
-  `service_account_id`; Yandex API Gateway при отсутствии SA у авторизатора (и
-  top-level `x-yc-apigateway.service_account_id`) не может вызвать функцию —
-  allow-путь недоступен (маршрут всегда 401). JWT/`none` работают. Нужен
-  follow-up: поле SA в auth-контракте или top-level SA gateway.
-- **Не исправлено (зарегистрировано)**: `DlqSender` (spec 005) публикует в DLQ
-  через `POST https://message-queue.api.cloud.yandex.net/queues/<id>/messages` с
-  `Authorization: Bearer <IAM>`. Реальный YMQ принимает только AWS SigV4 со
-  static access key (проверено: 400 `Invalid authorization parameters structure`
-  для Bearer, idle, имени и ARN). Соответственно app-level DLQ-доставка в облаке
-  не работает (fail-open, предупреждение в лог); e2e проверяет degrade-семантику
-  partial failure (invocation завершается успешно), а не доставку в DLQ. Нужен
-  отдельный follow-up (SigV4-подпись/источник ключей или API GW `cloud_ymq`).
-- **Ограничение доступа**: `yc serverless function logs` / `yc logging read`
-  дают PermissionDenied даже с выданными `logging.viewer`/`logging.editor`
-  (возможно, роль/область иная). Поэтому MQ/observability проверки сделаны
-  permission-free: глубина очереди (trigger delivery), прямой invoke с
-  MQ-событием (fail-fast/degrade), trace_id в error-ответе.
+- composer для `auth.yaml` scheme `function` эмитил `x-yc-apigateway-authorizer`
+  **без** `service_account_id`, из-за чего API Gateway не мог вызвать
+  авторизатор (allow-путь всегда 401). Фикс: в `auth.yaml` scheme `function`
+  добавлено опциональное поле `serviceAccount` (контракт spec 007), оно
+  эмитится как `service_account_id`; e2e allow-путь зелёный. Новый код ошибки
+  `AUTH_INVALID_FIELD`.
+- `DlqSender` (spec 005) публиковал в DLQ через `Bearer`-IAM, а реальный YMQ
+  принимает только AWS SigV4 со static access key (проверено: 400 для Bearer,
+  а также IAM-токен в SigV4 → `IAM authentication error`). Фикс: hand-rolled
+  SigV4 на `node:crypto` (`src/mq/sigv4.ts`), `SendMessage` (form-urlencoded) на
+  endpoint YMQ; ключи из `partialFailure.credentials` или env
+  `YC_MQ_KEY_ID`/`YC_MQ_KEY_VALUE` (fallback `AWS_*`); `deadLetterQueueId` —
+  URL очереди. Имена env выбраны без суффиксов `*secret`/`*accesskey`, чтобы не
+  триггерить `YCK_SUSPICIOUS_KEY`. App-level DLQ-доставка в e2e зелёная.
+
+**Ограничение покрытия**: cross-app path/operationId-коллизии composer-а
+структурно недостижимы через пайплайн и `ycsf-api` (оба выбирают **один**
+gateway-app; merge нескольких документов вызывается только библиотечно и покрыт
+unit-тестами composer). В e2e покрыта self-коллизия `operationId` внутри одного
+app (негативная проверка `ycsf build`). Коллизия с `resolved` кодом `COMPOSE_*`
+поверх CLI не пробрасывается (обёрнута в `CLI_BUILD_FAILED` с текстом).
 
 ## 9. Критерии завершения
 
-- Сьют (26 тестов) проходит на реальном облаке при заданных env-кредах; при
+- Сьют (34 теста) проходит на реальном облаке при заданных env-кредах; при
   отсутствии `YCSF_E2E=1`/кред — целиком skip, CI не затронут.
 - Найденные баги (queue URL/атрибуты, build_config-интерполяция, bucket-ref
-  attribute, moved idl, nestjs-function entrypoint) исправлены; тесты пакетов зелёные.
+  attribute, moved idl + multi-hop, nestjs-function entrypoint, function-authorizer
+  SA, DlqSender SigV4) исправлены; тесты пакетов зелёные, ref-golden пересчитан
+  (изменение A меняет хэш бандла).
 - `pnpm build && pnpm test && pnpm typecheck && pnpm lint` в корне зелёные.
 - Ветка `037-cloud-e2e` → PR в `dev`, без merge.
-
-**Статус реализации**: реализовано; AS-1, AS-3…AS-11 зелёные. AS-2 покрыт
-частично: jwt/none — полностью, function-authorizer — отказ + прямой invoke
-(allow-path недоступен, §8). app-level DLQ (§8) не проверяется. Отдельный
-follow-up нужен для function-authorizer SA и `DlqSender` SigV4.

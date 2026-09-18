@@ -1,10 +1,10 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { deployE2e, type DeployResult } from './helpers/deploy.js';
-import { httpGet, invokeFunction, terraformOutputs } from './helpers/cloud.js';
+import { httpGet, invokeFunction, terraformOutputs, waitForLog } from './helpers/cloud.js';
 import { PILOT_CLI, REPO_ROOT } from './helpers/state.js';
 import { run, runOrThrow } from './helpers/exec.js';
 import {
@@ -12,6 +12,7 @@ import {
   listObjectKeys,
   purgeQueue,
   queueMessageCount,
+  receiveMessages,
   sendMessage,
 } from './helpers/aws.js';
 import { signToken } from './helpers/jwt.js';
@@ -131,6 +132,88 @@ async function expectQueueDrained(name: string, timeoutMs: number): Promise<void
   );
 }
 
+async function expectQueueRedelivered(name: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let last = { visible: 0, notVisible: 0 };
+  while (Date.now() < deadline) {
+    last = await queueMessageCount(name);
+    if (last.visible > 0) {
+      return;
+    }
+    await sleep(3_000);
+  }
+  throw new Error(
+    `queue '${name}' was not redelivered within ${timeoutMs}ms (visible=${last.visible}, notVisible=${last.notVisible})`,
+  );
+}
+
+const BUILDERS_YAML = `version: 1
+builders:
+  ycforge:api-gateway: "../../../composer/dist/builder/index.js"
+materializers:
+  yandex-function: "@ycforge/materializers-core/yandex-function"
+  yandex-serverless-container: "@ycforge/materializers-core/yandex-serverless-container"
+  yandex-storage-bucket: "@ycforge/materializers-core/yandex-storage-bucket"
+  yandex-api-gateway: "@ycforge/materializers-core/yandex-api-gateway"
+`;
+
+/** Builds a minimal Project-C fixture with duplicate operationIds. */
+function writeComposerCollisionFixture(root: string): void {
+  mkdirSync(join(root, '.ycsf'), { recursive: true });
+  mkdirSync(join(root, 'apps', 'gw'), { recursive: true });
+  writeFileSync(
+    join(root, '.ycsf', 'apps.yaml'),
+    `version: 1
+apps:
+  gw:
+    source_path: apps/gw
+    builder: ycforge:api-gateway
+    depends_on: []
+`,
+    'utf8',
+  );
+  writeFileSync(join(root, '.ycsf', 'builders.yaml'), BUILDERS_YAML, 'utf8');
+  writeFileSync(
+    join(root, 'apps', 'gw', 'build_config.yaml'),
+    `version: 1
+build_config:
+  openapi_entry: openapi.yaml
+build_env: {}
+`,
+    'utf8',
+  );
+  writeFileSync(
+    join(root, 'apps', 'gw', 'auth.yaml'),
+    `version: 1
+defaultScheme: public
+schemes:
+  public:
+    type: none
+`,
+    'utf8',
+  );
+  writeFileSync(
+    join(root, 'apps', 'gw', 'openapi.yaml'),
+    `openapi: 3.0.0
+info:
+  title: collision
+  version: 1.0.0
+paths:
+  /a:
+    get:
+      operationId: duplicateOperation
+      responses:
+        "200": { description: ok }
+  /b:
+    get:
+      operationId: duplicateOperation
+      responses:
+        "200": { description: ok }
+`,
+    'utf8',
+  );
+}
+
 describe.skipIf(!enabled)('cloud e2e (spec 037)', () => {
   beforeAll(async () => {
     deployed = await deployE2e();
@@ -202,9 +285,67 @@ describe.skipIf(!enabled)('cloud e2e (spec 037)', () => {
       expect(parseJsonBody(response.text)).toEqual({ route: 'jwt' });
     });
 
-    it('rejects the function-authorizer route without credentials', async () => {
+    it('rejects a jwt token issued by a foreign issuer', async () => {
+      const token = await signToken({
+        issuer: 'https://wrong-issuer.invalid',
+        audience: 'e2e-api',
+        kid: String(state().jwk.kid),
+        privateKeyPem: state().privateKeyPem,
+      });
+      const response = await httpGet(`${baseUrl}/api/auth/jwt`, {
+        Authorization: `Bearer ${token}`,
+      });
+      expect(response.status).toBe(401);
+    });
+
+    it('rejects a jwt token with a foreign audience', async () => {
+      const token = await signToken({
+        issuer: state().jwtIssuer,
+        audience: 'other-api',
+        kid: String(state().jwk.kid),
+        privateKeyPem: state().privateKeyPem,
+      });
+      const response = await httpGet(`${baseUrl}/api/auth/jwt`, {
+        Authorization: `Bearer ${token}`,
+      });
+      expect(response.status).toBe(401);
+    });
+
+    it('rejects an expired jwt token', async () => {
+      const token = await signToken({
+        issuer: state().jwtIssuer,
+        audience: 'e2e-api',
+        kid: String(state().jwk.kid),
+        privateKeyPem: state().privateKeyPem,
+        expiresAt: new Date(Date.now() - 60_000),
+      });
+      const response = await httpGet(`${baseUrl}/api/auth/jwt`, {
+        Authorization: `Bearer ${token}`,
+      });
+      expect(response.status).toBe(401);
+    });
+
+    it('rejects the function-authorizer route without an Authorization header', async () => {
+      // The gateway only invokes an `http bearer` function authorizer when the
+      // bearer header is present; without it the request is rejected outright.
       const denied = await httpGet(`${baseUrl}/api/auth/function`);
       expect(denied.status).toBe(401);
+    });
+
+    it('accepts the function-authorizer route when the authorizer allows', async () => {
+      const allowed = await httpGet(`${baseUrl}/api/auth/function?auth=allow`, {
+        Authorization: 'Bearer dummy',
+      });
+      expect(allowed.status, `body: ${allowed.text}`).toBe(200);
+      expect(parseJsonBody(allowed.text)).toEqual({ route: 'function' });
+    });
+
+    it('rejects the function-authorizer route when the authorizer denies', async () => {
+      const denied = await httpGet(`${baseUrl}/api/auth/function`, {
+        Authorization: 'Bearer dummy',
+      });
+      // A 403 (authorizer denied) is distinct from a 401 (no credentials).
+      expect(denied.status).toBe(403);
     });
 
     it('runs the authorizer function logic (allow/deny)', async () => {
@@ -248,9 +389,16 @@ describe.skipIf(!enabled)('cloud e2e (spec 037)', () => {
   describe('message queue', () => {
     it('delivers a queue message to the fail-fast worker via a real trigger (MQ -> function -> nest-bridge)', async () => {
       await purgeQueue(state().workerEventsName);
-      await sendMessage(state().workerEventsName, { eventId: `good-${Date.now()}` });
+      const eventId = `good-${Date.now()}`;
+      await sendMessage(state().workerEventsName, { eventId });
       await expectQueueDrained(state().workerEventsName, 180_000);
-    }, 240_000);
+      const logs = await waitForLog(state().workerFunctionId, 'E2E_WORKER_OK', {
+        timeoutMs: 240_000,
+      });
+      // Structured handler log carries the eventId and the injected trace_id.
+      expect(logs).toContain(eventId);
+      expect(logs).toMatch(/"traceId":"[^"]+"/);
+    }, 360_000);
 
     it('fails fast on a bad message (direct invoke surfaces the handler error)', async () => {
       const result = await invokeMq(state().workerFunctionId, {
@@ -262,6 +410,14 @@ describe.skipIf(!enabled)('cloud e2e (spec 037)', () => {
       }
       expect(`${result.stdout}\n${result.stderr}`).toContain('fail-fast');
     }, 180_000);
+
+    it('redelivers a bad message through the real trigger (fail-fast keeps the message)', async () => {
+      await purgeQueue(state().workerEventsName);
+      await sendMessage(state().workerEventsName, { eventId: `redeliver-${Date.now()}`, fail: true });
+      // The trigger consumes the message, the handler throws, and YMQ makes it
+      // visible again after the visibility timeout (30s) for another attempt.
+      await expectQueueRedelivered(state().workerEventsName, 150_000);
+    }, 200_000);
 
     it('degrades a bad message in partial-failure mode (invocation succeeds)', async () => {
       const result = await invokeMq(state().workerDlqFunctionId, {
@@ -275,9 +431,27 @@ describe.skipIf(!enabled)('cloud e2e (spec 037)', () => {
 
     it('delivers a queue message to the partial-failure worker via a real trigger', async () => {
       await purgeQueue(state().workerDlqEventsName);
-      await sendMessage(state().workerDlqEventsName, { eventId: `dlq-good-${Date.now()}` });
+      const eventId = `dlq-good-${Date.now()}`;
+      await sendMessage(state().workerDlqEventsName, { eventId });
       await expectQueueDrained(state().workerDlqEventsName, 180_000);
-    }, 240_000);
+      const logs = await waitForLog(state().workerDlqFunctionId, 'E2E_WORKER_DLQ_OK', {
+        timeoutMs: 240_000,
+      });
+      expect(logs).toContain(eventId);
+    }, 360_000);
+
+    it('republishes a failed message to the app-level DLQ via SigV4 (real trigger)', async () => {
+      await purgeQueue(state().workerDlqEventsName);
+      await purgeQueue(state().workerAppDlqName);
+      const badId = `dlq-bad-${Date.now()}`;
+      await sendMessage(state().workerDlqEventsName, { eventId: badId, fail: true });
+      const messages = await receiveMessages(state().workerAppDlqName, {
+        max: 1,
+        timeoutMs: 240_000,
+      });
+      expect(messages.length).toBeGreaterThan(0);
+      expect(messages[0]?.body).toContain(badId);
+    }, 300_000);
   });
 
   describe('storage and build_env', () => {
@@ -436,11 +610,67 @@ moves:
       const after = String((outputs['e2e_renamed_app_function_id'] as { value: unknown }).value);
       expect(after).toBe(before);
 
+      // Second phase: roll the rename forward through a two-hop moved chain and
+      // assert the cloud resource is still the same (no recreate).
+      writeFileSync(
+        appsPath,
+        readFileSync(appsPath, 'utf8').replace(/^(\s*)e2e_renamed_app:/m, '$1e2e_renamed_final:'),
+        'utf8',
+      );
+      writeFileSync(
+        extensionsPath,
+        readFileSync(extensionsPath, 'utf8').replaceAll(
+          'functions.e2e_renamed_app',
+          'functions.e2e_renamed_final',
+        ),
+        'utf8',
+      );
+      writeFileSync(
+        join(state().projectDir, '.ycsf', 'moved.yaml'),
+        `version: 1
+moves:
+  - from: { idl: functions.e2e_rename_me, idt: yandex_function.e2e_rename_me }
+    to: { idl: functions.e2e_renamed_app, idt: yandex_function.e2e_renamed_app }
+  - from: { idl: functions.e2e_renamed_app, idt: yandex_function.e2e_renamed_app }
+    to: { idl: functions.e2e_renamed_final, idt: yandex_function.e2e_renamed_final }
+`,
+        'utf8',
+      );
+
+      await runOrThrow('node', [PILOT_CLI, '-p', state().projectDir, 'apply'], {
+        cwd: state().projectDir,
+        env: deployed.buildEnv,
+      });
+
+      const finalOutputs = await terraformOutputs(join(state().projectDir, 'infra'), deployed.buildEnv);
+      const final = String(
+        (finalOutputs['e2e_renamed_final_function_id'] as { value: unknown }).value,
+      );
+      expect(final).toBe(before);
+
       const plan = await run('terraform', ['plan', '-detailed-exitcode', '-input=false', '-no-color'], {
         cwd: join(state().projectDir, 'infra'),
         env: deployed.buildEnv,
       });
       expect(plan.code).toBe(0);
-    }, 600_000);
+    }, 900_000);
+  });
+
+  describe('composer collisions', () => {
+    it('fails the build on a duplicate operationId inside one gateway app', async () => {
+      const fixture = join(state().tempRoot, 'composer-collision');
+      writeComposerCollisionFixture(fixture);
+      const result = await run(
+        'node',
+        [PILOT_CLI, '-p', fixture, 'build', '--target', 'gw', '--json'],
+        { cwd: fixture, env: deployed.buildEnv },
+      );
+      expect(result.code).not.toBe(0);
+      // The composer code is wrapped by the builder into a descriptive
+      // CLI_BUILD_FAILED message (the raw COMPOSE_* code is not surfaced).
+      expect(`${result.stdout}\n${result.stderr}`).toMatch(
+        /operationId duplicateOperation is declared by more than one operation/,
+      );
+    }, 120_000);
   });
 });

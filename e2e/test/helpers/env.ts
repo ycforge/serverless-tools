@@ -62,6 +62,8 @@ export function requireHarnessEnv(): HarnessEnv {
     TF_VAR_run_id: runId,
     TF_VAR_message_queue_access_key: awsAccessKeyId,
     TF_VAR_message_queue_secret_key: awsSecretAccessKey,
+    TF_VAR_mq_access_key: awsAccessKeyId,
+    TF_VAR_mq_secret_key: awsSecretAccessKey,
   };
 
   const child: NodeJS.ProcessEnv = {

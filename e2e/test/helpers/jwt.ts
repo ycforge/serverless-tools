@@ -45,6 +45,8 @@ export interface SignOptions {
   readonly kid: string;
   readonly privateKeyPem: string;
   readonly subject?: string;
+  /** Override the `exp` claim (default: 15 minutes from now). */
+  readonly expiresAt?: Date;
 }
 
 export async function signToken(options: SignOptions): Promise<string> {
@@ -55,6 +57,6 @@ export async function signToken(options: SignOptions): Promise<string> {
     .setAudience(options.audience)
     .setSubject(options.subject ?? 'e2e-user')
     .setIssuedAt()
-    .setExpirationTime('15m')
+    .setExpirationTime(options.expiresAt ?? '15m')
     .sign(privateKey);
 }

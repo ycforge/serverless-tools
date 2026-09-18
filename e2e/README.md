@@ -61,7 +61,11 @@ pnpm --filter @ycforge/cloud-e2e e2e
 
 ## Известные ограничения (см. `specs/037-cloud-e2e/spec.md` §8)
 
-- Function-authorizer allow-path недоступен: composer не эмитит `service_account_id` авторизатора.
-- App-level DLQ (`DlqSender`) использует `Bearer`-авторизацию; реальный YMQ требует AWS SigV4.
-- Чтение логов функций (`yc serverless function logs`) недоступно с текущими ролями —
-  MQ/observability проверяются permission-free (глубина очереди, прямой invoke, `trace_id`).
+- Cross-app path/operationId-коллизии composer-а недостижимы через пайплайн/`ycsf-api`
+  (оба выбирают один gateway-app); в e2e покрыта self-коллизия `operationId` (негативный `ycsf build`).
+- Код `COMPOSE_*` не пробрасывается поверх CLI (обёрнут в `CLI_BUILD_FAILED` с текстом).
+- App-level DLQ требует static-ключей в env функции (`YC_MQ_KEY_ID`/`YC_MQ_KEY_VALUE`):
+  YMQ не принимает IAM-токен ни как `Bearer`, ни как SigV4-secret. В проде ключи — через
+  Lockbox/env; в e2e — через Terraform-переменные.
+- Для чтения логов функций нужна роль `logging.reader` (у `logging.viewer`/`editor`
+  чтения записей нет).

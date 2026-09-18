@@ -1,10 +1,3 @@
-locals {
-  # yandex_message_queue.id is the SQS-style queue URL
-  # (https://.../<cloud-id>/<queue-id>/<queue-name>), but the connector's DLQ
-  # HTTP API needs the raw queue id (<queue-id>).
-  e2e_worker_app_dlq_queue_id = regex("/([^/]+)/[^/]+$", yandex_message_queue.e2e_worker_app_dlq.id)[0]
-}
-
 resource "yandex_message_queue" "e2e_worker_events" {
   access_key = var.message_queue_access_key
   secret_key = var.message_queue_secret_key

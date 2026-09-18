@@ -104,6 +104,7 @@ schemes:
   internal:
     type: function
     function: functions.e2e_authorizer
+    serviceAccount: ${harness.serviceAccountId}
 `,
     'utf8',
   );

@@ -17,7 +17,11 @@ extensions:
     patch:
       service_account_id: "${var.service_account_id}"
       environment:
-        DLQ_QUEUE_ID: "${local.e2e_worker_app_dlq_queue_id}"
+        # The DLQ sender publishes with AWS SigV4 static keys; the queue URL is
+        # `yandex_message_queue.<name>.id` (the provider reports the SQS URL).
+        DLQ_QUEUE_ID: "${yandex_message_queue.e2e_worker_app_dlq.id}"
+        YC_MQ_KEY_ID: "${var.mq_access_key}"
+        YC_MQ_KEY_VALUE: "${var.mq_secret_key}"
   - target: functions.e2e_rename_me
     patch:
       service_account_id: "${var.service_account_id}"
