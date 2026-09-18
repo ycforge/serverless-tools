@@ -5,6 +5,10 @@ extensions:
       memory: 256
       execution_timeout: 10
       service_account_id: "${var.service_account_id}"
+      # Single nested block (object form, like the generated `content` block).
+      # No min_level: user stdout is UNSPECIFIED and must not be filtered out.
+      log_options:
+        log_group_id: "${yandex_logging_group.e2e.id}"
       environment:
         E2E_EXTENSION_MARKER: api-patched
   - target: functions.e2e_authorizer

@@ -2,6 +2,10 @@ output "e2e_gateway_domain" {
   value = yandex_api_gateway.e2e_openapi.domain
 }
 
+output "e2e_log_group_id" {
+  value = yandex_logging_group.e2e.id
+}
+
 output "e2e_container_url" {
   value = yandex_serverless_container.e2e_container.url
 }

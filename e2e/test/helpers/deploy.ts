@@ -183,6 +183,7 @@ export async function deployE2e(): Promise<DeployResult> {
       jwtIssuer: issuer,
       kmsKeyId,
       gatewayDomain: outputValue(outputs, 'e2e_gateway_domain'),
+      logGroupId: outputValue(outputs, 'e2e_log_group_id'),
       containerUrl: outputValue(outputs, 'e2e_container_url'),
       workerEventsName: outputValue(outputs, 'e2e_worker_events_name'),
       workerDlqEventsName: outputValue(outputs, 'e2e_worker_dlq_events_name'),

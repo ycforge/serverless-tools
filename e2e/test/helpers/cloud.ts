@@ -42,6 +42,33 @@ export async function functionLogs(functionId: string, since = '15m'): Promise<s
   return `${result.stdout}\n${result.stderr}`;
 }
 
+export async function readLogGroup(groupId: string, since = '20m'): Promise<string> {
+  // Keep the read small: a large --limit makes `yc logging read` page slowly.
+  const result = await run(
+    'yc',
+    ['logging', 'read', '--group-id', groupId, '--since', since, '--limit', '100'],
+    { env: process.env, timeoutMs: 90_000 },
+  );
+  return `${result.stdout}\n${result.stderr}`;
+}
+
+export async function waitForLogGroup(
+  groupId: string,
+  needle: string,
+  options: { timeoutMs?: number; pollMs?: number; since?: string } = {},
+): Promise<string> {
+  const deadline = Date.now() + (options.timeoutMs ?? 120_000);
+  let last = '';
+  while (Date.now() < deadline) {
+    last = await readLogGroup(groupId, options.since ?? '20m');
+    if (last.includes(needle)) {
+      return last;
+    }
+    await new Promise((resolve) => setTimeout(resolve, options.pollMs ?? 10_000));
+  }
+  throw new Error(`log needle '${needle}' not found in log group ${groupId} within timeout`);
+}
+
 export async function waitForLog(
   functionId: string,
   needle: string,

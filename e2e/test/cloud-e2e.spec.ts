@@ -4,7 +4,13 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { deployE2e, type DeployResult } from './helpers/deploy.js';
-import { httpGet, invokeFunction, terraformOutputs, waitForLog } from './helpers/cloud.js';
+import {
+  httpGet,
+  invokeFunction,
+  terraformOutputs,
+  waitForLog,
+  waitForLogGroup,
+} from './helpers/cloud.js';
 import { PILOT_CLI, REPO_ROOT } from './helpers/state.js';
 import { run, runOrThrow } from './helpers/exec.js';
 import {
@@ -489,6 +495,33 @@ describe.skipIf(!enabled)('cloud e2e (spec 037)', () => {
       expect(response.status).toBe(200);
       expect(parseJsonBody(response.text)).toEqual({ logged: true });
     });
+
+    it('writes NestJS logs at every level into the user-owned logging group', async () => {
+      const response = await httpGet(`${baseUrl}/api/logs`);
+      expect(response.status).toBe(200);
+      expect(parseJsonBody(response.text)).toEqual({ logged: 6 });
+
+      const logs = await waitForLogGroup(state().logGroupId, 'e2e-nestjs-level-fatal', {
+        timeoutMs: 240_000,
+        since: '3m',
+      });
+      // NestJS ConsoleLogger prefixes every line with its level label; the
+      // custom group must preserve each (level, message) pair. ANSI colour codes
+      // may sit between the label and the message, so match across the line.
+      const pairs: Array<[string, string]> = [
+        ['VERBOSE', 'e2e-nestjs-level-verbose'],
+        ['DEBUG', 'e2e-nestjs-level-debug'],
+        ['LOG', 'e2e-nestjs-level-info'],
+        ['WARN', 'e2e-nestjs-level-warn'],
+        ['ERROR', 'e2e-nestjs-level-error'],
+        ['FATAL', 'e2e-nestjs-level-fatal'],
+      ];
+      for (const [level, marker] of pairs) {
+        expect(logs, `missing ${level} line for ${marker}`).toMatch(
+          new RegExp(`${level}[^\\n]*${marker}`),
+        );
+      }
+    }, 300_000);
 
     it('carries trace_id in error responses', async () => {
       const response = await httpGet(`${baseUrl}/api/guarded`);

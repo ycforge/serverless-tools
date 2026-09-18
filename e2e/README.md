@@ -15,6 +15,7 @@
 - `moved.yaml`: переименование приложения без пересоздания ресурса (2 фазы).
 - docker builder: сборка `linux/amd64` + push в `cr.yandex`, деплой ревизии контейнера.
 - nest-bridge: HTTP v1 transport через API Gateway, `@RequireAuth`, MQ transport (real trigger), `trace_id` в error-ответе, `YandexLogger`.
+- Пользовательская logging-группа (`infra/logging.tf`) с привязкой функции через `log_options.log_group_id`; NestJS `Logger` всех уровней (verbose/debug/log/warn/error/fatal) появляется в группе.
 
 ## Требования
 
@@ -69,3 +70,8 @@ pnpm --filter @ycforge/cloud-e2e e2e
   Lockbox/env; в e2e — через Terraform-переменные.
 - Для чтения логов функций нужна роль `logging.reader` (у `logging.viewer`/`editor`
   чтения записей нет).
+- При привязке кастомной logging-группы **нельзя** задавать `log_options.min_level`:
+  пользовательский stdout имеет уровень `UNSPECIFIED` и при `min_level` отфильтровывается
+  (в группе остаются только платформенные `START`/`END`/`REPORT`). Cloud Logging не
+  парсит текстовый вывод NestJS в уровни (всем строкам ставится `TRACE`); метки
+  `VERBOSE/DEBUG/LOG/WARN/ERROR/FATAL` остаются в тексте сообщения.

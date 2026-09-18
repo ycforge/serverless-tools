@@ -19,6 +19,7 @@ export interface E2eState {
   readonly jwtIssuer: string;
   readonly kmsKeyId: string;
   readonly gatewayDomain: string;
+  readonly logGroupId: string;
   readonly containerUrl: string;
   readonly workerEventsName: string;
   readonly workerDlqEventsName: string;

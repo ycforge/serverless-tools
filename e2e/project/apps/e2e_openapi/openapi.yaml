@@ -67,6 +67,17 @@ paths:
         type: cloud_functions
         function_id: ${resources.functions.e2e_api.id}
         service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/logs:
+    get:
+      summary: Emits a NestJS log at every level
+      operationId: logsProbe
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
   /api/logged:
     get:
       summary: Emits a structured log line

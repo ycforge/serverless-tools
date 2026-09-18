@@ -1,4 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 export interface HarnessEnv {
   readonly runId: string;
@@ -50,9 +53,16 @@ export function requireHarnessEnv(): HarnessEnv {
   const ycProfile = optional('YC_PROFILE') ?? 'ycforge-sa';
   const cloudId = optional('YC_CLOUD_ID');
 
+  // Cache the yandex provider across per-run temp projects: avoids re-downloading
+  // it on every terraform init (faster, and avoids transient registry timeouts).
+  const pluginCacheDir =
+    optional('TF_PLUGIN_CACHE_DIR') ?? join(homedir(), '.terraform.d', 'plugin-cache');
+  mkdirSync(pluginCacheDir, { recursive: true });
+
   const terraform: NodeJS.ProcessEnv = {
     ...process.env,
     YC_FOLDER_ID: folderId,
+    TF_PLUGIN_CACHE_DIR: pluginCacheDir,
     ...(cloudId !== undefined ? { YC_CLOUD_ID: cloudId } : {}),
     // Yandex Message Queue is managed over the S3-compatible API: the provider
     // needs the SA static access key, not just IAM authentication.
