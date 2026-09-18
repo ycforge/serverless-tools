@@ -72,6 +72,9 @@ pnpm --filter @ycforge/cloud-e2e e2e
   чтения записей нет).
 - При привязке кастомной logging-группы **нельзя** задавать `log_options.min_level`:
   пользовательский stdout имеет уровень `UNSPECIFIED` и при `min_level` отфильтровывается
-  (в группе остаются только платформенные `START`/`END`/`REPORT`). Cloud Logging не
-  парсит текстовый вывод NestJS в уровни (всем строкам ставится `TRACE`); метки
-  `VERBOSE/DEBUG/LOG/WARN/ERROR/FATAL` остаются в тексте сообщения.
+  (в группе остаются только платформенные `START`/`END`/`REPORT`).
+- NestJS-логи выводятся структурированным JSON через дефолтный `YandexLogger`
+  (`level` + `message` + `trace_id`), поэтому Cloud Logging присваивает корректный
+  `level`. Опция `createYandexHandler({ logger })`: `false` — отключить логи,
+  свой `LoggerService` — заменить; для `logger:false`/кастомных логгеров нужен
+  перезапуск функции (пересборка образа/архива не требуется — версия функции).

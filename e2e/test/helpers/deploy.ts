@@ -14,7 +14,7 @@ import { join, resolve } from 'node:path';
 
 import { run, runOrThrow } from './exec.js';
 import { requireHarnessEnv, type HarnessEnv } from './env.js';
-import { E2E_ROOT, PILOT_CLI, TMP_ROOT, type E2eState } from './state.js';
+import { E2E_ROOT, PILOT_CLI, REPO_ROOT, TMP_ROOT, type E2eState } from './state.js';
 import {
   createJwtMaterial,
   jwksDocument,
@@ -153,6 +153,7 @@ export async function deployE2e(): Promise<DeployResult> {
   };
 
   try {
+    seedTerraform(workspace.setupDir);
     await runOrThrow('terraform', ['init', '-input=false', '-no-color'], {
       cwd: workspace.setupDir,
       env: harness.terraform,
@@ -216,8 +217,29 @@ function copyGeneratedSnapshots(projectDir: string): void {
   }
 }
 
+/**
+ * Pre-seeds a Terraform module with the reference project's already-installed
+ * Yandex provider (`.terraform`) and lock file. Provider downloads from GitHub
+ * are flaky in this environment and the Terraform plugin cache is not honored
+ * for this provider; copying the initialized module makes `terraform init`
+ * offline. Falls back to a normal init when the reference project has not been
+ * initialized locally.
+ */
+function seedTerraform(moduleDir: string): void {
+  const refInfra = join(REPO_ROOT, 'examples', 'reference-project', 'infra');
+  const providers = join(refInfra, '.terraform');
+  if (existsSync(providers)) {
+    cpSync(providers, join(moduleDir, '.terraform'), { recursive: true, force: true });
+  }
+  const lock = join(refInfra, '.terraform.lock.hcl');
+  if (existsSync(lock)) {
+    copyFileSync(lock, join(moduleDir, '.terraform.lock.hcl'));
+  }
+}
+
 async function runPipeline(projectDir: string, env: NodeJS.ProcessEnv): Promise<void> {
   const infraDir = join(projectDir, 'infra');
+  seedTerraform(infraDir);
   // source_path in apps.yaml is resolved from the process CWD by builders
   // (spec 030 open follow-up), so the CLI must run anchored at the project root.
   const pilot = (args: readonly string[]) =>

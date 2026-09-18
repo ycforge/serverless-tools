@@ -107,7 +107,7 @@ AS-3 **Direct invoke**: `yc --profile ycforge-sa serverless function invoke` с 
 AS-4 **MQ**: отправка через SQS (env `AWS_*`, endpoint YMQ) → реальный trigger вызывает worker, очередь опустошается, в логах — маркер обработки и `traceId`; fail-fast worker на плохом сообщении возвращает ошибку, сообщение редоставляется (реальный trigger); partial-failure worker деградирует и **перепубликует** плохое сообщение в app-level DLQ через SigV4 (проверяется receive-message из DLQ).
 AS-5 **S3**: объект из `web`-бакета скачивается по HTTPS; содержимое соответствует build_env.
 AS-6 **KMS**: `GET /api/kms?key=...` → encrypt/decrypt roundtrip. **Opt-in**: выполняется только при заданном `E2E_KMS_KEY_ID` — у эталонного SA `ycforge-reference` нет прав KMS (`kms.symmetricKeys.*` → PermissionDenied).
-AS-7 **Observability**: логи invocation структурированы, содержат `trace_id`; error-ответы несут `trace_id`. Логи функции пишутся в **user-owned logging group** (`yandex_logging_group` + `log_options.log_group_id`): все уровни NestJS `Logger` (`verbose`/`debug`/`log`/`warn`/`error`/`fatal`) появляются в группе с меткой уровня и сообщением.
+AS-7 **Observability**: логи invocation структурированы, содержат `trace_id`; error-ответы несут `trace_id`. Логи функции пишутся в **user-owned logging group** (`yandex_logging_group` + `log_options.log_group_id`): все уровни NestJS `Logger` (`verbose`/`debug`/`log`/`warn`/`error`/`fatal`) появляются в группе, и Cloud Logging присваивает каждому корректный `level` (`TRACE/DEBUG/INFO/WARN/ERROR/FATAL`).
 AS-8 **Terraform state/outputs**: outputs из state совпадают с `.ycsf/outputs.yaml` + auto-outputs; `terraform plan` после apply — no changes (идемпотентность).
 AS-9 **moved**: 2-фазный apply — ресурс переименован без `destroy`/`recreate`.
 AS-10 **Cache**: повторный build → cache hit; изменение источника → miss.
@@ -186,15 +186,19 @@ AS-11 **Teardown**: после прогона созданные `e2e-*` рес�
   URL очереди. Имена env выбраны без суффиксов `*secret`/`*accesskey`, чтобы не
   триггерить `YCK_SUSPICIOUS_KEY`. App-level DLQ-доставка в e2e зелёная.
 
-- **Логи (проверено вживую)**: при `log_options.min_level: TRACE` в кастомную
-  logging-группу попадали только платформенные логи (`START`/`END`/`REPORT`), а
-  пользовательский stdout (NestJS `Logger`, `console.*`, структурированные логи
-  коннектора) исчезал и из кастомной группы, и из default. Причина: пользовательский
-  stdout имеет уровень `UNSPECIFIED`, который отфильтровывается `min_level`. Фикс:
-  не задавать `min_level` при привязке группы. Дополнительно: Cloud Logging не
-  парсит текстовый вывод NestJS в уровни (всем строкам присваивается `TRACE`), а
-  сам ConsoleLogger печатает ANSI-цветные метки `VERBOSE/DEBUG/LOG/WARN/ERROR/FATAL`
-  внутри сообщения — «тип» лога читается из текста строки, а не из поля `level`.
+- **Логи (проверено вживую, исправлено)**: при `log_options.min_level: TRACE` в
+  кастомную logging-группу попадали только платформенные логи
+  (`START`/`END`/`REPORT`), а пользовательский stdout исчезал и из кастомной
+  группы, и из default — потому что пользовательский stdout имеет уровень
+  `UNSPECIFIED`, который отфильтровывается `min_level`. Фикс: не задавать
+  `min_level` при привязке группы. Дополнительно `YandexLogger`/`ConsoleLogger`
+  писали уровни как нижнерегистровый/ANSI-текст, который Cloud Logging не
+  парсил (level = `TRACE`/UNSPECIFIED). Фикс в A (spec 004 Extension): `YandexLogger`
+  реализует Nest `LoggerService`, эмитит **верхнерегистровые** `TRACE/DEBUG/INFO/WARN/ERROR/FATAL`
+  вместе с `message`, и ставится дефолтным логгером Nest-приложения
+  (`bufferLogs` + `useLogger` до `init()`); опция `logger: false` полностью
+  отключает логи. Boundary-записи тоже получили `level`/`message`. E2e проверяет
+  поле `level` в Cloud Logging для каждого уровня.
 
 **Ограничение покрытия**: cross-app path/operationId-коллизии composer-а
 структурно недостижимы через пайплайн и `ycsf-api` (оба выбирают **один**

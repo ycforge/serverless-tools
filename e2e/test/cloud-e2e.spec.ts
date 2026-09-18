@@ -501,26 +501,31 @@ describe.skipIf(!enabled)('cloud e2e (spec 037)', () => {
       expect(response.status).toBe(200);
       expect(parseJsonBody(response.text)).toEqual({ logged: 6 });
 
+      // The default structured logger maps Nest levels to Cloud Logging ones.
+      const filter = 'message: "e2e-nestjs"';
       const logs = await waitForLogGroup(state().logGroupId, 'e2e-nestjs-level-fatal', {
         timeoutMs: 240_000,
-        since: '3m',
+        since: '10m',
+        filter,
       });
-      // NestJS ConsoleLogger prefixes every line with its level label; the
-      // custom group must preserve each (level, message) pair. ANSI colour codes
-      // may sit between the label and the message, so match across the line.
       const pairs: Array<[string, string]> = [
-        ['VERBOSE', 'e2e-nestjs-level-verbose'],
+        ['TRACE', 'e2e-nestjs-level-verbose'],
         ['DEBUG', 'e2e-nestjs-level-debug'],
-        ['LOG', 'e2e-nestjs-level-info'],
+        ['INFO', 'e2e-nestjs-level-info'],
         ['WARN', 'e2e-nestjs-level-warn'],
         ['ERROR', 'e2e-nestjs-level-error'],
         ['FATAL', 'e2e-nestjs-level-fatal'],
       ];
+      // `yc logging read` prints the Cloud Logging level column before the
+      // message, so the text read asserts BOTH the assigned level and the
+      // message (the structured logger must not fall back to TRACE/UNSPECIFIED).
       for (const [level, marker] of pairs) {
         expect(logs, `missing ${level} line for ${marker}`).toMatch(
           new RegExp(`${level}[^\\n]*${marker}`),
         );
       }
+      // Sanity: the level column must not be the unstructured TRACE fallback.
+      expect(logs).toContain('INFO');
     }, 300_000);
 
     it('carries trace_id in error responses', async () => {
