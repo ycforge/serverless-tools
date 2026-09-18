@@ -155,7 +155,27 @@ describe("http api gateway v2 transport validation", () => {
     [
       "multiValueParameters value is not an array",
       { multiValueParameters: { q: "one" } },
-      'expected every value of field "multiValueParameters" to be a string array',
+      'expected every value of field "multiValueParameters" to be a string, number or boolean array',
+    ],
+    [
+      "multiValueParameters list has a nested object",
+      { multiValueParameters: { q: [{ n: 1 }] } },
+      'expected every value of field "multiValueParameters" to be a string, number or boolean array',
+    ],
+    [
+      "parameters value is a nested object",
+      { parameters: { q: { nested: 1 } } },
+      'expected every value of field "parameters" to be a string, number or boolean',
+    ],
+    [
+      "pathParameters value is an array",
+      { pathParameters: { ID: [1] } },
+      'expected every value of field "pathParameters" to be a string, number or boolean',
+    ],
+    [
+      "parameters value is null",
+      { parameters: { q: null } },
+      'expected every value of field "parameters" to be a string, number or boolean',
     ],
     ["body is not a string", { body: null }, 'expected field "body" to be a string'],
     [
@@ -185,6 +205,26 @@ describe("http api gateway v2 transport validation", () => {
       expect(error.message).toContain(reason);
     },
   );
+
+  it("accepts gateway-typed parameter scalars and normalizes path parameters (spec 038)", async () => {
+    const runtime = makeRuntime();
+
+    // The gateway materializes OpenAPI schema defaults in their JSON type
+    // (integer -> number, boolean -> boolean); a claimed event carrying those
+    // must dispatch instead of failing INVALID_INVOCATION_EVENT.
+    const result = await runtime(
+      makeHttpEvent({
+        parameters: { level: "warn", count: 1, verbose: false },
+        pathParameters: { ID: 7 },
+        multiValueParameters: { count: [1], verbose: [false] },
+      }),
+      RUNTIME_CONTEXT,
+    );
+
+    // Regression proof: the event completed full dispatch (404 root has no
+    // controllers) rather than being rejected by the validator.
+    expect(result).toMatchObject({ statusCode: 404 });
+  });
 
   it("accepts sensitive client headers without echoing them anywhere", async () => {
     const runtime = makeRuntime();

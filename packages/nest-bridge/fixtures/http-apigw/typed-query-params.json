@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-09-19T00:00:00.000Z",
+  "node": "v22.15.0",
+  "provenance": {
+    "kind": "reconstructed",
+    "evidence": "real Yandex API Gateway (cloud_functions integration) capture, spec 036; typed schema-default observed in spec 037 (502), fixed in spec 038"
+  },
+  "event": {
+    "httpMethod": "GET",
+    "path": "/users/logs",
+    "url": "/users/logs?",
+    "headers": {
+      "Accept": "*/*",
+      "Host": "conformance.gateway.apigw.yandexcloud.net",
+      "User-Agent": "conformance-fixture/1.0",
+      "X-Api-Gateway-Function-Id": "fnconf00000000000001",
+      "X-Envoy-Original-Path": "/users/logs",
+      "X-Forwarded-For": "203.0.113.10",
+      "X-Forwarded-Proto": "https",
+      "X-Request-Id": "3f0c0f7e-5a9b-4b3a-8d0e-1c2b3a4d5e6f",
+      "X-Serverless-Gateway-Id": "gwconf00000000000001"
+    },
+    "multiValueHeaders": {
+      "Accept": ["*/*"],
+      "Host": ["conformance.gateway.apigw.yandexcloud.net"],
+      "User-Agent": ["conformance-fixture/1.0"],
+      "X-Api-Gateway-Function-Id": ["fnconf00000000000001"],
+      "X-Envoy-Original-Path": ["/users/logs"],
+      "X-Forwarded-For": ["203.0.113.10"],
+      "X-Forwarded-Proto": ["https"],
+      "X-Request-Id": ["3f0c0f7e-5a9b-4b3a-8d0e-1c2b3a4d5e6f"],
+      "X-Serverless-Gateway-Id": ["gwconf00000000000001"]
+    },
+    "queryStringParameters": {},
+    "multiValueQueryStringParameters": {},
+    "params": { "count": 1, "verbose": false },
+    "multiValueParams": { "count": [1], "verbose": [false] },
+    "pathParams": {},
+    "body": "",
+    "isBase64Encoded": true,
+    "requestContext": {
+      "identity": {
+        "sourceIp": "203.0.113.10",
+        "userAgent": "conformance-fixture/1.0"
+      },
+      "httpMethod": "GET",
+      "requestId": "3f0c0f7e-5a9b-4b3a-8d0e-1c2b3a4d5e6f",
+      "requestTime": "19/Sep/2026:00:00:00 +0000",
+      "requestTimeEpoch": 1789776000
+    }
+  },
+  "context": {
+    "awsRequestId": "3f0c0f7e-5a9b-4b3a-8d0e-1c2b3a4d5e6f",
+    "requestId": "3f0c0f7e-5a9b-4b3a-8d0e-1c2b3a4d5e6f",
+    "invokedFunctionArn": "fnconf00000000000001",
+    "functionName": "fnconf00000000000001",
+    "functionVersion": "verv10000000000001",
+    "functionFolderId": "e5f6a7b8000000000000",
+    "memoryLimitInMB": "1024",
+    "deadlineMs": 1789776000166,
+    "logGroupName": "",
+    "token": "[REDACTED]",
+    "uberTraceId": "19fcffb9e777c3fb:03d75666c5aa6bb5:9c8c2230ba720d60:1",
+    "_data": {
+      "httpMethod": "GET",
+      "path": "/users/logs",
+      "url": "/users/logs?",
+      "headers": {
+        "Accept": "*/*",
+        "Host": "conformance.gateway.apigw.yandexcloud.net",
+        "User-Agent": "conformance-fixture/1.0",
+        "X-Api-Gateway-Function-Id": "fnconf00000000000001",
+        "X-Envoy-Original-Path": "/users/logs",
+        "X-Forwarded-For": "203.0.113.10",
+        "X-Forwarded-Proto": "https",
+        "X-Request-Id": "3f0c0f7e-5a9b-4b3a-8d0e-1c2b3a4d5e6f",
+        "X-Serverless-Gateway-Id": "gwconf00000000000001"
+      },
+      "queryStringParameters": {},
+      "params": { "count": 1, "verbose": false },
+      "multiValueParams": { "count": [1], "verbose": [false] },
+      "requestContext": {
+        "identity": {
+          "sourceIp": "203.0.113.10",
+          "userAgent": "conformance-fixture/1.0"
+        },
+        "httpMethod": "GET",
+        "requestId": "3f0c0f7e-5a9b-4b3a-8d0e-1c2b3a4d5e6f",
+        "requestTime": "19/Sep/2026:00:00:00 +0000",
+        "requestTimeEpoch": 1789776000
+      },
+      "body": "",
+      "isBase64Encoded": true,
+      "path": "/users/logs"
+    }
+  }
+}

@@ -55,7 +55,11 @@ class ApigwTransportModule {}
 
 Module({ controllers: [ApigwTransportController] })(ApigwTransportModule);
 
-const ALL_APIGW_FIXTURE_NAMES = ["get-without-query", "repeated-query-parameters"] as const;
+const ALL_APIGW_FIXTURE_NAMES = [
+  "get-without-query",
+  "repeated-query-parameters",
+  "typed-query-params",
+] as const;
 
 async function replay(name: string): Promise<{
   fixture: YcApiGatewayInvocationFixture;
@@ -228,6 +232,64 @@ describe("API Gateway cloud_functions (v1) transport (spec 036)", () => {
       // searchParams reads the canonical query string so repeats survive there.
       expect(normalizedRequest.searchParams.getAll("limit")).toEqual(["2", "3"]);
       expect(normalizedRequest.searchParams.getAll("multi")).toEqual(["a", "b"]);
+    });
+
+    it("accepts gateway-typed parameter scalars and normalizes them to strings (spec 038)", async () => {
+      const { captured, fixture } = await replay("typed-query-params");
+      const { normalizedRequest } = captured;
+
+      // The gateway materializes `integer`/`boolean` schema defaults as JSON
+      // scalars in BOTH the single- and multi-value parameter views (captured
+      // evidence: `params:{count:1}` AND `multiValueParams:{count:[1]}`); the
+      // 502 appeared only when the parameter was omitted (spec 037).
+      const rawParams = fixture.event.params as Record<string, unknown>;
+      expect(typeof rawParams["count"]).toBe("number");
+      expect(typeof rawParams["verbose"]).toBe("boolean");
+      const rawMulti = fixture.event.multiValueParams as Record<string, unknown[]>;
+      expect(rawMulti["count"]).toEqual([1]);
+
+      // HTTP-visible multi-value parameters are string arrays.
+      expect(normalizedRequest.multiValueParameters).toEqual({
+        count: ["1"],
+        verbose: ["false"],
+      });
+      for (const value of Object.values(normalizedRequest.pathParameters)) {
+        expect(typeof value).toBe("string");
+      }
+
+      // No client query was sent, and the gateway defaults are NOT merged into
+      // the application query (its canonical source is the client request).
+      expect(normalizedRequest.queryStringParameters).toEqual({});
+      expect(normalizedRequest.searchParams.get("count")).toBeNull();
+      expect(normalizedRequest.searchParams.get("verbose")).toBeNull();
+
+      // The raw v1 event stays a faithful record (typed scalars preserved).
+      expect((normalizedRequest.raw as { params?: unknown }).params).toEqual(
+        fixture.event.params,
+      );
+      expect((normalizedRequest.raw as { multiValueParams?: unknown }).multiValueParams).toEqual(
+        fixture.event.multiValueParams,
+      );
+    });
+
+    it("still rejects non-scalar values in the v1 parameter maps (spec 038)", async () => {
+      const base = await loadYcApiGatewayFixture("typed-query-params");
+      const anomalies: Record<string, unknown>[] = [
+        { params: { nested: { id: 1 } } },
+        { multiValueParams: { count: [{ id: 1 }] } },
+        { multiValueParams: { count: [null] } },
+      ];
+      for (const override of anomalies) {
+        const handler = createYandexHandler(ApigwTransportModule);
+        try {
+          await expect(handler({ ...base.event, ...override }, base.context)).rejects.toMatchObject({
+            code: "INVALID_INVOCATION_EVENT",
+            transportId: "http",
+          });
+        } finally {
+          await handler.close();
+        }
+      }
     });
 
     it("fails INVALID for a v1 event missing core requestContext.identity", async () => {

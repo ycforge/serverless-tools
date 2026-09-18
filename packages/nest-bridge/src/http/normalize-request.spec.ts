@@ -241,6 +241,34 @@ describe("normalized http request metadata exposure", () => {
     expect(normalizedRequest.pathParameters).toEqual({ ID: "a/b/c" });
   });
 
+  it("stringifies gateway-typed path parameter scalars (spec 038)", () => {
+    // A typed OpenAPI path/parameter schema can make the gateway emit a JSON
+    // number/boolean; the HTTP-visible path parameters must stay strings.
+    const event = makeHttpEvent({
+      rawPath: "/items/7",
+      pathParameters: { ID: 7, pinned: true } as unknown as Record<string, string>,
+      multiValueParameters: { seq: [1, 2], pinned: [true] } as unknown as Record<string, string[]>,
+    });
+
+    const normalizedRequest = normalizeHttpRequest(event);
+
+    expect(normalizedRequest.pathParameters).toEqual({ ID: "7", pinned: "true" });
+    expect(normalizedRequest.multiValueParameters).toEqual({
+      seq: ["1", "2"],
+      pinned: ["true"],
+    });
+    // Transformation, not mutation: the raw event keeps the typed values.
+    expect((event.pathParameters as unknown as Record<string, unknown>)).toEqual({
+      ID: 7,
+      pinned: true,
+    });
+    expect((event.multiValueParameters as unknown as Record<string, unknown>)).toEqual({
+      seq: [1, 2],
+      pinned: [true],
+    });
+    expect(normalizeHttpRequest(event).raw).toBe(event);
+  });
+
   it("exposes client metadata and correlation ids from requestContext.http", () => {
     const normalizedRequest = normalizeHttpRequest(
       makeHttpEvent({

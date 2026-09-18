@@ -1,5 +1,5 @@
 import type { NormalizedHttpRequest } from "./normalized-request";
-import type { RawHttpApiGatewayV2Event } from "./raw-event";
+import type { GatewayScalar, RawHttpApiGatewayV2Event } from "./raw-event";
 
 /**
  * Optional normalization controls (spec 036 — API Gateway cloud_functions).
@@ -42,11 +42,15 @@ export interface NormalizeHttpRequestOptions {
  *   section 4.4). Base64 payloads decode straight to bytes, keeping binary
  *   bodies intact.
  * - Headers, cookies and path parameters pass through verbatim: the gateway
- *   provides no multi-value headers and parses nothing on its own.
+ *   provides no multi-value headers and parses nothing on its own — except
+ *   that gateway-typed parameter scalars (`number`/`boolean`, materialized
+ *   from the OpenAPI schema) are stringified into the HTTP string domain
+ *   (spec 038). The untouched event stays reachable through `raw`.
  *
- * Normalization is transformation, not mutation: parameter maps are shared by
- * reference with the untouched event reachable through `raw`, so additive
- * Yandex fields survive without copying costs (AGENTS.md sections 7.3 and 36).
+ * Normalization is transformation, not mutation: unchanged maps are shared by
+ * reference, while the gateway-typed `pathParameters`/`multiValueParameters`
+ * are rebuilt as string maps; additive Yandex fields survive through `raw`
+ * (AGENTS.md sections 7.3 and 36).
  */
 export function normalizeHttpRequest(
   event: RawHttpApiGatewayV2Event,
@@ -64,14 +68,43 @@ export function normalizeHttpRequest(
     rawQueryString: event.rawQueryString,
     searchParams: new URLSearchParams(event.rawQueryString),
     queryStringParameters: event.queryStringParameters,
-    multiValueParameters: event.multiValueParameters,
-    pathParameters: event.pathParameters,
+    multiValueParameters: stringifyScalarListRecord(event.multiValueParameters),
+    pathParameters: stringifyScalarRecord(event.pathParameters),
     headers: event.headers,
     body: decodeEventBody(event.body, event.isBase64Encoded),
     sourceIp: event.requestContext.http.sourceIp,
     userAgent: event.requestContext.http.userAgent,
     requestId: event.requestContext.requestId,
   });
+}
+
+/**
+ * Projects a gateway-typed parameter map into the HTTP string domain.
+ *
+ * The gateway can materialize a declared parameter's `default` in its JSON
+ * type (`number`/`boolean`); HTTP parameters are strings, so `String(v)`
+ * restores the wire representation (`1` → `"1"`, `true` → `"true"`). A fresh
+ * object is returned — the typed values stay intact in the raw event.
+ */
+function stringifyScalarRecord(
+  source: Readonly<Record<string, GatewayScalar>>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(source)) {
+    out[key] = typeof value === "string" ? value : String(value);
+  }
+  return out;
+}
+
+/** Stringifies a gateway-typed multi-value parameter map (spec 038). */
+function stringifyScalarListRecord(
+  source: Readonly<Record<string, readonly GatewayScalar[]>>,
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [key, values] of Object.entries(source)) {
+    out[key] = values.map((value) => (typeof value === "string" ? value : String(value)));
+  }
+  return out;
 }
 
 /**

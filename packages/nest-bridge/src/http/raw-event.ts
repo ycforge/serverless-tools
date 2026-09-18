@@ -11,6 +11,17 @@
  * property checking for these boundary types only.
  */
 
+/**
+ * JSON scalar value Yandex API Gateway may materialize in a parameter map.
+ *
+ * The gateway evaluates the OpenAPI operation schema and emits a declared
+ * parameter's `default` (or an otherwise typed value) in its JSON type — a
+ * `type: integer` default arrives as a JSON number, `type: boolean` as a
+ * boolean (spec 037 observed the resulting 502; spec 038 normalizes it).
+ * Client-supplied values always arrive as strings.
+ */
+export type GatewayScalar = string | number | boolean;
+
 /** Gateway-injected request metadata block of the observed event. */
 export interface RawHttpApiGatewayV2RequestContext {
   authorizer: Record<string, unknown>;
@@ -53,9 +64,27 @@ export interface RawHttpApiGatewayV2Event {
 
   isBase64Encoded: boolean;
 
-  pathParameters: Record<string, string>;
-  parameters: Record<string, string>;
-  multiValueParameters: Record<string, string[]>;
+  /**
+   * Path parameters as provided by the gateway configuration. Values are
+   * `GatewayScalar` (the gateway can type them per the OpenAPI schema); the
+   * normalized HTTP request surfaces them stringified.
+   */
+  pathParameters: Record<string, GatewayScalar>;
+
+  /**
+   * Gateway-evaluated parameter set (client values plus schema defaults).
+   * Kept verbatim in `raw` for fidelity; never merged into the application
+   * query (the request-facing query is `queryStringParameters`).
+   */
+  parameters: Record<string, GatewayScalar>;
+
+  /**
+   * Multi-value view of the gateway-evaluated parameter set (spec 038): like
+   * `parameters`, values are `GatewayScalar` because the gateway materializes
+   * a typed default inside the list (observed: `{ count: [1] }`). The
+   * normalized request surfaces the stringified form.
+   */
+  multiValueParameters: Record<string, GatewayScalar[]>;
 
   operationId: string;
 
