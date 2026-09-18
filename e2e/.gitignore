@@ -1,0 +1,20 @@
+# Standalone workspace
+node_modules/
+
+# Harness scratch space (per-run copies, generated configs, terraform state)
+.tmp/
+
+# Toolchain-generated artifacts inside the committed project (if run in place)
+project/.ycsf/artifacts/
+project/.ycsf/cache/
+project/.ycsf/state.json
+project/infra/.terraform/
+project/infra/.terraform.lock.hcl
+project/infra/*.ycsf.tf.json
+project/infra/99-ycsf-outputs.tf.json
+project/infra/generated/
+project/infra/*.tfstate
+project/infra/*.tfstate.*
+project/infra/*.tfplan
+project/apps/*/dist/
+*.tsbuildinfo

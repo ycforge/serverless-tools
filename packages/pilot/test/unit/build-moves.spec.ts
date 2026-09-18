@@ -47,7 +47,7 @@ describe('buildMoves (T024–T030)', () => {
     ]);
   });
 
-  it('T026 chains compile to one TerraformMoved per compiled step, oldest first, plus-compression of intermediate hops (FR-002, US-3 AC1, Sc3)', () => {
+  it('T026 chains compile to one TerraformMoved per address hop, oldest first (FR-002, US-3 AC1, Sc3)', () => {
     const current = [endpoint('functions.accounts', 'yandex_function.accounts')];
 
     const twoHop = buildMoves(
@@ -66,7 +66,7 @@ describe('buildMoves (T024–T030)', () => {
     expect(twoHop.kind).toBe('ok');
     if (twoHop.kind !== 'ok') return;
     expect(twoHop.moved).toEqual([
-      { kind: 'moved', from: 'yandex_function.users', to: 'yandex_function.accounts' },
+      { kind: 'moved', from: 'yandex_function.users', to: 'yandex_function.user_service' },
       { kind: 'moved', from: 'yandex_function.user_service', to: 'yandex_function.accounts' },
     ]);
 
@@ -105,8 +105,8 @@ describe('buildMoves (T024–T030)', () => {
     expect(threeStep.kind).toBe('ok');
     if (threeStep.kind !== 'ok') return;
     expect(threeStep.moved).toEqual([
-      { kind: 'moved', from: 'yandex_function.users', to: 'yandex_function.accounts' },
-      { kind: 'moved', from: 'yandex_function.user_service', to: 'yandex_function.accounts' },
+      { kind: 'moved', from: 'yandex_function.users', to: 'yandex_function.user_service' },
+      { kind: 'moved', from: 'yandex_function.user_service', to: 'yandex_function.reports' },
       { kind: 'moved', from: 'yandex_function.reports', to: 'yandex_function.accounts' },
     ]);
   });

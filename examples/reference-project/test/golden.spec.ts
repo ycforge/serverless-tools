@@ -10,7 +10,7 @@ const REPO = resolve(ROOT, '../..');
 const CLI = join(REPO, 'packages/pilot/dist/cli/index.js');
 const FIXTURES = join(ROOT, 'test/fixtures');
 
-const FUNCTION_HASH = '7bde9ea828e4e5fc72ba5956260131643c0fa6ab8d4c08160aca35c56779c844';
+const FUNCTION_HASH = 'c78e8eb89ebcc3f9d1a4e6bd1a8ad4091698b796b491183f0c3d6ebb2687a23e';
 const ANALYTICS_IMAGE =
   'cr.yandex/crps9jj0ui2e954vaj8m/analytics@sha256:85b68206325f6af4fc29f72b87ebcdbc94cf5c8fc086ef48a02abf40372e80f4';
 const FRONTEND_JS = 'index-CII8GTtS.js';
@@ -154,12 +154,19 @@ describe('golden fixtures', () => {
     ) as OpenApiCompanion;
     expect(companion.openapi).toBe('3.0.0');
     expect(companion.info.title).toBe('Reference API Gateway');
-    expect(Object.keys(companion.paths).sort()).toEqual(['/analytics', '/analytics/kms', '/users']);
-    expect(companion.paths['/users'].get['x-yc-apigateway-integration']).toEqual({
-      type: 'cloud_functions',
-      function_id: '${yandex_function_user_service_id}',
-      service_account_id: 'ajefi3b58tak71g3ecp1',
-    });
+    expect(Object.keys(companion.paths).sort()).toEqual([
+      '/analytics',
+      '/analytics/kms',
+      '/users',
+      '/users/logs',
+    ]);
+    for (const p of ['/users', '/users/logs']) {
+      expect(companion.paths[p].get['x-yc-apigateway-integration']).toEqual({
+        type: 'cloud_functions',
+        function_id: '${yandex_function_user_service_id}',
+        service_account_id: 'ajefi3b58tak71g3ecp1',
+      });
+    }
     for (const p of ['/analytics', '/analytics/kms']) {
       expect(companion.paths[p].get['x-yc-apigateway-integration']).toEqual({
         type: 'serverless_containers',

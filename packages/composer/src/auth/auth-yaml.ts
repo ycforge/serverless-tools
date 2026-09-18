@@ -15,7 +15,12 @@ export interface RawAuthScheme {
   [key: string]: unknown;
 }
 
-export type ParsedFunctionScheme = { type: 'function'; function: string };
+export type ParsedFunctionScheme = {
+  type: 'function';
+  function: string;
+  /** Optional service account used by API Gateway to invoke the authorizer. */
+  serviceAccount?: string;
+};
 export type ParsedAuthScheme =
   | { type: 'none' }
   | { type: 'jwt'; jwksUri: string; issuer: string; audience: string | readonly string[] }
@@ -69,7 +74,14 @@ function validateJwtFields(raw: RawAuthScheme, schemeName: string): ParsedAuthSc
 
 function validateFunctionFields(raw: RawAuthScheme, schemeName: string): ParsedAuthScheme {
   const functionRef = requireNonEmptyString(raw, schemeName, 'function');
-  return { type: 'function', function: functionRef };
+  const serviceAccount = raw.serviceAccount;
+  if (serviceAccount === undefined) {
+    return { type: 'function', function: functionRef };
+  }
+  if (typeof serviceAccount !== 'string' || serviceAccount === '') {
+    throw new AuthConfigError('AUTH_INVALID_FIELD', { schemeName, field: 'serviceAccount' });
+  }
+  return { type: 'function', function: functionRef, serviceAccount };
 }
 
 export const DEFAULT_SCHEME_VALIDATORS: Readonly<Record<string, SchemeFieldValidator>> = {

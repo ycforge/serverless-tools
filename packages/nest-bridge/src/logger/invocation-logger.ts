@@ -73,11 +73,20 @@ export function createInvocationLogger(writer: LogSink): InvocationLogger {
   return {
     start(context) {
       invocationStart = performance.now();
-      emit({ event: "start", trace_id: context.trace_id, awsRequestId: context.awsRequestId, transport: context.transport });
+      emit({
+        level: "INFO",
+        event: "start",
+        message: "invocation start",
+        trace_id: context.trace_id,
+        awsRequestId: context.awsRequestId,
+        transport: context.transport,
+      });
     },
     finish(context) {
       emit({
+        level: "INFO",
         event: "finish",
+        message: "invocation finish",
         trace_id: context.trace_id,
         awsRequestId: context.awsRequestId,
         transport: context.transport,
@@ -86,14 +95,38 @@ export function createInvocationLogger(writer: LogSink): InvocationLogger {
       });
     },
     error(context) {
+      const fields = errorFields(context.error);
       emit({
+        level: "ERROR",
         event: "error",
+        // Safe connector-owned literal: never the application error text/stack
+        // (FR-007). The stable code/class live in their own fields.
+        message: "invocation error",
         trace_id: context.trace_id,
         awsRequestId: context.awsRequestId,
         transport: context.transport,
-        ...errorFields(context.error),
+        ...fields,
         durationMs: durationMs(),
       });
+    },
+  };
+}
+
+/**
+ * No-op invocation logger used when the application explicitly disables
+ * logging (`createYandexHandler({ logger: false })`, spec 037): the connector
+ * then emits no boundary records at all.
+ */
+export function createNoopInvocationLogger(): InvocationLogger {
+  return {
+    start() {
+      // intentionally silent
+    },
+    finish() {
+      // intentionally silent
+    },
+    error() {
+      // intentionally silent
     },
   };
 }

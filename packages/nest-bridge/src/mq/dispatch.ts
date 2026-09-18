@@ -302,7 +302,11 @@ export async function dispatchQueueHandlers(
   if (result.failureCount > 0) {
     const deadLetterQueueId = options?.partialFailure?.deadLetterQueueId;
     if (deadLetterQueueId) {
-      const dlqSender = new DlqSender();
+      const dlqSender = new DlqSender(
+        options?.partialFailure?.credentials !== undefined
+          ? { credentials: options.partialFailure.credentials }
+          : {},
+      );
       await dlqSender.sendBatch(failures, deadLetterQueueId);
     } else {
       const executionContext = resolveInvocationExecutionContext();

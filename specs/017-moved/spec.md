@@ -74,12 +74,14 @@ moves:
     to:   {idl: functions.accounts, idt: yandex_function.accounts}
 ```
 
-При текущей модели, где `functions.accounts` → `yandex_function.accounts`, C компилирует оба исторических адреса:
+При текущей модели, где `functions.accounts` → `yandex_function.accounts`, C компилирует цепочку **по-шагово** (Terraform резолвит её транзитивно):
 
 ```
-moved { from = yandex_function.users;       to = yandex_function.accounts }
+moved { from = yandex_function.users;        to = yandex_function.user_service }
 moved { from = yandex_function.user_service; to = yandex_function.accounts }
 ```
+
+> **Correction (spec 037)**: исходно спецификация предписывала «сворачивать» цепочку и эмитить каждый переход сразу в терминальный адрес (`A→C`, `B→C`). Terraform отклоняет такой конфиг как «Ambiguous move statements» (у одного ресурса несколько источников), поэтому реализация исправлена на per-hop emission.
 
 **Терминал цепочки** — `to` последней миграции в цепочке. Цепочка **live (живая)**, если её терминал соответствует текущему resource (по паре `{idl, idt}`).
 

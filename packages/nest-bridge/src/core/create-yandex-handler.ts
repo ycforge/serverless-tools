@@ -1,10 +1,15 @@
-import type { INestApplication, Type } from "@nestjs/common";
+import type { INestApplication, LoggerService, Type } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { buildYandexExecutionContext, readInvocationTraceId } from "../context/build-yandex-execution-context";
 import { runInInvocationScope } from "../context/invocation-scope";
 import { YandexHttpAdapter } from "../http/yandex-http-adapter";
 import { createLogWriter } from "../logger/writer";
-import { createInvocationLogger, contextFields } from "../logger/invocation-logger";
+import { YandexLogger } from "../logger/yandex-logger";
+import {
+  createInvocationLogger,
+  createNoopInvocationLogger,
+  contextFields,
+} from "../logger/invocation-logger";
 import type { YandexExecutionContext } from "../context/yandex-execution-context";
 import { detectTransport } from "./detect-transport";
 import type {
@@ -64,9 +69,12 @@ export function createYandexHandler(
   appModule: Type<unknown>,
   options?: CreateYandexHandlerOptions,
 ): ClosableYandexCloudFunctionHandler {
-  return createInvocationRuntime(appModule, createBuiltinTransports(options), {
-    defaultAuthGuard: options?.defaultAuthGuard ?? null,
-  });
+  return createInvocationRuntime(
+    appModule,
+    createBuiltinTransports(options),
+    { defaultAuthGuard: options?.defaultAuthGuard ?? null },
+    { logger: options?.logger },
+  );
 }
 
 /**
@@ -78,7 +86,9 @@ export function createInvocationRuntime(
   appModule: Type<unknown>,
   transports: readonly TransportAdapter[],
   bootstrapOptions: ConnectorBootstrapOptions = {},
+  runtimeOptions: { readonly logger?: LoggerService | false } = {},
 ): ClosableYandexCloudFunctionHandler {
+  const loggerOption = runtimeOptions.logger;
   // Shared initialization promise in the factory closure: one cache per
   // created handler, never global state shared between unrelated handlers
   // (AGENTS.md sections 10.3 and 11).
@@ -103,7 +113,16 @@ export function createInvocationRuntime(
       // before init(); the Message Queue dispatch path never passes through
       // it (FR-011).
       const bootstrapModule = createConnectorBootstrapModule(appModule, bootstrapOptions);
-      applicationPromise = NestFactory.create(bootstrapModule, httpAdapter)
+      // Pass the logger directly to `NestFactory.create` (rather than
+      // `useLogger` after the fact): module-resolution/RoutesResolver logs are
+      // emitted during `create`, before the application object exists, and
+      // `bufferLogs` here left Nest's buffer attached (never flushed) and
+      // silently dropped every application log. `false` disables logging.
+      const nestLogger: LoggerService | false =
+        loggerOption === false ? false : (loggerOption ?? new YandexLogger());
+      applicationPromise = NestFactory.create(bootstrapModule, httpAdapter, {
+        logger: nestLogger,
+      })
         .then((application) => {
           application.useGlobalGuards(application.get(GlobalAuthGuard));
           return application.init();
@@ -125,7 +144,10 @@ export function createInvocationRuntime(
     // record, correlating on the tolerant id read from the raw context when
     // one exists (research R4 / edge case 1). Everything stays side-effect
     // free with respect to the invocation result.
-    const logger = createInvocationLogger(createLogWriter());
+    const logger =
+      loggerOption === false
+        ? createNoopInvocationLogger()
+        : createInvocationLogger(createLogWriter());
     const tolerantTraceId = readInvocationTraceId(rawContext);
 
     // Detection runs once, before any initialization cost, so events nobody

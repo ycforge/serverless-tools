@@ -1,0 +1,5 @@
+version: 1
+buckets:
+  static_assets: {}
+queues:
+  events: {}

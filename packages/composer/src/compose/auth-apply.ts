@@ -57,6 +57,12 @@ function functionSchemeRecord(
     'x-yc-apigateway-authorizer': {
       type: 'function',
       function_id: reference,
+      // API Gateway needs a service account to invoke the authorizer function;
+      // without one (and without a top-level x-yc-apigateway.service_account_id)
+      // the invocation is unauthorized and every request is rejected.
+      ...(scheme.serviceAccount !== undefined
+        ? { service_account_id: scheme.serviceAccount }
+        : {}),
     },
   };
 }

@@ -23,6 +23,12 @@ export type BoundaryLogTransport = "http" | "message-queue";
  * token/header/body/payload fragments, FR-009).
  */
 export interface BoundaryLogRecord {
+  /**
+   * Cloud Logging severity (`INFO` for `start`/`finish`, `ERROR` for `error`).
+   * Emitted together with `message` so Yandex Cloud Logging parses the line as
+   * a structured record and assigns the correct level (spec 037).
+   */
+  readonly level: "INFO" | "ERROR";
   /** The boundary phase this record describes. */
   readonly event: BoundaryLogEvent;
   /** Per-invocation correlation id (equals `awsRequestId`; FR-001). */
@@ -48,6 +54,7 @@ export interface BoundaryLogRecord {
 
 /** Documentation index of the wire fields; drive deterministic serialization. */
 const RECORD_FIELD_ORDER = [
+  "level",
   "event",
   "trace_id",
   "awsRequestId",

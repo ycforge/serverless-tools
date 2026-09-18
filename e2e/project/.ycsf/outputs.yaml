@@ -1,0 +1,11 @@
+version: 1
+outputs:
+  e2e_api_id:
+    value: functions.e2e_api.id
+    description: "e2e api function id"
+  e2e_gateway_id:
+    value: gateways.e2e_openapi.id
+    description: "e2e API Gateway id"
+  e2e_worker_id:
+    value: functions.e2e_worker.id
+    description: "e2e MQ worker function id"

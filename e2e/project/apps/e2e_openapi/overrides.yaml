@@ -1,0 +1,16 @@
+version: 1
+rules:
+  - op: remove
+    target: { kind: path, path: /api/legacy }
+  - op: replace
+    target: { kind: operation, method: get, path: /api/public }
+    value:
+      summary: Public route (local override)
+      operationId: publicRoute
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"

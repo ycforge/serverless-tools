@@ -44,8 +44,26 @@ describe("YandexLogger (spec 004, FR-012..015)", () => {
     logger.warn("w");
     logger.error("e");
     const records = lines();
-    expect(records.map((r) => r.level)).toEqual(["debug", "info", "warn", "error"]);
+    expect(records.map((r) => r.level)).toEqual(["DEBUG", "INFO", "WARN", "ERROR"]);
     expect(records.map((r) => r.message)).toEqual(["d", "i", "w", "e"]);
+  });
+
+  it("implements the Nest LoggerService surface with Cloud Logging levels (spec 037)", async () => {
+    const { logger, lines } = captureLogger();
+    logger.verbose("v");
+    logger.debug("d");
+    logger.log("l");
+    logger.warn("w");
+    logger.error("e");
+    logger.fatal("f");
+    const records = lines();
+    expect(records.map((r) => r.level)).toEqual(["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"]);
+    expect(records.map((r) => r.message)).toEqual(["v", "d", "l", "w", "e", "f"]);
+    // Every record carries a `message` + `level` so Cloud Logging parses it.
+    for (const record of records) {
+      expect(typeof record.level).toBe("string");
+      expect(typeof record.message).toBe("string");
+    }
   });
 
   it("automatically carries trace_id/awsRequestId from the invocation scope", async () => {
@@ -54,7 +72,7 @@ describe("YandexLogger (spec 004, FR-012..015)", () => {
       logger.info("inside scope");
     });
     const record = lines()[0]!;
-    expect(record.level).toBe("info");
+    expect(record.level).toBe("INFO");
     expect(record.trace_id).toBe("unit-trace-id-1");
     expect(record.awsRequestId).toBe("unit-trace-id-1");
   });

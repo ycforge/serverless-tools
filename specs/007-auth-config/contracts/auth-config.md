@@ -25,6 +25,7 @@ schemes:
   internal:
     type: function
     function: functions.internal_authorizer
+    serviceAccount: ajefi3b58tak71g3ecp1
 ```
 
 ### Схема документа
@@ -39,6 +40,7 @@ schemes:
 | `schemes.<name>.issuer` | `string` | для `jwt` | непустая строка (FR-006) |
 | `schemes.<name>.audience` | `string \| string[]` | для `jwt` | непустое значение; пустой массив = отсутствие поля (FR-006, research R7) |
 | `schemes.<name>.function` | `string` | для `function` | грамматика `functions.<name>`, сегмент `[a-z][a-z0-9_]*`; `name` ∈ набор функций композиции (FR-006/FR-012) |
+| `schemes.<name>.serviceAccount` | `string` | нет (для `function`) | опционально; непустая строка — SA для вызова authorizer-функции шлюзом; эмитится как `x-yc-apigateway-authorizer.service_account_id`; при неверном типе/пустом значении — `AUTH_INVALID_FIELD` (spec 037) |
 
 - Дубликат ключа в документе — fail-fast: внутри `schemes` → `AUTH_DUPLICATE_SCHEME` (с именем), в любом другом месте → `AUTH_DUPLICATE_KEY` (с node-путём) (FR-007; строже минимума — весь документ unique, Constitution V).
 - `public` (нижний регистр, тип `none`) — зарезервированная no-op-конвенция (spec 003); объявление схемы `public` и `defaultScheme: public` допустимы (FR-009).
@@ -111,6 +113,7 @@ interface FunctionReference {
 | `AUTH_SCHEMES_NOT_MAP` | `schemes` существует, но не отображение | `field=schemes` | FR-004 / Edge |
 | `AUTH_UNKNOWN_SCHEME_TYPE` | `type` вне `{none, jwt, function}` (например `oauth2`) | `schemeName`, `type` | FR-005 |
 | `AUTH_MISSING_FIELD` | отсутствует/пусто обязательное поле по типу схемы | `schemeName`, `field` | FR-006 |
+| `AUTH_INVALID_FIELD` | присутствует, но имеет неверный тип/пустое значение (напр. `serviceAccount`) | `schemeName`, `field` | spec 037 |
 | `AUTH_FUNCTION_INVALID_REF` | `function` не по грамматике `functions.<name>` | `ref` | FR-012 |
 | `AUTH_FUNCTION_UNRESOLVED` | `name` не в наборе функций композиции | `ref` | FR-012 |
 | `AUTH_FUNCTION_SET_REQUIRED` | есть `function`-схема, но `functions` в запросе отсутствует | `schemeName` | FR-012 / V |

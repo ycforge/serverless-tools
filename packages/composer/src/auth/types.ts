@@ -3,7 +3,7 @@ import type { OpenApiDocument } from '../errors.js';
 export type AuthScheme =
   | { type: 'none' }
   | { type: 'jwt'; jwksUri: string; issuer: string; audience: string | readonly string[] }
-  | { type: 'function'; function: FunctionReference };
+  | { type: 'function'; function: FunctionReference; serviceAccount?: string };
 
 export interface FunctionReference {
   ref: string;

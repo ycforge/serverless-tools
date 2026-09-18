@@ -75,6 +75,26 @@ schemes:
     );
     expect(doc.schemes.public).toEqual({ type: 'none' });
   });
+
+  it('accepts an optional serviceAccount on a function scheme (spec 037)', () => {
+    const doc = parseAuthYaml(
+      `
+version: 1
+defaultScheme: internal
+schemes:
+  internal:
+    type: function
+    function: functions.internal_authorizer
+    serviceAccount: ajefi3b58tak71g3ecp1
+`,
+      SOURCE,
+    );
+    expect(doc.schemes.internal).toEqual({
+      type: 'function',
+      function: 'functions.internal_authorizer',
+      serviceAccount: 'ajefi3b58tak71g3ecp1',
+    });
+  });
 });
 
 describe('parseAuthYaml — invalid documents (US1/AC2..7, SC-003)', () => {
@@ -189,6 +209,19 @@ schemes:
     type: function
 `,
       { code: 'AUTH_MISSING_FIELD', schemeName: 'internal', field: 'function' },
+    ],
+    [
+      'function scheme with an empty serviceAccount',
+      `
+version: 1
+defaultScheme: internal
+schemes:
+  internal:
+    type: function
+    function: functions.internal_authorizer
+    serviceAccount: ""
+`,
+      { code: 'AUTH_INVALID_FIELD', schemeName: 'internal', field: 'serviceAccount' },
     ],
   ])(
     'rejects %s fail-fast with the exact code + context',
