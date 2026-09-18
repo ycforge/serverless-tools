@@ -14,6 +14,39 @@ paths:
         type: cloud_functions
         function_id: ${resources.functions.user_service.id}
         service_account_id: ajefi3b58tak71g3ecp1
+  /users/logs:
+    get:
+      summary: Emit NestJS logs at a chosen level (manual probe)
+      parameters:
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [verbose, debug, log, info, warn, error, fatal, all]
+            default: log
+        - name: message
+          in: query
+          schema:
+            type: string
+        # Declared as a string on purpose: Yandex API Gateway materializes an
+        # integer-typed parameter default as a JSON number, which the connector
+        # rejects fail-fast (every parameter value must be a string → 502).
+        # The controller parses and range-checks the value instead.
+        - name: count
+          in: query
+          schema:
+            type: string
+        - name: context
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.user_service.id}
+        service_account_id: ajefi3b58tak71g3ecp1
   /analytics:
     get:
       summary: Analytics health (analytics container API)
