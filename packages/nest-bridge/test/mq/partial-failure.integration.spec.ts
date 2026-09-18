@@ -18,6 +18,8 @@ import type { RawQueueEvent, RawQueueMessageEvent } from "../../src/mq/raw-event
  */
 
 const QUEUE_ID = "yrn:yc:ymq:ru-central1:b1g00000000000000000:f-test";
+const DLQ_URL = "https://message-queue.api.cloud.yandex.net/b1g1/dj6000000000000000000/dlq-queue";
+const DLQ_CREDENTIALS = { accessKeyId: "test-key", secretAccessKey: "test-secret" };
 
 const RUNTIME_CONTEXT = {
   awsRequestId: "trace-id-integration-001",
@@ -88,7 +90,11 @@ describe("partial failure integration", () => {
     partialFailure: { enabled: true },
   };
   const DEGRADE_WITH_DLQ: QueueTransportOptions = {
-    partialFailure: { enabled: true, deadLetterQueueId: "dlq-queue" },
+    partialFailure: {
+      enabled: true,
+      deadLetterQueueId: DLQ_URL,
+      credentials: DLQ_CREDENTIALS,
+    },
   };
 
   function makeDispatchContext(rawEvent: RawQueueEvent) {
@@ -232,10 +238,7 @@ describe("partial failure integration", () => {
   it("US2/AC2: per-message failure records are emitted in degrade+DLQ mode too", async () => {
     // DLQ republishing is mocked; the per-message record must still appear
     // regardless of deadLetterQueueId (T023) and stay free of payload values.
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ access_token: "mock-token", expires_in: 3600 }),
-    });
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
 
     const delivery = makeQueueDelivery("m-ok", "m-fail");
     const batch = normalizeQueueBatch(delivery);
@@ -276,11 +279,8 @@ describe("partial failure integration", () => {
   });
 
   it("US3/AC1: degrade + DLQ does not log data loss warning", async () => {
-    // Mock fetch for DlqSender HTTP calls
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ access_token: "mock-token", expires_in: 3600 }),
-    });
+    // Mock fetch for the SigV4 SendMessage call
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
 
     const delivery = makeQueueDelivery("m-ok", "m-fail");
     const batch = normalizeQueueBatch(delivery);
@@ -314,16 +314,8 @@ describe("partial failure integration", () => {
   });
 
   it("US3/AC2-degrade-DLQ: failed DLQ republish logs warning correlated with awsRequestId/messageId and invocation still resolves", async () => {
-    // IAM metadata call succeeds; every MQ DLQ send fails (HTTP 503).
-    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
-      if (String(url).includes("169.254.169.254")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ access_token: "mock-token", expires_in: 3600 }),
-        });
-      }
-      return Promise.resolve({ ok: false, status: 503 });
-    });
+    // Every SigV4 DLQ SendMessage fails (HTTP 503).
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503 });
 
     const delivery = makeQueueDelivery("m-ok", "m-fail");
     const batch = normalizeQueueBatch(delivery);

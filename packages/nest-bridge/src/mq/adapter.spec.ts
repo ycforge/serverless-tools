@@ -501,15 +501,13 @@ describe("message queue transport — partial failure wiring through the runtime
     // dispatch degrade path through the real runtime (FR-008): every message
     // is attempted despite the poison message, failed ones are republished to
     // the DLQ, and the invocation ack-successfully returns the batch.
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ access_token: "mock-token", expires_in: 3600 }),
-    });
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
 
+    const dlqUrl = "https://message-queue.api.cloud.yandex.net/b1g1/dj6000000000000000000/dlq-queue";
     const runtime = makeDegradeRuntime({
       enabled: true,
-      deadLetterQueueId: "dlq-queue",
+      deadLetterQueueId: dlqUrl,
+      credentials: { accessKeyId: "test-key", secretAccessKey: "test-secret" },
     });
     const delivery = makeQueueDelivery(EVENT_ID, FAILING_MESSAGE_ID, "c31a-e94b5f6d70a25271d3f21e9a04c6g1a");
 
@@ -520,13 +518,15 @@ describe("message queue transport — partial failure wiring through the runtime
     // The batch is acked (invocation returns normally) in degrade mode.
     expect(result.messages).toHaveLength(3);
 
-    // Failed message was republished to the DLQ via Yandex MQ HTTP API.
+    // Failed message was republished to the DLQ via the SigV4-signed YMQ
+    // SendMessage API (no metadata IAM round-trip).
     const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
-    const mqCalls = fetchMock.mock.calls.filter(
-      (call) => !String(call[0]).includes("169.254.169.254"),
-    );
-    expect(mqCalls.length).toBe(1);
-    expect(String(mqCalls[0]![0])).toContain("/queues/dlq-queue/messages");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe("https://message-queue.api.cloud.yandex.net/");
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toMatch(/^AWS4-HMAC-SHA256 /);
+    expect(new URLSearchParams(String(init.body)).get("QueueUrl")).toBe(dlqUrl);
   });
 
   it("default transport keeps fail-fast semantics without opt-in", async () => {

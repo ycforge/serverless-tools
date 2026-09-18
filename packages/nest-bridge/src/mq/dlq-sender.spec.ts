@@ -1,6 +1,10 @@
 import { DlqSender } from "./dlq-sender";
 
-describe("DlqSender", () => {
+const CREDENTIALS = { accessKeyId: "YCACCESSKEY", secretAccessKey: "secret-key-value" };
+const QUEUE_URL =
+  "https://message-queue.api.cloud.yandex.net/b1g1/dj6000000000000000000/my-dlq";
+
+describe("DlqSender (spec 037: SigV4 static credentials)", () => {
   const originalFetch = globalThis.fetch;
 
   afterEach(() => {
@@ -9,177 +13,137 @@ describe("DlqSender", () => {
   });
 
   describe("send", () => {
-    it("sends a POST request with base64-encoded body to the correct URL", async () => {
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ access_token: "test-token", expires_in: 3600 }),
-      });
+    it("POSTs a SigV4-signed SendMessage to the YMQ endpoint", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
       globalThis.fetch = fetchMock;
 
-      const sender = new DlqSender();
-      const result = await sender.send("hello world", "dlq-queue-id");
+      const sender = new DlqSender({ credentials: CREDENTIALS });
+      const result = await sender.send("hello world", QUEUE_URL);
 
       expect(result).toBe(true);
-
-      // First call: IAM token fetch
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      const [iamCall, mqCall] = fetchMock.mock.calls;
-
-      // IAM token call
-      expect(iamCall![0]).toContain("169.254.169.254");
-      expect(iamCall![1].headers).toEqual({ "Metadata-Flavor": "Google" });
-
-      // MQ API call
-      expect(mqCall![0]).toContain("/queues/dlq-queue-id/messages");
-      expect(mqCall![1].method).toBe("POST");
-      const body = JSON.parse(mqCall![1].body as string);
-      expect(body.messageBody).toBe(Buffer.from("hello world").toString("base64"));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0]!;
+      expect(url).toBe("https://message-queue.api.cloud.yandex.net/");
+      expect(init.method).toBe("POST");
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=YCACCESSKEY\//);
+      expect(headers.Authorization).toContain("SignedHeaders=");
+      expect(headers.Authorization).toContain("x-amz-date");
+      expect(headers["content-type"]).toBe("application/x-www-form-urlencoded");
+      const body = new URLSearchParams(init.body as string);
+      expect(body.get("Action")).toBe("SendMessage");
+      expect(body.get("Version")).toBe("2012-11-05");
+      expect(body.get("QueueUrl")).toBe(QUEUE_URL);
+      expect(body.get("MessageBody")).toBe("hello world");
     });
 
-    it("returns false when fetch throws", async () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      globalThis.fetch = vi.fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ access_token: "tok", expires_in: 3600 }),
-        })
-        .mockRejectedValueOnce(new Error("network error"));
-
-      const sender = new DlqSender();
-      const result = await sender.send("body", "queue-id");
-
-      expect(result).toBe(false);
-      // Failures are logged (T004/T015), never thrown (fail-open, FR-011).
-      const warned = warnSpy.mock.calls.map((args) => String(args[0])).join("\n");
-      expect(warned).toContain("DLQ publish failed");
-      expect(warned).toContain("queue-id");
-      warnSpy.mockRestore();
-    });
-
-    it("returns false when response is not ok", async () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      globalThis.fetch = vi.fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ access_token: "tok", expires_in: 3600 }),
-        })
-        .mockResolvedValueOnce({ ok: false, status: 500 });
-
-      const sender = new DlqSender();
-      const result = await sender.send("body", "queue-id");
-
-      expect(result).toBe(false);
-      const warned = warnSpy.mock.calls.map((args) => String(args[0])).join("\n");
-      expect(warned).toContain("HTTP 500");
-      expect(warned).toContain("queue-id");
-      warnSpy.mockRestore();
-    });
-  });
-
-  describe("IAM token caching", () => {
-    it("reuses cached token across calls", async () => {
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ access_token: "test-token", expires_in: 3600 }),
-      });
+    it("resolves credentials from YC_MQ_* environment variables", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
       globalThis.fetch = fetchMock;
+      const previousId = process.env.YC_MQ_KEY_ID;
+      const previousSecret = process.env.YC_MQ_KEY_VALUE;
+      process.env.YC_MQ_KEY_ID = "ENVKEY";
+      process.env.YC_MQ_KEY_VALUE = "envsecret";
+      try {
+        const result = await new DlqSender().send("b", QUEUE_URL);
+        expect(result).toBe(true);
+        const headers = fetchMock.mock.calls[0]![1].headers as Record<string, string>;
+        expect(headers.Authorization).toContain("Credential=ENVKEY/");
+      } finally {
+        if (previousId === undefined) delete process.env.YC_MQ_KEY_ID;
+        else process.env.YC_MQ_KEY_ID = previousId;
+        if (previousSecret === undefined) delete process.env.YC_MQ_KEY_VALUE;
+        else process.env.YC_MQ_KEY_VALUE = previousSecret;
+      }
+    });
 
-      const sender = new DlqSender();
+    it("returns false and warns when no credentials are configured", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const previousId = process.env.YC_MQ_KEY_ID;
+      const previousAwsId = process.env.AWS_ACCESS_KEY_ID;
+      const previousSecret = process.env.YC_MQ_KEY_VALUE;
+      const previousAwsSecret = process.env.AWS_SECRET_ACCESS_KEY;
+      delete process.env.YC_MQ_KEY_ID;
+      delete process.env.AWS_ACCESS_KEY_ID;
+      delete process.env.YC_MQ_KEY_VALUE;
+      delete process.env.AWS_SECRET_ACCESS_KEY;
+      globalThis.fetch = vi.fn();
+      try {
+        const result = await new DlqSender().send("b", QUEUE_URL);
+        expect(result).toBe(false);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+        expect(warnSpy.mock.calls.map((a) => String(a[0])).join("\n")).toContain(
+          "no static credentials configured",
+        );
+      } finally {
+        if (previousId !== undefined) process.env.YC_MQ_KEY_ID = previousId;
+        if (previousAwsId !== undefined) process.env.AWS_ACCESS_KEY_ID = previousAwsId;
+        if (previousSecret !== undefined) process.env.YC_MQ_KEY_VALUE = previousSecret;
+        if (previousAwsSecret !== undefined) process.env.AWS_SECRET_ACCESS_KEY = previousAwsSecret;
+      }
+      warnSpy.mockRestore();
+    });
 
-      // First send fetches token + sends MQ request = 2 calls
-      await sender.send("body1", "queue-id");
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+    it("returns false and warns when deadLetterQueueId is a bare id, not a URL", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      globalThis.fetch = vi.fn();
+      const result = await new DlqSender({ credentials: CREDENTIALS }).send("b", "dj6000000000000000000");
+      expect(result).toBe(false);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(warnSpy.mock.calls.map((a) => String(a[0])).join("\n")).toContain("queue URL");
+      warnSpy.mockRestore();
+    });
 
-      // Second send reuses token (no IAM call) = 1 more call
-      await sender.send("body2", "queue-id");
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+    it("returns false when fetch throws (fail-open)", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("network error"));
+      const result = await new DlqSender({ credentials: CREDENTIALS }).send("body", QUEUE_URL);
+      expect(result).toBe(false);
+      expect(warnSpy.mock.calls.map((a) => String(a[0])).join("\n")).toContain("DLQ publish failed");
+      warnSpy.mockRestore();
+    });
+
+    it("returns false when the response is not ok", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 403 });
+      const result = await new DlqSender({ credentials: CREDENTIALS }).send("body", QUEUE_URL);
+      expect(result).toBe(false);
+      expect(warnSpy.mock.calls.map((a) => String(a[0])).join("\n")).toContain("HTTP 403");
+      warnSpy.mockRestore();
     });
   });
 
   describe("sendBatch", () => {
-    it("sends all failures and returns count of successful sends", async () => {
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ access_token: "batch-token", expires_in: 3600 }),
-      });
-      globalThis.fetch = fetchMock;
-
-      const sender = new DlqSender();
-      const sent = await sender.sendBatch(
+    it("sends all failures and returns the count of successful sends", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      const sent = await new DlqSender({ credentials: CREDENTIALS }).sendBatch(
         [
           { messageId: "m-1", body: "body-1" },
           { messageId: "m-2", body: "body-2" },
         ],
-        "dlq-id",
+        QUEUE_URL,
       );
-
-      // 1 IAM token (first send fetches, second reuses cache) + 2 MQ sends = 3 calls
-      expect(fetchMock).toHaveBeenCalledTimes(3);
       expect(sent).toBe(2);
     });
 
-    it("reports partial success when some sends fail", async () => {
-      let callCount = 0;
-      const fetchMock = vi.fn().mockImplementation(() => {
-        callCount += 1;
-        // IAM token call always succeeds; MQ sends: first ok, second fails
-        if (callCount === 1) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ access_token: "tok", expires_in: 3600 }),
-          });
-        }
-        if (callCount === 2) return Promise.resolve({ ok: true });
-        return Promise.resolve({ ok: false, status: 500 });
-      });
-      globalThis.fetch = fetchMock;
-
-      const sender = new DlqSender();
-      const sent = await sender.sendBatch(
-        [
-          { messageId: "m-1", body: "b1" },
-          { messageId: "m-2", body: "b2" },
-        ],
-        "q",
-      );
-
-      expect(sent).toBe(1);
-    });
-
-    it("logs a per-message warning naming the failed messageId", async () => {
+    it("reports partial success and warns by messageId without leaking bodies", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      let callCount = 0;
-      const fetchMock = vi.fn().mockImplementation(() => {
-        callCount += 1;
-        if (callCount === 1) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ access_token: "tok", expires_in: 3600 }),
-          });
-        }
-        if (callCount === 2) return Promise.resolve({ ok: true });
-        return Promise.resolve({ ok: false, status: 500 });
-      });
-      globalThis.fetch = fetchMock;
-
-      const sender = new DlqSender();
-      const sent = await sender.sendBatch(
+      globalThis.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, status: 200 })
+        .mockResolvedValueOnce({ ok: false, status: 500 });
+      const sent = await new DlqSender({ credentials: CREDENTIALS }).sendBatch(
         [
-          { messageId: "m-ok", body: "b1" },
-          { messageId: "m-lost", body: "b2" },
+          { messageId: "m-ok", body: "secret-body-1" },
+          { messageId: "m-lost", body: "secret-body-2" },
         ],
-        "q",
+        QUEUE_URL,
       );
-
       expect(sent).toBe(1);
-      const warned = warnSpy.mock.calls.map((args) => String(args[0])).join("\n");
+      const warned = warnSpy.mock.calls.map((a) => String(a[0])).join("\n");
       expect(warned).toContain("message m-lost");
-      expect(warned).toContain("queue q");
-      // No payload values leak into the warning (FR-010).
-      expect(warned).not.toContain("b1");
-      expect(warned).not.toContain("b2");
+      expect(warned).not.toContain("secret-body-1");
+      expect(warned).not.toContain("secret-body-2");
       warnSpy.mockRestore();
     });
   });
