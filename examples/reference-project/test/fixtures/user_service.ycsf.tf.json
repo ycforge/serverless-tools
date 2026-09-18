@@ -11,7 +11,7 @@
         "name": "user-service",
         "runtime": "nodejs22",
         "service_account_id": "ajefi3b58tak71g3ecp1",
-        "user_hash": "7bde9ea828e4e5fc72ba5956260131643c0fa6ab8d4c08160aca35c56779c844"
+        "user_hash": "d9f06c34c96ca7a2bda05456f50df71baccd843d55f5f62e86b967571f16a5b9"
       }
     }
   }
