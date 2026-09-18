@@ -1,3 +1,4 @@
+import type { LoggerService } from "@nestjs/common";
 import type { QueueBodyDeserializer } from "../mq/message";
 import type { SigV4Credentials } from "../mq/sigv4";
 import type { ConnectorBootstrapOptions } from "../auth/connector-bootstrap-options";
@@ -62,4 +63,11 @@ export interface QueueTransportOptions {
  */
 export interface CreateYandexHandlerOptions extends ConnectorBootstrapOptions {
   readonly queue?: QueueTransportOptions;
+  /**
+   * Nest application logger (spec 037). `undefined` (default) installs the
+   * connector's structured `YandexLogger` for Nest's own bootstrap/route logs
+   * and application `Logger` calls; `false` disables logging entirely
+   * (boundary records included); any `LoggerService` replaces the default.
+   */
+  readonly logger?: LoggerService | false;
 }
