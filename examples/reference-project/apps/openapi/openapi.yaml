@@ -28,14 +28,15 @@ paths:
           in: query
           schema:
             type: string
-        # Declared as a string on purpose: Yandex API Gateway materializes an
-        # integer-typed parameter default as a JSON number, which the connector
-        # rejects fail-fast (every parameter value must be a string → 502).
-        # The controller parses and range-checks the value instead.
+        # The gateway materializes this default as a JSON number; the connector
+        # accepts typed parameter scalars and normalizes them (spec 038).
         - name: count
           in: query
           schema:
-            type: string
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 1
         - name: context
           in: query
           schema:

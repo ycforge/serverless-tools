@@ -48,13 +48,19 @@ export function validateYcApiGatewayEvent(rawEvent: unknown): YcApiGatewayEvent 
       requireStringListRecord(event, field);
     }
   }
+  // Parameter maps are schema-typed by the gateway (a `type: integer` default
+  // materializes as a JSON number), so they accept JSON scalars — unlike
+  // `headers`/`queryStringParameters`, which are always strings (spec 038).
   for (const field of ["params", "pathParams"] as const) {
     if (event[field] !== undefined) {
-      requireStringRecord(event, field);
+      requireScalarRecord(event, field);
     }
   }
+  // `multiValueParams` mirrors the gateway-evaluated parameter set, so it
+  // carries the same typed scalars in its lists (observed `{count:[1]}`);
+  // `multiValueHeaders`/`multiValueQueryStringParameters` stay string-only.
   if (event.multiValueParams !== undefined) {
-    requireStringListRecord(event, "multiValueParams");
+    requireScalarListRecord(event, "multiValueParams");
   }
   if (event.operationId !== undefined) {
     requireString(event as Record<string, unknown>, "operationId");
@@ -115,6 +121,11 @@ function requireBoolean(source: Record<string, unknown>, field: string): void {
   }
 }
 
+/** JSON scalar accepted in the gateway-evaluated parameter maps (spec 038). */
+function isScalar(value: unknown): value is string | number | boolean {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+
 function requireStringRecord(source: Record<string, unknown>, field: string): void {
   const value = source[field];
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -123,6 +134,25 @@ function requireStringRecord(source: Record<string, unknown>, field: string): vo
   for (const entry of Object.values(value)) {
     if (typeof entry !== "string") {
       throw invalid(`expected every value of field "${field}" to be a string`);
+    }
+  }
+}
+
+/**
+ * Parameter maps accept JSON scalars: the gateway types values by the OpenAPI
+ * schema (spec 038). Structure stays strict — a non-object container, `null`,
+ * arrays and nested objects are rejected so contract drift stays loud.
+ */
+function requireScalarRecord(source: Record<string, unknown>, field: string): void {
+  const value = source[field];
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw invalid(`expected field "${field}" to be an object`);
+  }
+  for (const entry of Object.values(value)) {
+    if (!isScalar(entry)) {
+      throw invalid(
+        `expected every value of field "${field}" to be a string, number or boolean`,
+      );
     }
   }
 }
@@ -136,6 +166,21 @@ function requireStringListRecord(source: Record<string, unknown>, field: string)
   for (const values of Object.values(value)) {
     if (!Array.isArray(values) || values.some((entry) => typeof entry !== "string")) {
       throw invalid(`expected every value of field "${field}" to be a string array`);
+    }
+  }
+}
+
+/** Multi-value view of gateway-typed parameters: scalar arrays (spec 038). */
+function requireScalarListRecord(source: Record<string, unknown>, field: string): void {
+  const value = source[field];
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw invalid(`expected field "${field}" to be an object`);
+  }
+  for (const values of Object.values(value)) {
+    if (!Array.isArray(values) || values.some((entry) => !isScalar(entry))) {
+      throw invalid(
+        `expected every value of field "${field}" to be a string, number or boolean array`,
+      );
     }
   }
 }

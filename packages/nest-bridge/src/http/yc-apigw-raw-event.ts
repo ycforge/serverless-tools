@@ -16,6 +16,7 @@
  * Index signatures keep additive future fields accessible instead of
  * discarding them (AGENTS.md section 36).
  */
+import type { GatewayScalar } from "./raw-event";
 
 /** Gateway-injected request metadata block of the observed v1 event. */
 export interface YcApiGatewayRequestContext {
@@ -61,9 +62,20 @@ export interface YcApiGatewayEvent {
 
   multiValueHeaders?: Record<string, string[]>;
   multiValueQueryStringParameters?: Record<string, string[]>;
-  params?: Record<string, string>;
-  multiValueParams?: Record<string, string[]>;
-  pathParams?: Record<string, string>;
+  /**
+   * Gateway-evaluated parameter set. Observed empty `{}` when the operation
+   * declares no parameters, but populated with schema-typed values (e.g. a
+   * `type: integer` default as a JSON number) once parameters are declared
+   * (spec 037/038).
+   */
+  params?: Record<string, GatewayScalar>;
+  /**
+   * Multi-value view of the evaluated parameter set; values are scalars
+   * because a typed default appears inside the list (observed `{count:[1]}`),
+   * unlike the strictly-string `multiValueQueryStringParameters`.
+   */
+  multiValueParams?: Record<string, GatewayScalar[]>;
+  pathParams?: Record<string, GatewayScalar>;
   operationId?: string;
 
   [key: string]: unknown;

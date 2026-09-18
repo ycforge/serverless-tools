@@ -101,4 +101,10 @@ Specs создаются **перед реализацией соответст�
 
 | # | Spec | Scope (IDEA.md) | Статус | Зависимости |
 |---|------|-----------------|--------|-------------|
-| 037 | cloud-e2e — воспроизводимый облачной e2e: отдельный standalone тест-проект в `e2e/` реально разворачивается в YC (functions/container/bucket/gateway/MQ), живые HTTP/MQ/S3/KMS-проверки, moved/cache/overrides/resources/env, teardown; e2e в CI не подключается | §30, §41 | 🚧 | 024, 025–028, 036 |
+| 037 | cloud-e2e — воспроизводимый облачной e2e: отдельный standalone тест-проект в `e2e/` реально разворачивается в YC (functions/container/bucket/gateway/MQ), живые HTTP/MQ/S3/KMS-проверки, moved/cache/overrides/resources/env, teardown; e2e в CI не подключается | §30, §41 | ✅ | 024, 025–028, 036 |
+
+## Волна 8 — connector transport follow-ups (найдено e2e 037)
+
+| # | Spec | Scope (IDEA.md) | Статус | Зависимости |
+|---|------|-----------------|--------|-------------|
+| 038 | apigw-scalar-params — API Gateway материализует OpenAPI-дефолт типизированного параметра (`type: integer` → JSON-число) в v1-карту `params`; валидатор A требует только строки → 502 на вызове без параметра. Приём `string\|number\|boolean` в картах параметров + единственная точка нормализации скаляров в строки на границе транспорта; fail-fast к структурным аномалиям сохранён; шлюзовые дефолты в app-запрос не мёржатся | §2 | 🚧 | 036 |

@@ -1,4 +1,4 @@
-import type { RawHttpApiGatewayV2Event } from "./raw-event";
+import type { GatewayScalar, RawHttpApiGatewayV2Event } from "./raw-event";
 import type { YcApiGatewayEvent } from "./yc-apigw-raw-event";
 
 /**
@@ -105,7 +105,7 @@ function hasEntries(record: Record<string, unknown> | undefined): boolean {
  * Query multiplicity wins over the observed-always-empty `multiValueParams`
  * when the gateway populated `multiValueQueryStringParameters`.
  */
-function pickMultiValueParameters(event: YcApiGatewayEvent): Record<string, string[]> {
+function pickMultiValueParameters(event: YcApiGatewayEvent): Record<string, GatewayScalar[]> {
   if (hasEntries(event.multiValueQueryStringParameters)) {
     return event.multiValueQueryStringParameters!;
   }
