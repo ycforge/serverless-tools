@@ -5,7 +5,7 @@ import {
   type AuthConfigErrorCode,
 } from './auth-errors.js';
 
-const CODE_COUNT = 17;
+const CODE_COUNT = 18;
 
 const MESSAGE_CASES: Array<[AuthConfigErrorCode, Record<string, string>, string[]]> = [
   ['AUTH_FILE_MISSING', { path: '/app/auth.yaml' }, ['/app/auth.yaml']],
@@ -20,6 +20,7 @@ const MESSAGE_CASES: Array<[AuthConfigErrorCode, Record<string, string>, string[
   ['AUTH_SCHEMES_NOT_MAP', { field: 'schemes' }, ['schemes']],
   ['AUTH_UNKNOWN_SCHEME_TYPE', { schemeName: 'user', type: 'oauth2' }, ['user', 'oauth2']],
   ['AUTH_MISSING_FIELD', { schemeName: 'user', field: 'audience' }, ['user', 'audience']],
+  ['AUTH_INVALID_FIELD', { schemeName: 'internal', field: 'serviceAccount' }, ['internal', 'serviceAccount']],
   ['AUTH_FUNCTION_INVALID_REF', { ref: 'internal_authorizer' }, ['internal_authorizer']],
   ['AUTH_FUNCTION_UNRESOLVED', { ref: 'functions.nope' }, ['functions.nope']],
   ['AUTH_FUNCTION_SET_REQUIRED', { schemeName: 'internal' }, ['internal']],
@@ -36,7 +37,7 @@ describe('AuthConfigError', () => {
     expect(err.code).toBe('AUTH_VERSION_UNSUPPORTED');
   });
 
-  it('exposes the full 17-code taxonomy from the contract table', () => {
+  it('exposes the full 18-code taxonomy from the contract table', () => {
     expect(AUTH_CONFIG_ERROR_CODES).toHaveLength(CODE_COUNT);
     expect(new Set(AUTH_CONFIG_ERROR_CODES)).toHaveLength(CODE_COUNT);
     for (const code of AUTH_CONFIG_ERROR_CODES) {
