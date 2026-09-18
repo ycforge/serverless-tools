@@ -16,10 +16,10 @@
 
 ## Поведение транспорта
 
-- [x] CHK004 Скаляры (`string|number|boolean`) принимаются в картах параметров (v1 `params`/`pathParams`, v2 `parameters`/`pathParameters`) (FR-001)
+- [x] CHK004 Скаляры (`string|number|boolean`) и их списки принимаются в оценочных картах параметров (v1 `params`/`pathParams`/`multiValueParams`, v2 `parameters`/`pathParameters`/`multiValueParameters`) (FR-001)
 - [x] CHK005 Структурные аномалии (`null`/объект/массив/`NaN`/неверный контейнер) по-прежнему отвергаются value-free `INVALID_INVOCATION_EVENT` (FR-002)
 - [x] CHK006 Нормализация скаляров в строки — в единственной точке канонизации `normalizeHttpRequest`, для обоих входов; transformation, not mutation, `raw` сохраняет типы (FR-003/FR-004)
-- [x] CHK007 `headers`/`queryStringParameters`/`multiValue*` сохраняют строгость; послабление ограничено картами скалярных параметров (FR-005)
+- [x] CHK007 Клиентские представления `headers`/`queryStringParameters`/`multiValueHeaders`/`multiValueQueryStringParameters` сохраняют строгость; послабление ограничено оценочными картами параметров (FR-005)
 - [x] CHK008 Шлюзовые `parameters` (дефолты) не мёржатся в запрос приложения; канон query — клиентские значения (FR-006)
 
 ## Переиспользование и стабильность

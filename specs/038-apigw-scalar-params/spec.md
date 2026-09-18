@@ -26,7 +26,14 @@ expected every value of field "params" to be a string
 
 Обратная сторона: ломается именно **дефолт**, то есть самый обычный вызов без параметра; явная передача `count=1` работает. Это протечка: штатная OpenAPI-фича (`integer` + `default`) становится несовместимой с рантаймом, хотя число порождает сам шлюз.
 
-> Эвиденс-база: (1) облачный прогон 037 с приведённой таблицей и error-текстом; (2) спецификация параметров в `apps/openapi/openapi.yaml`; (3) реальные v1-захваты спеки 036 (`packages/nest-bridge/fixtures/http-apigw/`), где карты `params`/`pathParams` при отсутствии объявленных параметров пусты (`{}`) и типы не проявляются. Точный санитизированный дамп события с типизированным дефолтом реконструируется в рамках этого спека (FR-008) — по образцу 036.
+> Эвиденс-база: (1) облачный прогон 037 с приведённой таблицей и error-текстом; (2) **прямой захват** реального v1-события через временный echo-хендлер + отдельный API Gateway с `type: integer, default: 1` / `type: boolean, default: false` (spec 038): запрос без параметров дал
+>
+> ```json
+> { "params": { "count": 1 }, "multiValueParams": { "count": [1] },
+>   "queryStringParameters": {}, "multiValueQueryStringParameters": {} }
+> ```
+>
+> а с клиентским `flag=true` — `"params": { "count": 1, "flag": "true" }` и `"multiValueParams": { "count": [1], "flag": ["true"] }`. Ключевой факт: типизированный дефолт материализуется в **обеих** оценочных картах (`params` — скаляр, `multiValueParams` — список скаляров), тогда как клиентские представления `queryStringParameters`/`multiValueQueryStringParameters` остаются строго строковыми. Именно `multiValueParams: {count:[1]}` добивал вызов после первого фикса `params`. (3) Реальные v1-захваты 036: при отсутствии объявленных параметров карты пусты (`{}`). Санитизированная реконструкция — `fixtures/http-apigw/typed-query-params.json` (FR-008).
 
 ## Clarifications
 
@@ -52,8 +59,8 @@ expected every value of field "params" to be a string
 
 **Acceptance Scenarios**:
 
-1. **Given** событие v1, где `params` содержит `count: 1` (число) и `flag: true` (булево), **When** обработано, **Then** transport claimed `"http"`, вызов успешен, ошибки `INVALID_INVOCATION_EVENT` нет.
-2. **Given** нормализованный запрос из AS1, **When** приложение читает query, **Then** значения `count`/`flag` представлены строками (`"1"`/`"true"`), а клиентские параметры из `queryStringParameters` — verbatim.
+1. **Given** событие v1, где `params` содержит `count: 1` (число) и `flag: true` (булево), а `multiValueParams` — `count: [1]` / `flag: [true]`, **When** обработано, **Then** transport claimed `"http"`, вызов успешен, ошибки `INVALID_INVOCATION_EVENT` нет.
+2. **Given** нормализованный запрос из AS1, **When** приложение читает query, **Then** `pathParameters`/`multiValueParameters` представлены строками (`"1"`/`["1"]`, `"true"`/`["true"]`), а клиентские параметры из `queryStringParameters` — verbatim.
 3. **Given** развёрнутый reference-проект с обратно возвращённым `type: integer, default: 1`, **When** `GET /users/logs` без параметров через шлюз, **Then** `200` (реальный e2e).
 
 ---
@@ -94,7 +101,9 @@ expected every value of field "params" to be a string
 - Отсутствие карт (`params`/`pathParams`/`parameters`/`pathParameters`) — как и раньше, нормализуется в `{}`.
 - Пустые карты `{}` — допустимы, дают `{}`.
 - `null`/объект/массив как значение скалярной карты — ошибка (US2).
-- `multiValueParams`/`multiValueParameters` — списки строк, скаляры не допускаются.
+- Типизированный дефолт в мульти-представлении: `multiValueParams: { count: [1] }` (список скаляров) — принимается и нормализуется в `["1"]` (эвиденс захвата).
+- `multiValueParams` со вложенным объектом/`null` в списке — ошибка (US2).
+- `multiValueQueryStringParameters`/`multiValueHeaders` — всегда списки строк (клиентское представление), послабление не распространяется.
 - `queryStringParameters`/`headers` — всегда строки, послабление не распространяется.
 - Значение из шлюзовых `params` (дефолт) в app-запрос НЕ попадает; приложение видит только клиентские параметры.
 
@@ -102,11 +111,11 @@ expected every value of field "params" to be a string
 
 ### Functional Requirements
 
-- **FR-001**: THE HTTP TRANSPORT ВАЛИДАТОР SHALL принимать карты параметров как `Record<string, string | number | boolean>`: v1 `params`/`pathParams` (`validate-yc-apigw-event.ts`) и v2 `parameters`/`pathParameters` (`validate-raw-event.ts`); строка, число и булево — валидные значения (эвиденс 037: число из integer-дефолта).
+- **FR-001**: THE HTTP TRANSPORT ВАЛИДАТОР SHALL принимать оценочные карты параметров как `Record<string, string | number | boolean>` и их мульти-представления как `Record<string, (string | number | boolean)[]>`: v1 `params`/`pathParams`/`multiValueParams` (`validate-yc-apigw-event.ts`) и v2 `parameters`/`pathParameters`/`multiValueParameters` (`validate-raw-event.ts`); эвиденс захвата 038: `params:{count:1}` и `multiValueParams:{count:[1]}`.
 - **FR-002**: THE ВАЛИДАТОР SHALL по-прежнему отвергать не-скаляры (`null`, объект, массив), не-объектный контейнер, а также `NaN`/`Infinity`, возвращая `INVALID_INVOCATION_EVENT(transportId:"http")` с value-free диагностикой (имена полей/типы, без значений) — fail-fast не ослаблен.
-- **FR-003**: THE НОРМАЛИЗАТОР SHALL приводить значения карт параметров к строкам в **единственной точке канонизации** (`normalizeHttpRequest`) для обоих входов (v1 → канонический v2 через адаптер; v2 напрямую): `string` verbatim, `number`/`boolean` — через их проводное строковое представление (`String(v)`).
-- **FR-004**: THE НОРМАЛИЗАТОР SHALL формировать строковые карты (`Record<string,string>`) для `parameters`/`pathParameters` (и для `pathParameters`, потребляемого path-matching/`request.params`), как transformation, not mutation: исходное событие с типизированными значениями SHALL оставаться доступным без изменений.
-- **FR-005**: THE ТРАНСПОРТ SHALL сохранять строгость для `headers`, `queryStringParameters` (`Record<string,string>`) и `multiValueParameters`/`multiValueParams`/`multiValueQueryStringParameters` (`Record<string,string[]>`); послабление FR-001 ограничено картами скалярных параметров.
+- **FR-003**: THE НОРМАЛИЗАТОР SHALL приводить к строкам **выносимые в запрос** карты `pathParameters` (скаляры) и `multiValueParameters` (списки скаляров) в **единственной точке канонизации** (`normalizeHttpRequest`) для обоих входов (v1 → канонический v2 через адаптер; v2 напрямую): `string` verbatim, `number`/`boolean` — через их проводное строковое представление (`String(v)`). Шлюзовая оценочная карта `parameters` (клиентские значения + дефолты) в `NormalizedHttpRequest` не выносится вовсе и остаётся доступной только через `raw` (FR-006).
+- **FR-004**: THE НОРМАЛИЗАТОР SHALL формировать строковые карты (`Record<string,string>` / `Record<string,string[]>`) для `pathParameters`, потребляемого path-matching/`request.params`, и `multiValueParameters`, как transformation, not mutation: исходное событие с типизированными значениями SHALL оставаться доступным без изменений.
+- **FR-005**: THE ТРАНСПОРТ SHALL сохранять строгость для клиентских представлений `headers`/`queryStringParameters` (`Record<string,string>`) и `multiValueHeaders`/`multiValueQueryStringParameters` (`Record<string,string[]>`); послабление FR-001 ограничено оценочными картами параметров (`params`/`pathParams`/`multiValueParams` и их v2-эквиваленты).
 - **FR-006**: THE КОННЕКТОР SHALL NOT мёржить шлюзовые `parameters` (вычисленные шлюзом значения, включая дефолты) в запрос приложения: канон query — `queryStringParameters`/`rawQueryString`; отсутствующий параметр остаётся отсутствующим для приложения.
 - **FR-007**: THE DISCRIMINATOR/registry SHALL оставаться без изменений: `[http, mq]`, ветки v2/v1/MQ попарно непересекающиеся; нормализация не влияет на выбор транспорта.
 - **FR-008**: THE ПАКЕТ SHALL фиксировать эвиденс: reconstructed-fixture v1-события с типизированными значениями в `packages/nest-bridge/fixtures/http-apigw/` (provenance: «real API Gateway (cloud_functions) capture, spec 037/038», значения санитизированы, структура сохранена); conformance-тест проигрывает её через публичное API (fixture → RED → GREEN).
@@ -117,8 +126,8 @@ expected every value of field "params" to be a string
 ### Key Entities
 
 - **YcApiGatewayEvent** (v1 raw): карты `params`/`pathParams` расширяются до `Record<string, string | number | boolean>`.
-- **RawHttpApiGatewayV2Event** (canonical internal): `parameters`/`pathParameters` расширяются до `Record<string, string | number | boolean>`.
-- **NormalizedHttpRequest**: `parameters`/`pathParameters` — строго `Readonly<Record<string,string>>` (как результат нормализации); `raw` сохраняет типизированное событие.
+- **RawHttpApiGatewayV2Event** (canonical internal): `parameters`/`pathParameters` расширяются до `Record<string, string | number | boolean>`, `multiValueParameters` — до `Record<string, (string | number | boolean)[]>`.
+- **NormalizedHttpRequest**: `pathParameters` — строго `Readonly<Record<string,string>>`, `multiValueParameters` — `Readonly<Record<string, readonly string[]>>` (результат нормализации); `parameters` в нормализованный запрос не выносится (raw-only); `raw` сохраняет типизированное событие.
 - **GatewayScalar** (новый тип): `string | number | boolean` — допустимое значение карты параметров на входе транспорта.
 
 ## Success Criteria *(mandatory)*
@@ -126,7 +135,7 @@ expected every value of field "params" to be a string
 ### Measurable Outcomes
 
 - **SC-001**: `GET /users/logs` без параметров через реальный шлюз отвечает `200` после редеплоя функции (US1/AS3); ранее — 502.
-- **SC-002**: Табличный unit-тест карт параметров: скаляры (`string|number|boolean`) приняты и нормализованы в строки; `null`/объект/массив/`NaN`/неверный контейнер отвергнуты (US1/AS1–2, US2).
+- **SC-002**: Табличный unit-тест карт параметров: скаляры (`string|number|boolean`) и их списки приняты и нормализованы в строки; `null`/объект/массив/вложенный объект/неверный контейнер отвергнуты (US1/AS1–2, US2).
 - **SC-003**: Conformance-fixture с типизированными значениями закоммичена с provenance и зелёная через публичное API коннектора (FR-008).
 - **SC-004**: `pnpm --filter @ycforge/nestjs-connector test` зелёный; отсутствие регрессий по другим пакетам (`pnpm build`/`pnpm test` без новых падений).
 - **SC-005**: Шлюзовые дефолты не появляются в запросе приложения: тест подтверждает, что вызов без параметра не добавляет значение в query приложения (FR-006).
