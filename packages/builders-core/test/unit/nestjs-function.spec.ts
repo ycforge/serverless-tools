@@ -58,6 +58,24 @@ describe('nestjs-function builder (US1, US5, SC-001/003/006)', () => {
     expect(existsSync(value.archivePath)).toBe(true);
   });
 
+  it('non-main entry: entryPoint names the emitted module file (spec 037 regression)', async () => {
+    const dir = makeTempDir('bc-nestjs-index-');
+    dirs.push(dir);
+    writeProject(dir.root, {
+      'package.json': JSON.stringify({ name: 'authorizer', version: '0.0.0' }, null, 2),
+      'src/index.ts': 'export function handler(): { ok: boolean } { return { ok: true }; }\n',
+    });
+    const outputDir = join(dir.root, 'build-out');
+    const artifact = (await nestjsFunctionBuilder.build(
+      ctx(dir.root, {
+        buildConfig: { entry: 'src/index.ts', runtime: 'nodejs20', external: [] },
+        outputDir,
+      }),
+    )).value as FunctionArtifactValue;
+    expect(artifact.entryPoint).toBe('index.handler');
+    expect(unzipList(artifact.archivePath)).toEqual(['index.js']);
+  });
+
   it('SC-003 determinism: two identical builds produce byte-identical zips (same outputDir)', async () => {
     const fixture = nestjsFixture();
     dirs.push(fixture);

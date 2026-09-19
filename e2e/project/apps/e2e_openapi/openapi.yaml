@@ -1,0 +1,150 @@
+openapi: 3.0.0
+info:
+  title: e2e gateway source
+  version: 0.0.0
+  description: Composed entry point over the cloud e2e functions/container/buckets.
+paths:
+  /api/users:
+    get:
+      summary: List users
+      operationId: listUsers
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/kms:
+    get:
+      summary: KMS encrypt/decrypt roundtrip
+      operationId: kmsRoundtrip
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/auth/jwt:
+    get:
+      summary: JWT protected
+      operationId: authJwt
+      security:
+        - user: []
+      responses:
+        "200":
+          description: ok
+        "401":
+          description: unauthorized
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/auth/function:
+    get:
+      summary: Function-authorizer protected
+      operationId: authFunction
+      security:
+        - internal: []
+      responses:
+        "200":
+          description: ok
+        "401":
+          description: unauthorized
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/public:
+    get:
+      summary: Public route
+      operationId: publicRoute
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/logs:
+    get:
+      summary: Emits a NestJS log at every level
+      operationId: logsProbe
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/logged:
+    get:
+      summary: Emits a structured log line
+      operationId: loggedProbe
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/guarded:
+    get:
+      summary: In-app guard probe
+      operationId: guardedProbe
+      responses:
+        "200":
+          description: ok
+        "403":
+          description: forbidden
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/legacy:
+    get:
+      summary: Removed by the local override
+      operationId: legacyRoute
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${resources.functions.e2e_api.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /api/analytics:
+    get:
+      summary: Analytics container health
+      operationId: analyticsHealth
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: serverless_containers
+        container_id: ${resources.containers.e2e_container.id}
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /web:
+    get:
+      summary: Managed frontend bucket
+      operationId: webStatic
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: ${resources.buckets.e2e_web.name}
+        object: index.html
+        service_account_id: "__SERVICE_ACCOUNT_ID__"
+  /static:
+    get:
+      summary: External bucket resolved via ENV-only
+      operationId: staticAssets
+      responses:
+        "200":
+          description: ok
+      x-yc-apigateway-integration:
+        type: object_storage
+        bucket: ${resources.buckets.static_assets.name}
+        object: hello.txt
+        service_account_id: "__SERVICE_ACCOUNT_ID__"

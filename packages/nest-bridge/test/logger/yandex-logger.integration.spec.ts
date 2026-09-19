@@ -93,7 +93,9 @@ describe("YandexLogger integration (spec 004, FR-012..015)", () => {
       );
 
       const records = parseAppRecords(captured);
-      const info = records.find((line) => line.parsed["level"] === "info");
+      const info = records.find(
+        (line) => line.parsed["level"] === "INFO" && line.parsed["message"] === "probe pinged",
+      );
       expect(info).toBeDefined();
       expect(info!.parsed["message"]).toBe("probe pinged");
       expect(info!.parsed["trace_id"]).toBe("f18fed85-7096-4f0e-a6db-e2c5e37e925f");

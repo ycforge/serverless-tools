@@ -1,4 +1,6 @@
+import type { LoggerService } from "@nestjs/common";
 import type { QueueBodyDeserializer } from "../mq/message";
+import type { SigV4Credentials } from "../mq/sigv4";
 import type { ConnectorBootstrapOptions } from "../auth/connector-bootstrap-options";
 
 /**
@@ -17,9 +19,15 @@ import type { ConnectorBootstrapOptions } from "../auth/connector-bootstrap-opti
 export interface PartialFailureOptions {
   /** Enable degrade mode: ack batch, push failures to DLQ. Default: false (fail-fast). */
   readonly enabled: boolean;
-  /** Queue ID for dead letter republishing. Required when enabled = true.
-   *  Without it, failed messages are lost (logged as warning). */
+  /** DLQ SQS queue URL for dead letter republishing (e.g. the value of
+   *  `yandex_message_queue.<name>.id` in Terraform). Required when
+   *  enabled = true. Without it, failed messages are lost (logged as warning). */
   readonly deadLetterQueueId?: string;
+  /** Static SQS credentials for DLQ republishing. When absent, resolved from
+   *  `YC_MQ_KEY_ID`/`YC_MQ_KEY_VALUE` (or
+   *  `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`). YMQ does not accept IAM
+   *  bearer tokens, so a static key is mandatory to publish. */
+  readonly credentials?: SigV4Credentials;
 }
 
 /**
@@ -55,4 +63,11 @@ export interface QueueTransportOptions {
  */
 export interface CreateYandexHandlerOptions extends ConnectorBootstrapOptions {
   readonly queue?: QueueTransportOptions;
+  /**
+   * Nest application logger (spec 037). `undefined` (default) installs the
+   * connector's structured `YandexLogger` for Nest's own bootstrap/route logs
+   * and application `Logger` calls; `false` disables logging entirely
+   * (boundary records included); any `LoggerService` replaces the default.
+   */
+  readonly logger?: LoggerService | false;
 }

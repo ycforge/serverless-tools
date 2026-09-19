@@ -26,8 +26,9 @@ export function validateHttpApiGatewayV2Event(rawEvent: unknown): RawHttpApiGate
   validateRequestContext(event.requestContext);
   requireString(event, "body");
   requireBoolean(event, "isBase64Encoded");
-  requireStringRecord(event, "pathParameters");
-  requireStringRecord(event, "parameters");
+  // Parameter maps are schema-typed by the gateway (spec 038): scalars only.
+  requireScalarRecord(event, "pathParameters");
+  requireScalarRecord(event, "parameters");
   requireMultiValueParameters(event.multiValueParameters);
   requireString(event, "operationId");
 
@@ -106,16 +107,45 @@ function requireStringRecord(source: Record<string, unknown>, field: string): vo
 }
 
 /**
- * `multiValueParameters` keeps repeated values as lists (observed); anything
- * but a record of string arrays breaks that representation.
+ * Parameter maps accept JSON scalars because the gateway materializes typed
+ * OpenAPI defaults (integer → number, boolean → boolean) in its own type
+ * (spec 038). The container must still be a plain object and every value a
+ * scalar; nested objects, arrays and `null` remain structural errors.
+ */
+function requireScalarRecord(source: Record<string, unknown>, field: string): void {
+  const value = source[field];
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw invalid(`expected field "${field}" to be an object`);
+  }
+  for (const entry of Object.values(value)) {
+    if (!isScalar(entry)) {
+      throw invalid(
+        `expected every value of field "${field}" to be a string, number or boolean`,
+      );
+    }
+  }
+}
+
+/** JSON scalar accepted in the gateway-evaluated parameter maps (spec 038). */
+function isScalar(value: unknown): value is string | number | boolean {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+
+/**
+ * `multiValueParameters` keeps repeated values as lists (observed); the
+ * gateway-evaluated parameter view can carry typed scalars inside the lists
+ * (`{ count: [1] }`, spec 038), while the strictly-string query/header
+ * multi-value views do not.
  */
 function requireMultiValueParameters(value: unknown): void {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw invalid('expected field "multiValueParameters" to be an object');
   }
   for (const values of Object.values(value)) {
-    if (!Array.isArray(values) || values.some((entry) => typeof entry !== "string")) {
-      throw invalid('expected every value of field "multiValueParameters" to be a string array');
+    if (!Array.isArray(values) || values.some((entry) => !isScalar(entry))) {
+      throw invalid(
+        'expected every value of field "multiValueParameters" to be a string, number or boolean array',
+      );
     }
   }
 }

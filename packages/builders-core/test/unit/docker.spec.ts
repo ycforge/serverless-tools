@@ -620,7 +620,9 @@ describe.skipIf(!probeDockerDaemon())('docker daemon no-push smoke (spec 027, ga
       }
       throw err;
     }
-  });
+    // A real image build (base-image pull + build) legitimately exceeds the
+    // 5s Vitest default on CI runners; the gate only decides whether it runs.
+  }, 180_000);
 });
 
 describe('docker dev-modes (spec 028): registry-ref', () => {

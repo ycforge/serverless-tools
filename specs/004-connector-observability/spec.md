@@ -165,3 +165,31 @@ Error response:
 | 1 | §2, gap №11 (001) | Какое значение является `trace_id`: переиспользовать `awsRequestId` напрямую (самый дешёвый, cross-transport id уже есть — 97/97), независимое поле `trace_id` с правилом приоритет—`uberTraceId` trace-segment → fallback `awsRequestId` (более «настоящий» W3C-стиль трейс-пропагации), либо только `uberTraceId` без fallback | **РЕШЕНО 2026-09-04**: вариант A — `trace_id` дублирует `awsRequestId` (FR-001) |
 | 2 | §2, gap №12 (001) | Какие HTTP error-ответы несут `trace_id`: только last-resort конверт 500 (минимальный wire change), или также mapped 404 not-found и все 4xx/5xx из exception filters (полная корреляция для клиентов, но меняет контракт фильтров и требует аккуратного дополнения тела) | **РЕШЕНО 2026-09-04**: вариант B — все error-ответы (FR-016, FR-017) |
 | 3 | §2, gap №10 (001) | Поверхность logging: boundary-события только (start/finish/error) как минимальный v1, или также публичный логер-провайдер приложению (инъекция в Nest DI, уровни debug..error, политика структурности) как заявка на «unified logger» из IDEA §2 | **РЕШЕНО 2026-09-04**: вариант B — boundary-события + публичный провайдер (FR-005..011, FR-012..015) |
+## Extension (spec 037) — structured level for Cloud Logging
+
+Реальный облачной прогон (spec 037) показал, что записи логгера уходили в Cloud
+Logging без распознанного уровня: `YandexLogger` эмитил нижнерегистровые
+`level: "info"|"debug"|"warn"|"error"`, а `ConsoleLogger` NestJS печатал
+ANSI-текст, который Cloud Logging трактует как plain text (уровень
+`TRACE`/`UNSPECIFIED`).
+
+Изменения (обратно совместимые по смыслу, но меняющие формат записи):
+
+- `YandexLogger` реализует Nest `LoggerService` (`log/error/warn/debug/verbose/fatal`)
+  и эмитит **верхнерегистровые** уровни Yandex Cloud Logging:
+  `TRACE` (verbose), `DEBUG`, `INFO` (log/info), `WARN`, `ERROR`, `FATAL`.
+  Вместе с полем `message` это делает запись **structured log** для Cloud Logging
+  (см. docs: structured logs требуют `message`/`msg` и `level`).
+- `createYandexHandler` ставит `YandexLogger` логгером Nest-приложения **по умолчанию**
+  (`bufferLogs: true` + `app.useLogger(...)` до `init()`), поэтому стартовые логи
+  Nest и `new Logger()` в приложении тоже становятся структурированными.
+- Новая опция `createYandexHandler({ logger })`: `undefined` — дефолтный
+  structured-логгер; `false` — логирование полностью отключено (включая
+  boundary-записи); свой `LoggerService` — используется он.
+- Boundary-записи (`start`/`finish`/`error`) получили поля `level`
+  (`INFO`/`ERROR`) и `message` (безопасный connector-owned литерал), чтобы и они
+  распознавались Cloud Logging как structured.
+
+FR-012..FR-015 расширяются: уровни — в терминах Cloud Logging, провайдер также
+является `LoggerService` и дефолтным логгером приложения. Остальные гарантии
+(trace_id-инъекция, redaction, fail-open) — без изменений.

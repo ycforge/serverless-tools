@@ -50,6 +50,65 @@
           "service_account_id": "ajefi3b58tak71g3ecp1"
         }
       }
+    },
+    "/users/logs": {
+      "get": {
+        "summary": "Emit NestJS logs at a chosen level (manual probe)",
+        "parameters": [
+          {
+            "name": "level",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "verbose",
+                "debug",
+                "log",
+                "info",
+                "warn",
+                "error",
+                "fatal",
+                "all"
+              ],
+              "default": "log"
+            }
+          },
+          {
+            "name": "message",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 1
+            }
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        },
+        "x-yc-apigateway-integration": {
+          "type": "cloud_functions",
+          "function_id": "${yandex_function_user_service_id}",
+          "service_account_id": "ajefi3b58tak71g3ecp1"
+        }
+      }
     }
   },
   "components": {

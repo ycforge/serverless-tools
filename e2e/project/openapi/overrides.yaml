@@ -1,0 +1,19 @@
+version: 1
+rules:
+  - op: replace
+    target: { kind: info }
+    value:
+      title: Cloud E2E Gateway
+      version: 1.0.0
+  - op: add
+    target: { kind: path, path: /_health }
+    value:
+      get:
+        operationId: health
+        responses:
+          "200":
+            description: ok
+        x-yc-apigateway-integration:
+          type: cloud_functions
+          function_id: ${resources.functions.e2e_api.id}
+          service_account_id: "__SERVICE_ACCOUNT_ID__"

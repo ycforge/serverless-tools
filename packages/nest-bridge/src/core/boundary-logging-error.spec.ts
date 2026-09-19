@@ -163,7 +163,8 @@ describe("boundary logging — error paths (spec 004, FR-007/008)", () => {
       // Error class only — never the message text or a stack trace (FR-007).
       expect(errorRecord["errorClass"]).toBe("Error");
       expect(errorRecord["code"]).toBeUndefined();
-      expect(errorRecord["message"]).toBeUndefined();
+      // A safe connector-owned literal only — never the application error text.
+      expect(errorRecord["message"]).toBe("invocation error");
       expect(errorRecord["trace_id"]).toBe("app-fail-1");
       expect(JSON.stringify(errorRecord)).not.toContain("handler-boom");
     } finally {

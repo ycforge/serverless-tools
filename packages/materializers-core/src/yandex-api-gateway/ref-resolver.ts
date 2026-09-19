@@ -25,6 +25,22 @@ function globVarName(ref: ResourceReference, name: string, property: string): st
   return `${ref.terraformType}_${name}_${property}`;
 }
 
+/**
+ * Logical property → real Terraform attribute, where they differ.
+ *
+ * `resources.yaml` / `${resources...}` use the logical property vocabulary
+ * (`buckets.*` exposes `name`), but `yandex_storage_bucket` names that
+ * attribute `bucket` (there is no `name` argument). Emitting the logical name
+ * verbatim produced an "Unsupported attribute" at `terraform validate`.
+ */
+const TERRAFORM_ATTRIBUTE_BY_PROPERTY: Readonly<Record<string, string>> = Object.freeze({
+  'yandex_storage_bucket.name': 'bucket',
+});
+
+function terraformAttribute(terraformType: string, property: string): string {
+  return TERRAFORM_ATTRIBUTE_BY_PROPERTY[`${terraformType}.${property}`] ?? property;
+}
+
 export function buildGatewayTemplate(
   spec: string,
   references: readonly ResourceReference[],
@@ -38,7 +54,7 @@ export function buildGatewayTemplate(
     const search = `\${resources.${domain}.${name}.${property}}`;
     if (content.includes(search)) {
       const varName = globVarName(ref, name, property);
-      const address = `${ref.terraformType}.${name}.${property}`;
+      const address = `${ref.terraformType}.${name}.${terraformAttribute(ref.terraformType, property)}`;
       content = content.replaceAll(search, `\${${varName}}`);
       variableMap[varName] = address;
     }

@@ -91,7 +91,7 @@ describe('quickstart scenarios (T080–T089)', () => {
     ]);
   });
 
-  it('T082 Sc3 multi-hop chain + incomplete history: deterministic, chronological compression', () => {
+  it('T082 Sc3 multi-hop chain + incomplete history: deterministic, per-hop chronological emission', () => {
     const current = [endpoint('functions.accounts', 'yandex_function.accounts')];
     const chain = movesFrom([
       entry(
@@ -117,8 +117,11 @@ describe('quickstart scenarios (T080–T089)', () => {
       ),
     );
     expect(a).toEqual(b);
+    // Per-hop blocks (Terraform resolves the chain transitively). Emitting every
+    // hop straight to the terminal address produced duplicate `to` targets and
+    // Terraform rejected the config with "Ambiguous move statements" (spec 037).
     expect(a).toEqual([
-      { kind: 'moved', from: 'yandex_function.users', to: 'yandex_function.accounts' },
+      { kind: 'moved', from: 'yandex_function.users', to: 'yandex_function.user_service' },
       { kind: 'moved', from: 'yandex_function.user_service', to: 'yandex_function.accounts' },
     ]);
     expect(incomplete).toEqual([

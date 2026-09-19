@@ -1,6 +1,6 @@
 import type { AuthScheme, FunctionReference } from './types.js';
 import type { AuthYamlDocument } from './types.js';
-import type { ParsedAuthYamlDocument } from './auth-yaml.js';
+import type { ParsedAuthYamlDocument, ParsedFunctionScheme } from './auth-yaml.js';
 import { AuthConfigError } from './auth-errors.js';
 
 const FUNCTION_REF_PATTERN = /^functions\.([a-z][a-z0-9_]*)$/;
@@ -30,7 +30,7 @@ export function validateFunctionReferences(
   functions?: readonly string[],
 ): AuthYamlDocument {
   const functionSchemes = Object.entries(authYaml.schemes).filter(
-    (entry): entry is [string, { type: 'function'; function: string }] => entry[1].type === 'function',
+    (entry): entry is [string, ParsedFunctionScheme] => entry[1].type === 'function',
   );
   if (functionSchemes.length === 0) {
     return authYaml as AuthYamlDocument;
@@ -56,7 +56,11 @@ export function validateFunctionReferences(
     if (scheme.type === 'function') {
       const parsed = parsedByScheme[schemeName];
       if (parsed !== undefined) {
-        schemes[schemeName] = { type: 'function', function: parsed };
+        schemes[schemeName] = {
+          type: 'function',
+          function: parsed,
+          ...(scheme.serviceAccount !== undefined ? { serviceAccount: scheme.serviceAccount } : {}),
+        };
       }
     } else {
       schemes[schemeName] = scheme;

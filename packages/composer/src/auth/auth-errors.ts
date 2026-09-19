@@ -11,6 +11,7 @@ export const AUTH_CONFIG_ERROR_CODES = [
   'AUTH_SCHEMES_NOT_MAP',
   'AUTH_UNKNOWN_SCHEME_TYPE',
   'AUTH_MISSING_FIELD',
+  'AUTH_INVALID_FIELD',
   'AUTH_FUNCTION_INVALID_REF',
   'AUTH_FUNCTION_UNRESOLVED',
   'AUTH_FUNCTION_SET_REQUIRED',
@@ -50,6 +51,10 @@ const AUTH_ERROR_MESSAGE_BY_CODE: Record<AuthConfigErrorCode, (c: AuthConfigErro
   },
   AUTH_MISSING_FIELD: (c) =>
     `auth config scheme ${c.schemeName ?? '<unknown>'} is missing required field: ${
+      c.field ?? '<unknown>'
+    }`,
+  AUTH_INVALID_FIELD: (c) =>
+    `auth config scheme ${c.schemeName ?? '<unknown>'} has invalid field: ${
       c.field ?? '<unknown>'
     }`,
   AUTH_FUNCTION_INVALID_REF: (c) =>

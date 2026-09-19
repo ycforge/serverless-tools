@@ -132,6 +132,34 @@ describe('applyAuth — securitySchemes emission (US4/AC3/AC4, FR-012/013)', () 
     expect(JSON.stringify(schemes)).not.toMatch(/\$\$\{/);
   });
 
+  it('emits service_account_id when the function scheme declares serviceAccount (spec 037)', () => {
+    const doc = baseDoc({});
+    applyAuth(
+      doc,
+      {
+        version: 1,
+        defaultScheme: 'internal',
+        schemes: {
+          internal: {
+            type: 'function',
+            function: { ref: 'functions.internal_authorizer', name: 'internal_authorizer' },
+            serviceAccount: 'ajefi3b58tak71g3ecp1',
+          },
+        },
+      },
+      RESOURCE_INDEX,
+    );
+    expect(securitySchemes(doc)['internal']).toEqual({
+      type: 'http',
+      scheme: 'bearer',
+      'x-yc-apigateway-authorizer': {
+        type: 'function',
+        function_id: '${resources.functions.internal_authorizer.id}',
+        service_account_id: 'ajefi3b58tak71g3ecp1',
+      },
+    });
+  });
+
   it('function authorizer for a function NOT declared in the index → RESOURCE_REF_NOT_DECLARED (US3/AC2, FR-008)', () => {
     const doc = baseDoc({});
     try {

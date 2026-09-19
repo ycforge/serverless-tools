@@ -11,14 +11,23 @@
  * absent — logging never throws (FR-013, US4/AC2). User `context` objects pass
  * through the secret redactor so token-like keys never reach the log
  * (FR-014).
+ *
+ * The class also implements the Nest `LoggerService` interface and is
+ * installed as the application logger by default (spec 037): Nest's own
+ * bootstrap/route logs and application `new Logger()` calls then become the
+ * same structured JSON instead of ANSI-coloured `ConsoleLogger` text.
+ *
+ * Levels are emitted as the uppercase values Yandex Cloud Logging recognizes
+ * (`TRACE/DEBUG/INFO/WARN/ERROR/FATAL`) together with the `message` field, so
+ * Cloud Logging assigns the correct severity instead of `TRACE`/UNSPECIFIED.
  */
-import { Injectable, Optional } from "@nestjs/common";
+import { Injectable, Optional, type LoggerService } from "@nestjs/common";
 import { resolveInvocationExecutionContext } from "../context/invocation-scope";
 import { redactForLogging } from "./redact";
 import { createLogWriter, type LogSink } from "./writer";
 
-/** Supported provider levels, low to high. */
-export type YandexLogLevel = "debug" | "info" | "warn" | "error";
+/** Supported levels, low to high, using the Yandex Cloud Logging vocabulary. */
+export type YandexLogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR" | "FATAL";
 
 /** Field order for deterministic provider record serialization. */
 const PROVIDER_FIELD_ORDER = [
@@ -44,6 +53,36 @@ export interface YandexLogRecord {
 }
 
 /**
+ * Normalizes Nest `LoggerService` variadic params into a single context value:
+ * no params → `undefined`; one param (the common `logger.log(msg, 'Context')`
+ * shape) → that value; several → the array.
+ */
+function nestContext(optionalParams: readonly unknown[]): unknown {
+  if (optionalParams.length === 0) {
+    return undefined;
+  }
+  if (optionalParams.length === 1) {
+    return optionalParams[0];
+  }
+  return optionalParams;
+}
+
+function formatMessage(message: unknown): string {
+  if (typeof message === "string") {
+    return message;
+  }
+  if (message instanceof Error) {
+    return `${message.name}: ${message.message}`;
+  }
+  try {
+    const redacted = redactForLogging(message);
+    return JSON.stringify(redacted) ?? String(message);
+  } catch {
+    return String(message);
+  }
+}
+
+/**
  * The connector's public logger provider.
  *
  * The sink is resolved internally (default `process.stdout`); the public
@@ -51,7 +90,7 @@ export interface YandexLogRecord {
  * configuration in v1 (contract §4 Assumptions).
  */
 @Injectable()
-export class YandexLogger {
+export class YandexLogger implements LoggerService {
   private readonly writer: LogSink;
 
   constructor(@Optional() writer?: LogSink) {
@@ -62,23 +101,42 @@ export class YandexLogger {
     this.writer = writer ?? createLogWriter();
   }
 
-  debug(message: string, context?: unknown): void {
-    this.write("debug", message, context);
+  /** Nest `LoggerService.log` — informational. */
+  log(message: unknown, ...optionalParams: unknown[]): void {
+    this.write("INFO", message, nestContext(optionalParams));
   }
 
-  info(message: string, context?: unknown): void {
-    this.write("info", message, context);
+  /** Backward-compatible alias of {@link log}. */
+  info(message: unknown, context?: unknown): void {
+    this.write("INFO", message, context);
   }
 
-  warn(message: string, context?: unknown): void {
-    this.write("warn", message, context);
+  /** Nest `LoggerService.error` — error. */
+  error(message: unknown, ...optionalParams: unknown[]): void {
+    this.write("ERROR", message, nestContext(optionalParams));
   }
 
-  error(message: string, context?: unknown): void {
-    this.write("error", message, context);
+  /** Nest `LoggerService.warn` — warning. */
+  warn(message: unknown, ...optionalParams: unknown[]): void {
+    this.write("WARN", message, nestContext(optionalParams));
   }
 
-  private write(level: YandexLogLevel, message: string, context?: unknown): void {
+  /** Nest `LoggerService.debug` — debug. */
+  debug(message: unknown, ...optionalParams: unknown[]): void {
+    this.write("DEBUG", message, nestContext(optionalParams));
+  }
+
+  /** Nest `LoggerService.verbose` — maps to `TRACE` (there is no VERBOSE level). */
+  verbose(message: unknown, ...optionalParams: unknown[]): void {
+    this.write("TRACE", message, nestContext(optionalParams));
+  }
+
+  /** Nest `LoggerService.fatal` — fatal. */
+  fatal(message: unknown, ...optionalParams: unknown[]): void {
+    this.write("FATAL", message, nestContext(optionalParams));
+  }
+
+  private write(level: YandexLogLevel, message: unknown, context: unknown): void {
     this.writer.write(this.serialize(level, message, context));
   }
 
@@ -86,12 +144,12 @@ export class YandexLogger {
    * Builds the record line. Scope resolution is fail-open: outside an
    * invocation the correlation fields are omitted and never throw (FR-013).
    */
-  private serialize(level: YandexLogLevel, message: string, context?: unknown): string {
+  private serialize(level: YandexLogLevel, message: unknown, context: unknown): string {
     const record: YandexLogRecord & {
       trace_id?: string;
       awsRequestId?: string;
       context?: unknown;
-    } = { level, message };
+    } = { level, message: formatMessage(message) };
     try {
       const invocation = resolveInvocationExecutionContext();
       record.trace_id = invocation.trace_id;
@@ -100,9 +158,10 @@ export class YandexLogger {
       // No live invocation scope: proceed without correlation fields.
     }
     if (context !== undefined) {
-      const redacted = redactForLogging(context);
-      if (redacted !== undefined) {
-        record.context = redacted;
+      try {
+        record.context = redactForLogging(context);
+      } catch {
+        // Never let redaction break logging (fail-open).
       }
     }
     const serialized: Record<string, unknown> = {};

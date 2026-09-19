@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import functionMaterializer from '../../src/yandex-function/index.js';
 import gatewayMaterializer from '../../src/yandex-api-gateway/index.js';
 import containerMaterializer from '../../src/yandex-serverless-container/index.js';
+import queueMaterializer from '../../src/yandex-message-queue/index.js';
 import { createOutputBuilder } from '../../src/helpers/output-builder.js';
 import type { OutputBuilderWithCollection } from '../../src/helpers/output-builder.js';
 import type { MaterializationContext, TerraformResource } from '../../src/types.js';
@@ -55,7 +56,7 @@ describe('terraform validate on materialized configs (spec 028, T022)', () => {
     return { output: createOutputBuilder(), projectRoot };
   }
 
-  it('0 "Missing required argument" for yandex_function name/memory, yandex_api_gateway name and yandex_serverless_container name/memory/image',
+  it('0 "Missing required argument" for yandex_function name/memory, yandex_api_gateway name, yandex_serverless_container name/memory/image and yandex_message_queue name',
     { timeout: 180000 },
     async () => {
     try {
@@ -92,6 +93,11 @@ describe('terraform validate on materialized configs (spec 028, T022)', () => {
       { type: 'ycforge:docker-image', name: 'analytics', value: { image: 'cr.yandex/app@sha256:abc123def456' } } as never,
       ctCtx,
     )) as TerraformResource;
+    const qCtx = context(root);
+    const qResource = (await queueMaterializer.materialize(
+      { type: 'ycforge:queue', name: 'events', value: { queueUrl: 'https://message-queue.api.cloud.yandex.net/b1g1/dj600000010upn2504mi/events' } } as never,
+      qCtx,
+    )) as TerraformResource;
 
     // Structural form (unit effect — RED until materializers emit required attrs).
     const fnConfig = fnResource.configuration as { name: string; memory: number };
@@ -103,6 +109,9 @@ describe('terraform validate on materialized configs (spec 028, T022)', () => {
     expect(ctConfig.name).toBe('analytics');
     expect(ctConfig.memory).toBe(128);
     expect(ctConfig.image).toEqual([{ url: 'cr.yandex/app@sha256:abc123def456' }]);
+    const qConfig = qResource.configuration as { name: string; region_id: string };
+    expect(qConfig.name).toBe('events');
+    expect(qConfig.region_id).toBe('ru-central1');
 
     // Golden terraform project: required_providers + three resources as emitted.
     const infra = join(root, 'infra');
@@ -128,6 +137,10 @@ describe('terraform validate on materialized configs (spec 028, T022)', () => {
     writeFileSync(
       join(infra, 'container.tf.json'),
       JSON.stringify({ resource: { yandex_serverless_container: { analytics: ctResource.configuration } } }),
+    );
+    writeFileSync(
+      join(infra, 'queue.tf.json'),
+      JSON.stringify({ resource: { yandex_message_queue: { events: qResource.configuration } } }),
     );
 
     // Probe: init (needs network for the provider plugin); on failure keep the

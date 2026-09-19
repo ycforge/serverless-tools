@@ -21,7 +21,7 @@ describe('yandex-message-queue materializer (US3, T080)', () => {
     expect(materializer.supports({ type: 'ycforge:function', value: {} } as never, ctx)).toBe(false);
   });
 
-  it('generates yandex_message_queue with queue_name + region (FR-019)', async () => {
+  it('generates yandex_message_queue with name + region_id (FR-019)', async () => {
     const ctx = createContext();
     const result = (await materializer.materialize(
       { type: 'ycforge:queue', name: 'notifications', value: { queueUrl: validUrl } } as never,
@@ -30,28 +30,37 @@ describe('yandex-message-queue materializer (US3, T080)', () => {
     expect(result.kind).toBe('resource');
     expect(result.type).toBe('yandex_message_queue');
     expect(result.name).toBe('notifications');
-    expect(result.configuration).toEqual({ queue_name: 'my-queue', region: 'ru-central1' });
+    expect(result.configuration).toEqual({ name: 'my-queue', region_id: 'ru-central1' });
   });
 
-  it('queue_name is last segment after /queues/ (DQ-9)', async () => {
-    const ctx = createContext();
-    const result = (await materializer.materialize(
-      { type: 'ycforge:queue', name: 'q', value: { queueUrl: 'https://message-queue.api.cloud.yandex.net/b1g1/queues/my-queue' } } as never,
-      ctx,
-    )) as TerraformResource;
-    expect((result.configuration as { queue_name: string }).queue_name).toBe('my-queue');
-  });
-
-  it('region defaults to ru-central1 (DQ-9)', async () => {
+  it('name is the last segment of the real YMQ URL (DQ-9)', async () => {
     const ctx = createContext();
     const result = (await materializer.materialize(
       { type: 'ycforge:queue', name: 'q', value: { queueUrl: validUrl } } as never,
       ctx,
     )) as TerraformResource;
-    expect((result.configuration as { region: string }).region).toBe('ru-central1');
+    expect((result.configuration as { name: string }).name).toBe('my-queue');
   });
 
-  it('throws YMT_INVALID_QUEUE_URL for URL without /queues/ (FR-020)', async () => {
+  it('accepts legacy /queues/ URLs (backward compatibility)', async () => {
+    const ctx = createContext();
+    const result = (await materializer.materialize(
+      { type: 'ycforge:queue', name: 'q', value: { queueUrl: 'https://message-queue.api.cloud.yandex.net/b1g1/queues/my-queue' } } as never,
+      ctx,
+    )) as TerraformResource;
+    expect((result.configuration as { name: string }).name).toBe('my-queue');
+  });
+
+  it('region_id defaults to ru-central1 (DQ-9)', async () => {
+    const ctx = createContext();
+    const result = (await materializer.materialize(
+      { type: 'ycforge:queue', name: 'q', value: { queueUrl: validUrl } } as never,
+      ctx,
+    )) as TerraformResource;
+    expect((result.configuration as { region_id: string }).region_id).toBe('ru-central1');
+  });
+
+  it('throws YMT_INVALID_QUEUE_URL for URL without a queue segment (FR-020)', async () => {
     const ctx = createContext();
     await expect(
       materializer.materialize(

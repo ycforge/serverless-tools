@@ -27,10 +27,14 @@ export function buildMoves(
   for (const chain of chains) {
     const target = chain.current;
     if (target === undefined) continue;
+    // Emit one `moved` block per address hop in chronological order
+    // (A -> B, B -> C). Emitting every hop straight to the terminal address
+    // produced duplicate "to" targets and Terraform rejected the config with
+    // "Ambiguous move statements"; Terraform resolves the chain transitively.
     let prevIdt = chain.start.idt;
     for (const entry of chain.entries) {
       if (entry.to.idt === prevIdt) continue;
-      moved.push({ kind: 'moved', from: prevIdt, to: target.idt });
+      moved.push({ kind: 'moved', from: prevIdt, to: entry.to.idt });
       prevIdt = entry.to.idt;
     }
   }

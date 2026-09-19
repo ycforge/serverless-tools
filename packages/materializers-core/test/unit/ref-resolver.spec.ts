@@ -33,13 +33,13 @@ describe('ref-resolver (D-RE-4)', () => {
     });
   });
 
-  it('replaces non-id properties via the full canonical template (buckets .name)', () => {
+  it('replaces non-id properties via the full canonical template (buckets .name -> .bucket)', () => {
     const spec = 'bucket: ${resources.buckets.frontend.name}';
     const refs = [{ logical: 'buckets.frontend', terraformType: 'yandex_storage_bucket', property: 'name' }];
     const { content, variableMap } = buildGatewayTemplate(spec, refs);
     expect(content).toBe('bucket: ${yandex_storage_bucket_frontend_name}');
     expect(variableMap).toEqual({
-      yandex_storage_bucket_frontend_name: 'yandex_storage_bucket.frontend.name',
+      yandex_storage_bucket_frontend_name: 'yandex_storage_bucket.frontend.bucket',
     });
   });
 
@@ -63,7 +63,7 @@ describe('ref-resolver (D-RE-4)', () => {
     );
     expect(variableMap).toEqual({
       yandex_serverless_container_analytics_id: 'yandex_serverless_container.analytics.id',
-      yandex_storage_bucket_frontend_name: 'yandex_storage_bucket.frontend.name',
+      yandex_storage_bucket_frontend_name: 'yandex_storage_bucket.frontend.bucket',
     });
   });
 

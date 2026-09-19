@@ -167,4 +167,29 @@ describe("boundary logging — success path (spec 004, FR-005/006/011)", () => {
       stdout.mockRestore();
     }
   });
+
+  it("logger:false disables boundary records and Nest logging (spec 037)", async () => {
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const runtime = createInvocationRuntime(
+      SuccessModule,
+      [makeSuccessfulTransport("http", "api-gateway-v2", { statusCode: 200 })],
+      {},
+      { logger: false },
+    );
+    runtimes.push(runtime);
+    try {
+      const result = await runtime({ kind: "api-gateway-v2" }, { ...RUNTIME_CONTEXT, awsRequestId: "silent-1" });
+      expect(result).toEqual({ statusCode: 200 });
+
+      // No structured boundary records at all.
+      expect(parseLines(stdout.mock.calls)).toEqual([]);
+      // And no raw Nest bootstrap lines either.
+      const rawStrings = stdout.mock.calls
+        .map(([arg]) => arg)
+        .filter((arg): arg is string => typeof arg === "string");
+      expect(rawStrings.filter((line) => line.includes("[Nest]"))).toEqual([]);
+    } finally {
+      stdout.mockRestore();
+    }
+  });
 });

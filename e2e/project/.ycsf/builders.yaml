@@ -1,0 +1,11 @@
+version: 1
+builders:
+  ycforge:function: "@ycforge/builders-core/nestjs-function"
+  ycforge:docker-image: "@ycforge/builders-core/docker"
+  ycforge:frontend: "@ycforge/builders-core/vite"
+  ycforge:api-gateway: "../../../composer/dist/builder/index.js"
+materializers:
+  yandex-function: "@ycforge/materializers-core/yandex-function"
+  yandex-serverless-container: "@ycforge/materializers-core/yandex-serverless-container"
+  yandex-storage-bucket: "@ycforge/materializers-core/yandex-storage-bucket"
+  yandex-api-gateway: "@ycforge/materializers-core/yandex-api-gateway"

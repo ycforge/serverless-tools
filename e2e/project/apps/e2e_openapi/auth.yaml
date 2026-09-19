@@ -1,0 +1,13 @@
+version: 1
+defaultScheme: public
+schemes:
+  public:
+    type: none
+  user:
+    type: jwt
+    issuer: https://e2e-jwt.invalid
+    audience: e2e-api
+    jwksUri: https://e2e-jwt.invalid/.well-known/jwks.json
+  internal:
+    type: function
+    function: functions.e2e_authorizer

@@ -220,6 +220,27 @@ Discriminators (**observed**):
   `details.message.message_id`, ...). Validation must be cheap top-level
   structure checks — no heavyweight schema library (AGENTS.md §9).
 
+**Typed parameter values** (spec 038): Yandex API Gateway evaluates the
+OpenAPI operation schema and materializes a declared parameter's `default` in
+its JSON type — a `type: integer` default arrives as a JSON **number**,
+`type: boolean` as a boolean — and it appears in **both** the single- and
+multi-value evaluated views (captured: `params:{count:1}` and
+`multiValueParams:{count:[1]}`), while client-supplied values always arrive as
+strings. The gateway-evaluated parameter maps (`params`/`pathParams`/
+`multiValueParams` for v1, `parameters`/`pathParameters`/`multiValueParameters`
+for v2) therefore accept JSON scalars and scalar lists
+(`string | number | boolean`, `(string | number | boolean)[]`); the container
+must still be a plain object and nested objects, arrays and `null` remain
+structural errors. The client views — `headers`, `queryStringParameters`,
+`multiValueHeaders`, `multiValueQueryStringParameters` — stay strictly
+string-valued. Canonicalization stringifies the consumed maps
+(`pathParameters`, `multiValueParameters`) into the HTTP string domain
+(`1` → `"1"`, `true` → `"true"`); the gateway-evaluated `parameters` map
+(client values plus schema defaults) is preserved verbatim in
+`NormalizedHttpRequest.raw` and is **never merged** into the application query,
+whose canonical source is the client's `queryStringParameters`/`rawQueryString`.
+The raw event keeps the original typed values (transformation, not mutation).
+
 Adding a future transport means writing a new internal adapter module,
 extending the `TransportId` union in one place, and registering it in
 `src/core/transports.ts`'s ordered adapter list. The application layer does

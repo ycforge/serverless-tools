@@ -402,6 +402,7 @@ describe("core invocation runtime lifecycle", () => {
         close: stubClose,
         get: () => ({ canActivate: () => true }),
         useGlobalGuards: () => stubApplication,
+        useLogger: () => stubApplication,
         resolve: () => Promise.reject(new Error("stub application resolves nothing")),
       } as unknown as INestApplication;
 

@@ -73,6 +73,17 @@ export async function bundleFunction(options: BundleFunctionOptions): Promise<Fu
     );
   }
 
+  // The runtime entrypoint must name the file actually shipped in the archive:
+  // esbuild emits `<module>.js` and the handler export lives there, so a
+  // non-`main` entry (`src/index.ts`) previously announced `index.handler`
+  // while the archive only contained `main.js` → 502 at runtime.
+  const moduleName = basename(entry, extname(entry));
+  if (moduleName === '') {
+    throw builderError(BLC_ENTRY_NOT_FOUND, `entry has no module name: ${entry} (${BLC_ENTRY_NOT_FOUND})`, {
+      field: 'entry',
+    });
+  }
+
   const target = runtime === 'nodejs22' ? 'node22' : 'node20';
   const staging = join(outputDir, '.staging');
 
@@ -87,7 +98,7 @@ export async function bundleFunction(options: BundleFunctionOptions): Promise<Fu
         target,
         external: [...external],
         plugins: [stubPlugin],
-        outfile: join(staging, 'main.js'),
+        outfile: join(staging, `${moduleName}.js`),
         write: true,
         logLevel: 'silent',
         sourcemap: false,

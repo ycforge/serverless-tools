@@ -111,6 +111,7 @@ export async function buildApps(
   // 3. Prepare build env
   const envDiagnostics: Diagnostic[] = [];
   const resolvedEnvs = new Map<string, Record<string, string>>();
+  const resolvedConfigs = new Map<string, Record<string, unknown>>();
   for (const [appId, buildConfig] of projectModel.build_configs) {
     if (!appsToBuild.has(appId)) continue;
     const result = prepareBuildEnv(appId, buildConfig, undefined, appsToBuild.get(appId)!.source_path);
@@ -118,6 +119,7 @@ export async function buildApps(
       envDiagnostics.push(...result.errors);
     } else {
       resolvedEnvs.set(appId, result.resolvedEnv);
+      resolvedConfigs.set(appId, result.buildConfig as Record<string, unknown>);
     }
   }
   if (envDiagnostics.length > 0) {
@@ -196,7 +198,7 @@ export async function buildApps(
         filesHash = hashString('');
       }
     }
-    const buildConfig = projectModel.build_configs.get(appId)?.build_config ?? {};
+    const buildConfig = resolvedConfigs.get(appId) ?? projectModel.build_configs.get(appId)?.build_config ?? {};
     const buildConfigHash = hashString(canonicalJson(buildConfig));
     const buildEnv = resolvedEnvs.get(appId) ?? {};
     const sortedEnv: Record<string, string> = {};
@@ -326,7 +328,7 @@ export async function buildApps(
       const context = {
         projectRoot: rootDir,
         sourcePath: app.source_path,
-        buildConfig: projectModel.build_configs.get(appId)?.build_config ?? {},
+        buildConfig: resolvedConfigs.get(appId) ?? projectModel.build_configs.get(appId)?.build_config ?? {},
         buildEnv: resolvedEnv,
         outputDir,
         ...(appIdentities.length > 0 ? { appIdentities } : {}),

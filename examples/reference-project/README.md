@@ -77,6 +77,41 @@ gitignore-нут) и `YC_FOLDER_ID`. Smoke после apply:
 `https://<gateway-domain>/users`, `/analytics`, `/analytics/kms` (domain —
 `yc serverless api-gateway get <id>`).
 
+### Ручная проверка логов: `/users/logs`
+
+`user_service` отдаёт диагностический роут `GET /users/logs`, который пишет
+структурированные логи Nest через коннектор с выбранным уровнем (spec 037), —
+удобно проверять severity в Cloud Logging руками:
+
+| Параметр  | Значения                                                                     | По умолчанию       |
+|-----------|------------------------------------------------------------------------------|--------------------|
+| `level`   | `verbose`, `debug`, `log`, `info`, `warn`, `error`, `fatal`, `all`           | `log`              |
+| `message` | произвольный текст                                                            | `manual log probe` |
+| `count`   | целое 1..100                                                                  | `1`                |
+| `context` | строка (поле `context` записи)                                                | `users-manual-probe` |
+
+```bash
+DOMAIN=$(yc serverless api-gateway get <gateway-id> --format json | python3 -c 'import sys,json;print(json.load(sys.stdin)["domain"])')
+
+# один уровень, с явным маркером и контекстом
+curl -s "https://$DOMAIN/users/logs?level=warn&message=probe&count=2&context=manual"
+# все шесть уровней одним вызовом (verbose→TRACE … fatal→FATAL)
+curl -s "https://$DOMAIN/users/logs?level=all&message=probe"
+
+# записи функции за последние 15 минут (там видно колонку уровня)
+yc serverless function logs <function-id> --since 15m | grep probe
+```
+
+Ожидаемая колонка уровня в Cloud Logging: `TRACE/DEBUG/INFO/WARN/ERROR/FATAL`
+(Nest `verbose/log/info/error` маппятся в `TRACE/INFO/INFO/ERROR`). Каждая запись
+несёт `trace_id`/`awsRequestId` текущего вызова, поэтому запрос легко
+скоррелировать с ответом (ошибки возвращают `trace_id` в теле). `count`
+объявлен как `type: integer, default: 1`: шлюз материализует дефолт числом, а
+коннектор (spec 038) принимает типизированные значения параметров и нормализует
+их в строки, поэтому вызов без параметра тоже отвечает `200`. Само значение
+дефолта в запрос приложения не подмешивается — контроллер применяет свою
+логику по умолчанию.
+
 ## Конфигурация
 
 `.ycsf/*` — версия 1, дерево:
