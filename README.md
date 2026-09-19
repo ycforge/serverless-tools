@@ -2,11 +2,10 @@
 
 # serverless-tools
 
-**Пишите обычный NestJS — разворачивайте в Yandex Cloud Serverless.**
+**Пишите обычное приложение — разворачивайте в Yandex Cloud Serverless.**
 
-Runtime-адаптер, композиция API Gateway и оркестратор сборки/деплоя, которые не
-превращают NestJS в отдельный framework и не заставляют вручную описывать
-инфраструктуру.
+Runtime-адаптер для NestJS, композиция API Gateway и оркестратор сборки и
+деплоя.
 
 [**Русский**](README.md) · [English](README.en.md)
 
@@ -23,15 +22,14 @@ Runtime-адаптер, композиция API Gateway и оркестрато
 
 ## Что это
 
-`serverless-tools` — экосистема для запуска обычных приложений (в первую очередь
-NestJS) в Yandex Cloud Serverless. Ваше приложение остаётся обычным NestJS со
-всеми привычными механизмами — DI, guards, pipes, interceptors, exception
-filters, middleware. Инфраструктура описывается декларативно в `.ycsf/*.yaml` и
+`serverless-tools` — инструменты для запуска обычных приложений в Yandex Cloud
+Serverless. Ваше приложение продолжает работать как обычно. Например, в NestJS
+остаются на месте DI, guards, pipes, interceptors, exception filters и
+middleware. Инфраструктура описывается декларативно в `.ycsf/*.yaml` и
 генерируется в Terraform.
 
-Четыре ответственности строго разделены:
-
-> **A — runtime, B — API composition, C — orchestration/build, Terraform — provisioning/deployment.**
+Слои не смешиваются: выполнение кода, композиция API, оркестрация сборки и
+провижининг ресурсов отвечают каждый за своё.
 
 ## Возможности
 
@@ -52,7 +50,7 @@ filters, middleware. Инфраструктура описывается дек�
 
 ## Архитектура
 
-**Runtime (Project A):** запрос проходит через API Gateway и Cloud Function в
+**Runtime.** Запрос проходит через API Gateway и Cloud Function в
 runtime-адаптер, а приложение остаётся NestJS.
 
 ```mermaid
@@ -60,38 +58,38 @@ flowchart LR
   Client([Клиент]) -->|HTTPS| APIGW[Yandex API Gateway]
   APIGW --> Fn[Yandex Cloud Function]
   MQ[(Yandex Message Queue)] -->|Триггер| Fn
-  Fn --> A["A · @ycforge/nestjs-connector"]
-  A --> App[NestJS-приложение]
+  Fn --> Connector["@ycforge/nestjs-connector"]
+  Connector --> App[NestJS-приложение]
 ```
 
-**Build & deploy (Project B + C):** composer собирает API-спецификацию, pilot
-оркестрирует builders и materializers и передаёт результат Terraform.
+**Сборка и деплой.** Composer собирает API-спецификацию, pilot оркестрирует
+builders и materializers и передаёт результат Terraform.
 
 ```mermaid
 flowchart LR
-  Src([Исходники]) --> B["B · @ycforge/composer"]
-  Src --> C["C · @ycforge/pilot — CLI ycsf"]
-  B --> C
-  C --> Builders[builders-core]
-  C --> Materializers[materializers-core]
+  Src([Исходники]) --> Composer["@ycforge/composer"]
+  Src --> Pilot["@ycforge/pilot — CLI ycsf"]
+  Composer --> Pilot
+  Pilot --> Builders[builders-core]
+  Pilot --> Materializers[materializers-core]
   Materializers --> TF[Terraform]
   TF --> Cloud([Yandex Cloud])
 ```
 
-| Проект | Роль | Что делает |
-|--------|------|------------|
-| **A** | Runtime | Выполняет NestJS внутри Cloud Function, адаптирует HTTP/MQ-инвокации |
-| **B** | API composition | Собирает OpenAPI и API Gateway-спецификацию из нескольких приложений |
-| **C** | Orchestration / build | Запускает сборку, собирает артефакты, генерирует Terraform |
-| **Terraform** | Provisioning / deployment | Создаёт и изменяет ресурсы в Yandex Cloud |
+| Слой | Что делает |
+|------|------------|
+| Runtime | Выполняет приложение внутри Cloud Function, адаптирует HTTP/MQ-инвокации |
+| Композиция API | Собирает OpenAPI и API Gateway-спецификацию из нескольких приложений |
+| Оркестрация сборки | Запускает сборку, собирает артефакты, генерирует Terraform |
+| Terraform | Создаёт и изменяет ресурсы в Yandex Cloud |
 
 ## Пакеты
 
 | Пакет | Роль | Назначение |
 |-------|------|------------|
-| [`@ycforge/nestjs-connector`](https://www.npmjs.com/package/@ycforge/nestjs-connector) | A · runtime | Runtime/transport-адаптер NestJS ↔ Yandex Cloud Functions (HTTP + Message Queue) |
-| [`@ycforge/composer`](https://www.npmjs.com/package/@ycforge/composer) | B · composition | Извлечение OpenAPI и сборка единой API Gateway-спецификации; CLI `ycsf-api` |
-| [`@ycforge/pilot`](https://www.npmjs.com/package/@ycforge/pilot) | C · orchestrator | Оркестратор сборки и деплоя; CLI `ycsf`; контракты плагинов `@ycforge/pilot/contracts` |
+| [`@ycforge/nestjs-connector`](https://www.npmjs.com/package/@ycforge/nestjs-connector) | Runtime | Runtime/transport-адаптер NestJS ↔ Yandex Cloud Functions (HTTP + Message Queue) |
+| [`@ycforge/composer`](https://www.npmjs.com/package/@ycforge/composer) | Композиция API | Извлечение OpenAPI и сборка единой API Gateway-спецификации; CLI `ycsf-api` |
+| [`@ycforge/pilot`](https://www.npmjs.com/package/@ycforge/pilot) | Оркестрация сборки и деплоя | Оркестратор сборки и деплоя; CLI `ycsf`; контракты плагинов `@ycforge/pilot/contracts` |
 | [`@ycforge/builders-core`](https://www.npmjs.com/package/@ycforge/builders-core) | Плагины сборки | Builders: `nestjs-function`, `docker`, `vite` |
 | [`@ycforge/materializers-core`](https://www.npmjs.com/package/@ycforge/materializers-core) | Плагины Terraform | Materializers: `yandex-function`, `yandex-serverless-container`, `yandex-api-gateway`, `yandex-message-queue`, `yandex-storage-bucket` |
 | [`@ycforge/serverless-dev-tools`](https://www.npmjs.com/package/@ycforge/serverless-dev-tools) | Локальная разработка | Dev-server с эмуляцией API Gateway v2 |
@@ -241,7 +239,7 @@ npx ycsf destroy      # удаление инфраструктуры
 
 Полный end-to-end пример — [`examples/reference-project`](examples/reference-project):
 четыре приложения (`user_service`, `analytics`, `frontend`, `openapi`),
-проходящие путь от исходников NestJS до валидированного `terraform plan`.
+проходящие путь от исходников до валидированного `terraform plan`.
 
 ```bash
 pnpm install

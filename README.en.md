@@ -2,11 +2,10 @@
 
 # serverless-tools
 
-**Write plain NestJS — deploy to Yandex Cloud Serverless.**
+**Write a regular application — deploy it to Yandex Cloud Serverless.**
 
-A runtime adapter, API Gateway composition builder, and build/deploy orchestrator
-that never turn NestJS into a separate framework and never make you hand-write
-infrastructure.
+A runtime adapter for NestJS, an API Gateway composition builder, and a
+build/deploy orchestrator.
 
 [Русский](README.md) · [**English**](README.en.md)
 
@@ -23,15 +22,14 @@ infrastructure.
 
 ## What it is
 
-`serverless-tools` is a toolchain for running ordinary applications (NestJS
-first) on Yandex Cloud Serverless. Your application stays a regular NestJS app
-with all the usual building blocks — DI, guards, pipes, interceptors, exception
-filters, middleware. Infrastructure is declared in `.ycsf/*.yaml` and generated
-into Terraform.
+`serverless-tools` is a toolchain for running ordinary applications on Yandex
+Cloud Serverless. Your application keeps working as usual. For example, in
+NestJS the familiar DI, guards, pipes, interceptors, exception filters, and
+middleware stay in place. Infrastructure is declared in `.ycsf/*.yaml` and
+generated into Terraform.
 
-Four responsibilities are strictly separated:
-
-> **A owns runtime, B owns API composition, C owns orchestration/build, Terraform owns provisioning/deployment.**
+Layers stay separate: code execution, API composition, build orchestration, and
+resource provisioning each do their own job.
 
 ## Features
 
@@ -52,46 +50,46 @@ Four responsibilities are strictly separated:
 
 ## Architecture
 
-**Runtime (Project A):** a request flows through API Gateway and a Cloud Function
-into the runtime adapter, while the application stays NestJS.
+**Runtime.** A request flows through API Gateway and a Cloud Function into the
+runtime adapter, while the application stays NestJS.
 
 ```mermaid
 flowchart LR
   Client([Client]) -->|HTTPS| APIGW[Yandex API Gateway]
   APIGW --> Fn[Yandex Cloud Function]
   MQ[(Yandex Message Queue)] -->|Trigger| Fn
-  Fn --> A["A · @ycforge/nestjs-connector"]
-  A --> App[NestJS application]
+  Fn --> Connector["@ycforge/nestjs-connector"]
+  Connector --> App[NestJS application]
 ```
 
-**Build & deploy (Project B + C):** composer builds the API specification, pilot
-orchestrates builders and materializers, and hands the result to Terraform.
+**Build & deploy.** Composer builds the API specification, pilot orchestrates
+builders and materializers, and hands the result to Terraform.
 
 ```mermaid
 flowchart LR
-  Src([Sources]) --> B["B · @ycforge/composer"]
-  Src --> C["C · @ycforge/pilot — CLI ycsf"]
-  B --> C
-  C --> Builders[builders-core]
-  C --> Materializers[materializers-core]
+  Src([Sources]) --> Composer["@ycforge/composer"]
+  Src --> Pilot["@ycforge/pilot — CLI ycsf"]
+  Composer --> Pilot
+  Pilot --> Builders[builders-core]
+  Pilot --> Materializers[materializers-core]
   Materializers --> TF[Terraform]
   TF --> Cloud([Yandex Cloud])
 ```
 
-| Project | Role | Responsibility |
-|---------|------|----------------|
-| **A** | Runtime | Runs NestJS inside a Cloud Function, adapts HTTP/MQ invocations |
-| **B** | API composition | Composes OpenAPI and the API Gateway specification from multiple apps |
-| **C** | Orchestration / build | Runs builds, collects artifacts, generates Terraform |
-| **Terraform** | Provisioning / deployment | Creates and changes resources in Yandex Cloud |
+| Layer | Responsibility |
+|-------|----------------|
+| Runtime | Runs the application inside a Cloud Function, adapts HTTP/MQ invocations |
+| API composition | Composes OpenAPI and the API Gateway specification from multiple apps |
+| Build orchestration | Runs builds, collects artifacts, generates Terraform |
+| Terraform | Creates and changes resources in Yandex Cloud |
 
 ## Packages
 
 | Package | Role | Purpose |
 |---------|------|---------|
-| [`@ycforge/nestjs-connector`](https://www.npmjs.com/package/@ycforge/nestjs-connector) | A · runtime | NestJS ↔ Yandex Cloud Functions runtime/transport adapter (HTTP + Message Queue) |
-| [`@ycforge/composer`](https://www.npmjs.com/package/@ycforge/composer) | B · composition | OpenAPI extraction and single API Gateway specification composition; CLI `ycsf-api` |
-| [`@ycforge/pilot`](https://www.npmjs.com/package/@ycforge/pilot) | C · orchestrator | Build/deploy orchestrator; CLI `ycsf`; plugin contracts `@ycforge/pilot/contracts` |
+| [`@ycforge/nestjs-connector`](https://www.npmjs.com/package/@ycforge/nestjs-connector) | Runtime | NestJS ↔ Yandex Cloud Functions runtime/transport adapter (HTTP + Message Queue) |
+| [`@ycforge/composer`](https://www.npmjs.com/package/@ycforge/composer) | API composition | OpenAPI extraction and single API Gateway specification composition; CLI `ycsf-api` |
+| [`@ycforge/pilot`](https://www.npmjs.com/package/@ycforge/pilot) | Build/deploy orchestration | Build/deploy orchestrator; CLI `ycsf`; plugin contracts `@ycforge/pilot/contracts` |
 | [`@ycforge/builders-core`](https://www.npmjs.com/package/@ycforge/builders-core) | Build plugins | Builders: `nestjs-function`, `docker`, `vite` |
 | [`@ycforge/materializers-core`](https://www.npmjs.com/package/@ycforge/materializers-core) | Terraform plugins | Materializers: `yandex-function`, `yandex-serverless-container`, `yandex-api-gateway`, `yandex-message-queue`, `yandex-storage-bucket` |
 | [`@ycforge/serverless-dev-tools`](https://www.npmjs.com/package/@ycforge/serverless-dev-tools) | Local development | Dev server with API Gateway v2 emulation |
@@ -241,7 +239,7 @@ Useful flags: `-p, --project-dir <path>`, `--target <app>`, `--no-cache`,
 
 A full end-to-end example lives in
 [`examples/reference-project`](examples/reference-project): four applications
-(`user_service`, `analytics`, `frontend`, `openapi`) going from NestJS sources
+(`user_service`, `analytics`, `frontend`, `openapi`) going from source
 to a validated `terraform plan`.
 
 ```bash
