@@ -234,4 +234,38 @@ describe("normalized execution context builder", () => {
       expect(Object.keys(serialized)).not.toContain("uberTraceId");
     });
   });
+
+  describe("tolerant mode (local invocation / tests)", () => {
+    it("synthesizes missing required fields instead of throwing", () => {
+      const executionContext = buildYandexExecutionContext(RAW_EVENT_FIXTURE, undefined, {
+        tolerant: true,
+      });
+
+      expect(executionContext.awsRequestId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(executionContext.trace_id).toBe(executionContext.awsRequestId);
+      expect(executionContext.functionName).toBe("local-function");
+      expect(executionContext.functionVersion).toBe("$LATEST");
+      expect(executionContext.functionFolderId).toBe("local-folder");
+      expect(executionContext.memoryLimitInMB).toBe("1024");
+      expect(executionContext.logGroupName).toBe("");
+      expect(executionContext.deadlineMs).toBeGreaterThan(Date.now());
+    });
+
+    it("replaces mistyped fields rather than failing", () => {
+      const malformed = { ...OBSERVED_CONTEXT, memoryLimitInMB: 1024, deadlineMs: "nope" };
+
+      const executionContext = buildYandexExecutionContext(RAW_EVENT_FIXTURE, malformed, {
+        tolerant: true,
+      });
+
+      expect(executionContext.memoryLimitInMB).toBe("1024");
+      expect(typeof executionContext.deadlineMs).toBe("number");
+    });
+
+    it("stays strict by default", () => {
+      expect(() => buildYandexExecutionContext(RAW_EVENT_FIXTURE, undefined)).toThrow(
+        /runtime context: expected an object/,
+      );
+    });
+  });
 });

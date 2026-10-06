@@ -63,7 +63,7 @@ describe("npm package distribution contract", () => {
   });
 
   it("ships only built output", () => {
-    expect(packageJson.files).toEqual(["dist"]);
+    expect(packageJson.files).toEqual(["dist", "README.md"]);
     expect(packageJson.sideEffects).toBe(false);
   });
 
@@ -74,6 +74,12 @@ describe("npm package distribution contract", () => {
       "@nestjs/common": "^11.0.0",
       "@nestjs/core": "^11.0.0",
       "@nestjs/swagger": "^11.0.0",
+    });
+  });
+
+  it("marks @nestjs/swagger an optional peer (no swagger required unless OpenAPI is emitted)", () => {
+    expect(packageJson.peerDependenciesMeta).toEqual({
+      "@nestjs/swagger": { optional: true },
     });
   });
 

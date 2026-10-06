@@ -32,6 +32,10 @@ export type { ConnectorErrorCode, ConnectorErrorDetail } from "./core/errors";
 
 // HTTP / API Gateway v2 transport contracts.
 export type { RawHttpApiGatewayV2Event, RawHttpApiGatewayV2RequestContext } from "./http/raw-event";
+export {
+  YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION,
+  type YandexApiGatewayPayloadFormatVersion,
+} from "./http/raw-event";
 export type { NormalizedHttpRequest } from "./http/normalized-request";
 export type { YandexFunctionHttpResponse } from "./http/response";
 

@@ -16,6 +16,7 @@ import type { BuilderError } from '../diagnostics.js';
 import { collectDir } from '../zip/collect.js';
 import { zipEntries } from '../zip/writer.js';
 import type { ParsedNestjsConfig } from './config.js';
+import { createDecoratorMetadataPlugin } from './swc-plugin.js';
 
 export interface BundleFunctionOptions extends ParsedNestjsConfig {
   readonly sourcePath: string;
@@ -97,7 +98,7 @@ export async function bundleFunction(options: BundleFunctionOptions): Promise<Fu
         format: 'cjs',
         target,
         external: [...external],
-        plugins: [stubPlugin],
+        plugins: [createDecoratorMetadataPlugin(), stubPlugin],
         outfile: join(staging, `${moduleName}.js`),
         write: true,
         logLevel: 'silent',

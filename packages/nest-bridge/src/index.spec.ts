@@ -18,6 +18,7 @@ describe("public API surface", () => {
       "QueueHandler",
       "QueueMessage",
       "RequireAuth",
+      "YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION",
       "YandexContext",
       "YandexLogger",
       "createYandexHandler",
@@ -28,5 +29,9 @@ describe("public API surface", () => {
     // The decorator must stay callable and the normalized message contract
     // importable under the same pinned name (docs/ARCHITECTURE.md section 7).
     expect(typeof publicApi.QueueMessage).toBe("function");
+  });
+
+  it("pins the API Gateway payload_format_version the v2 frame requires", () => {
+    expect(publicApi.YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION).toBe("2.0");
   });
 });

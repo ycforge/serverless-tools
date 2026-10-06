@@ -33,7 +33,8 @@
   },
   "files": [
     "dist",
-    "runner"
+    "runner",
+    "README.md"
   ],
   "sideEffects": false,
   "bin": {

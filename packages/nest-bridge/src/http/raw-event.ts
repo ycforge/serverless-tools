@@ -11,6 +11,22 @@
  * property checking for these boundary types only.
  */
 
+/**
+ * Wire value of the API Gateway integration's `payload_format_version` that
+ * produces {@link RawHttpApiGatewayV2Event}.
+ *
+ * The function's API Gateway integration MUST be configured with
+ * `payload_format_version: "2.0"` (or the ALB payload-format-2.0 variant) for
+ * the v2 frame below; the legacy `cloud_functions` `0.1` frame delivers the
+ * `path` as the route template (e.g. `/api/{proxy+}`) and is a distinct event
+ * shape handled by the v1 transport instead.
+ */
+export const YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION = "2.0" as const;
+
+/** Literal type of {@link YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION}. */
+export type YandexApiGatewayPayloadFormatVersion =
+  typeof YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION;
+
 /** Gateway-injected request metadata block of the observed event. */
 export interface RawHttpApiGatewayV2RequestContext {
   authorizer: Record<string, unknown>;
@@ -34,7 +50,7 @@ export interface RawHttpApiGatewayV2RequestContext {
 }
 
 export interface RawHttpApiGatewayV2Event {
-  version: "2.0";
+  version: YandexApiGatewayPayloadFormatVersion;
   rawPath: string;
   rawQueryString: string;
 

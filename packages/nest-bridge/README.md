@@ -133,6 +133,23 @@ Its IAM token (`executionContext.token`) is a secret: automatic serialization
 (`JSON.stringify`) redacts it to `REDACTED_TOKEN` and excludes the raw
 payloads, so accidental logging cannot leak credentials.
 
+#### Local invocation and tests
+
+The platform always supplies the full runtime context, and by default a missing
+or mistyped observed field fails the invocation loudly. When invoking the
+handler directly (local runs, unit/integration tests) you can opt into a
+tolerant mode that synthesizes the absent fields instead:
+
+```ts
+const handler = createYandexHandler(AppModule, { runtimeContext: "tolerant" });
+await handler(event, {}); // awsRequestId generated, identity fields defaulted
+```
+
+Tolerant mode is for local/test use only — production keeps the default
+`strict` behavior. The local dev server
+(`@ycforge/serverless-dev-tools`) always synthesizes a complete context and
+does not need it.
+
 The built-in registry ships with the HTTP / API Gateway transport (#5, #6,
 spec 036): payload-format-`2.0`/ALB events (`version: "2.0"`) **and** the API
 Gateway `cloud_functions` v1 frame (`httpMethod`/`path`, no `version`) are
@@ -154,6 +171,16 @@ header values (e.g. multiple `Set-Cookie`) surface under the optional
 Gateway payload-format-2.0 response path: the gateway accepts it, joins
 repeated ordinary headers with commas on the wire, and emits repeated
 `Set-Cookie` values as separate header lines (see `src/http/response.ts`).
+
+> **Gateway integration requirement.** The v2/ALB frame is produced only when
+> the function's API Gateway integration is configured with
+> `payload_format_version: "2.0"` — exported as
+> `YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION`. The legacy `cloud_functions`
+> `0.1` default instead delivers the v1 frame above, whose `path` is the route
+> template (e.g. `/api/{proxy+}`); that frame is claimed by the v1 branch, but
+> an integration left on `0.1` while expecting v2 semantics surfaces as
+> `404 Cannot GET /api/{proxy+}`.
+
 Message Queue deliveries are detected by the built-in registry as well
 (#7): events carrying the observed `messages[]` trigger shape are
 structurally validated, normalized into a batch of typed message envelopes

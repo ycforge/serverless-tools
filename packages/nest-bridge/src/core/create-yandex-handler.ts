@@ -21,7 +21,7 @@ import type {
   TransportInvocation,
   YandexCloudFunctionHandler,
 } from "./transport";
-import type { CreateYandexHandlerOptions } from "./handler-options";
+import type { CreateYandexHandlerOptions, RuntimeContextMode } from "./handler-options";
 import type { ConnectorBootstrapOptions } from "../auth/connector-bootstrap-options";
 import { createConnectorBootstrapModule } from "../auth/bootstrap-module";
 import { GlobalAuthGuard } from "../auth/global-auth.guard";
@@ -73,7 +73,7 @@ export function createYandexHandler(
     appModule,
     createBuiltinTransports(options),
     { defaultAuthGuard: options?.defaultAuthGuard ?? null },
-    { logger: options?.logger },
+    { logger: options?.logger, runtimeContext: options?.runtimeContext },
   );
 }
 
@@ -86,7 +86,7 @@ export function createInvocationRuntime(
   appModule: Type<unknown>,
   transports: readonly TransportAdapter[],
   bootstrapOptions: ConnectorBootstrapOptions = {},
-  runtimeOptions: { readonly logger?: LoggerService | false } = {},
+  runtimeOptions: { readonly logger?: LoggerService | false; readonly runtimeContext?: RuntimeContextMode } = {},
 ): ClosableYandexCloudFunctionHandler {
   const loggerOption = runtimeOptions.logger;
   // Shared initialization promise in the factory closure: one cache per
@@ -176,7 +176,9 @@ export function createInvocationRuntime(
     // Queue executions (issue #4).
     let executionContext: YandexExecutionContext;
     try {
-      executionContext = buildYandexExecutionContext(rawEvent, rawContext);
+      executionContext = buildYandexExecutionContext(rawEvent, rawContext, {
+        tolerant: runtimeOptions.runtimeContext === "tolerant",
+      });
     } catch (error) {
       logger.error({ trace_id: tolerantTraceId, error });
       throw error;

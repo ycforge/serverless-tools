@@ -1,5 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import 'reflect-metadata';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { BuildContext, FunctionArtifactValue } from '../../src/types.js';
@@ -113,6 +114,85 @@ describe('nestjs-function builder (US1, US5, SC-001/003/006)', () => {
     // self-contained-only, declared externals are the deployment's concern.
     expect(unzipList(artifact.archivePath)).toEqual(['main.js']);
     unzipTest(artifact.archivePath);
+  });
+
+  it('stubs Nest optional integrations and class-transformer storage without manual aliases/externals (ESM/CJS)', async () => {
+    const dir = makeTempDir('bc-nestjs-optional-');
+    dirs.push(dir);
+    writeProject(dir.root, {
+      'package.json': JSON.stringify({ name: 'user_service', version: '0.0.0' }, null, 2),
+      'node_modules/fake-nest/package.json': JSON.stringify(
+        { name: 'fake-nest', version: '0.0.0', main: 'index.js' },
+        null,
+        2,
+      ),
+      'node_modules/fake-nest/index.js': [
+        "module.exports = {",
+        "  microservices: typeof require('@nestjs/microservices'),",
+        "  websockets: typeof require('@nestjs/websockets'),",
+        "  storage: typeof require('class-transformer/storage'),",
+        "  validator: typeof require('class-validator'),",
+        '};',
+      ].join('\n'),
+      'src/main.ts': [
+        "import fake from 'fake-nest';",
+        'export function handler(): string { return JSON.stringify(fake); }',
+      ].join('\n'),
+    });
+    const outputDir = join(dir.root, 'build-out');
+    const artifact = (await nestjsFunctionBuilder.build(ctx(dir.root, { outputDir })))
+      .value as FunctionArtifactValue;
+    const bundle = unzipEntry(artifact.archivePath, 'main.js').toString('utf8');
+
+    // The optional Nest integrations are not installed: the builder substitutes
+    // empty stubs so esbuild never has to resolve them (no `--alias`/`--external`
+    // needed). Executing the bundle must yield `"object"` for each stub.
+    expect(bundle).not.toContain('require("@nestjs/microservices")');
+    expect(bundle).not.toContain('require("@nestjs/websockets")');
+    expect(bundle).not.toContain('require("class-transformer/storage")');
+    expect(bundle).not.toContain('require("class-validator")');
+    const mod: { exports: Record<string, unknown> } = { exports: {} };
+    new Function('module', 'exports', 'require', bundle)(mod, mod.exports, require);
+    expect(JSON.parse((mod.exports.handler as () => string)())).toEqual({
+      microservices: 'object',
+      websockets: 'object',
+      storage: 'object',
+      validator: 'object',
+    });
+  });
+
+  it('emits design:paramtypes so Nest constructor DI survives bundling', async () => {
+    const dir = makeTempDir('bc-nestjs-di-');
+    dirs.push(dir);
+    writeProject(dir.root, {
+      'package.json': JSON.stringify({ name: 'user_service', version: '0.0.0' }, null, 2),
+      'src/main.ts': [
+        'function Injectable(): ClassDecorator { return () => {}; }',
+        'class Dep { readonly kind = "dep"; }',
+        '@Injectable()',
+        'class Service {',
+        '  constructor(public readonly dep: Dep) {}',
+        '}',
+        'export function handler(): unknown {',
+        "  return Reflect.getMetadata('design:paramtypes', Service);",
+        '}',
+      ].join('\n'),
+    });
+    const outputDir = join(dir.root, 'build-out');
+    const artifact = (await nestjsFunctionBuilder.build(ctx(dir.root, { outputDir })))
+      .value as FunctionArtifactValue;
+    const bundle = unzipEntry(artifact.archivePath, 'main.js').toString('utf8');
+
+    // esbuild cannot emit decorator metadata; the SWC pre-transform must, or
+    // Nest DI resolves constructor tokens to `undefined`.
+    expect(bundle).toContain('design:paramtypes');
+
+    const mod: { exports: Record<string, unknown> } = { exports: {} };
+    new Function('module', 'exports', 'require', bundle)(mod, mod.exports, require);
+    const paramTypes = (mod.exports.handler as () => unknown[])();
+    expect(Array.isArray(paramTypes)).toBe(true);
+    expect(paramTypes).toHaveLength(1);
+    expect((paramTypes[0] as { name: string }).name).toBe('Dep');
   });
 
   it('hoisted external: resolvable from a parent node_modules, still not vendored (Sc2/hoisting)', async () => {

@@ -4,6 +4,49 @@ Core builder plugins for the serverless-tools ecosystem (spec 018): `nestjs-func
 (bundling), `docker`, `vite`. Registered via the spec-013 explicit mapping under
 subpath specifiers `@ycforge/builders-core/{nestjs-function,docker,vite}`.
 
+## nestjs-function builder
+
+App-level `build_config`:
+
+```yaml
+# .ycsf/<appId>/build_config.yaml
+build_config:
+  entry: src/main.ts      # default: src/main.ts
+  runtime: nodejs22       # nodejs20 | nodejs22, default nodejs20
+  external: []            # bare runtime requires kept out of the bundle
+  out_filename: function.zip
+```
+
+The builder bundles the entry and its local imports into one self-contained CJS
+file and zips it into the app output directory, returning
+`{ type: 'ycforge:function', value: { archivePath, entryPoint } }`.
+
+### Optional Nest integrations need no manual aliases/externals
+
+Nest loads optional integrations with runtime `require()` guards
+(`@nestjs/microservices`, `@nestjs/websockets`, `@nestjs/platform-express`,
+`class-transformer/storage`, `class-validator`). esbuild would otherwise try to
+resolve them (and their own optional transports) and fail. The builder
+substitutes empty stubs for these imports automatically, so a plain NestJS
+function bundles without `--alias`/`--external` flags:
+
+```bash
+ycsf build   # no esbuild aliases required
+```
+
+Declared `external` entries are the opposite: they stay a bare `require` in the
+bundle and are the deployment's responsibility, never vendored.
+
+### NestJS constructor DI (decorator metadata)
+
+esbuild implements TypeScript decorators but **not** `emitDecoratorMetadata`,
+which needs type information — bundling a NestJS app with esbuild alone strips
+`design:paramtypes` and breaks constructor injection. The builder therefore
+transpiles every `.ts`/`.tsx` file through SWC (`legacyDecorator` +
+`decoratorMetadata`) before esbuild bundles it, so class-token DI keeps working
+exactly as in a `tsc`-compiled app. `@swc/core` is a runtime dependency of this
+package for that reason.
+
 ## docker builder
 
 App-level `build_config` (versionless, spec 011):

@@ -55,6 +55,17 @@ export interface QueueTransportOptions {
 }
 
 /**
+ * How the connector treats the platform-provided runtime context.
+ *
+ * - `strict` (default): a missing or mistyped observed field fails the
+ *   invocation loudly — the platform always provides them in production.
+ * - `tolerant`: synthesize missing fields (random `awsRequestId`, static local
+ *   identity placeholders, a short deadline). Intended for local invocation
+ *   and tests; never for production.
+ */
+export type RuntimeContextMode = "strict" | "tolerant";
+
+/**
  * Options accepted by {@link createYandexHandler}.
  *
  * All sections are optional; omitting `queue` selects the documented default
@@ -70,4 +81,9 @@ export interface CreateYandexHandlerOptions extends ConnectorBootstrapOptions {
    * (boundary records included); any `LoggerService` replaces the default.
    */
   readonly logger?: LoggerService | false;
+  /**
+   * Runtime-context strictness (default `strict`). Set `tolerant` for local
+   * invocation or tests that cannot supply the full platform context.
+   */
+  readonly runtimeContext?: RuntimeContextMode;
 }

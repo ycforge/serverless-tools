@@ -1,5 +1,5 @@
 import { applyDecorators, SetMetadata } from "@nestjs/common";
-import { ApiSecurity } from "@nestjs/swagger";
+import { loadApiSecurity } from "./api-security";
 import { AUTH_GUARD_KEY, AUTH_SCHEME_KEY, type AuthGuardType } from "./auth-metadata";
 
 /**
@@ -10,8 +10,9 @@ import { AUTH_GUARD_KEY, AUTH_SCHEME_KEY, type AuthGuardType } from "./auth-meta
  *
  * - Always writes {@link AUTH_SCHEME_KEY} and {@link AUTH_GUARD_KEY} metadata
  *   (read by `GlobalAuthGuard` with method > controller precedence).
- * - For any scheme other than `'public'` also applies `ApiSecurity(scheme)`,
- *   so the generated OpenAPI document carries the security requirement.
+ * - For any scheme other than `'public'` also applies `ApiSecurity(scheme)`
+ *   (when `@nestjs/swagger` is installed — it is an optional peer), so the
+ *   generated OpenAPI document carries the security requirement.
  * - `guard === null` means an explicitly public route: `GlobalAuthGuard`
  *   skips enforcement. A non-public scheme with `guard === null` is allowed
  *   (scheme enforcement then happens at the API Gateway) — scheme and guard
@@ -33,9 +34,10 @@ export function RequireAuth(
       `RequireAuth: scheme must be a non-empty string, received ${typeof scheme === "string" ? '""' : String(scheme)}.`,
     );
   }
+  const apiSecurity = scheme === "public" ? undefined : loadApiSecurity();
   return applyDecorators(
     SetMetadata(AUTH_GUARD_KEY, guard),
     SetMetadata(AUTH_SCHEME_KEY, scheme),
-    scheme === "public" ? () => {} : ApiSecurity(scheme),
+    ...(apiSecurity === undefined ? [] : [apiSecurity(scheme)]),
   );
 }

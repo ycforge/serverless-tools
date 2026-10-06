@@ -4,6 +4,7 @@ import type { YandexFunctionHttpResponse } from "./response";
 import type { NormalizedHttpRequest } from "./normalized-request";
 import { normalizeHttpRequest } from "./normalize-request";
 import type { RawHttpApiGatewayV2Event } from "./raw-event";
+import { YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION } from "./raw-event";
 import { validateHttpApiGatewayV2Event } from "./validate-raw-event";
 import type { YcApiGatewayEvent } from "./yc-apigw-raw-event";
 import { adaptYcApiGatewayEventToV2 } from "./yc-apigw-event-adapter";
@@ -52,7 +53,7 @@ export const httpApiGatewayV2Transport: TransportAdapter<
     }
     const candidate = rawEvent as Record<string, unknown>;
     if (
-      candidate["version"] === "2.0" &&
+      candidate["version"] === YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION &&
       typeof candidate["rawPath"] === "string" &&
       typeof candidate["rawQueryString"] === "string"
     ) {
@@ -86,7 +87,7 @@ export const httpApiGatewayV2Transport: TransportAdapter<
 
 /** Discriminates the claimed frame cheaply inside `invoke`. */
 function isApiGatewayV2Event(event: HttpTransportEvent): event is RawHttpApiGatewayV2Event {
-  return (event as Record<string, unknown>)["version"] === "2.0";
+  return (event as Record<string, unknown>)["version"] === YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION;
 }
 
 /** Shared runtime dispatch for both HTTP frame formats. */

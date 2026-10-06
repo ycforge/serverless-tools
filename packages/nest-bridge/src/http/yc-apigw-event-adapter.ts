@@ -1,4 +1,5 @@
 import type { RawHttpApiGatewayV2Event } from "./raw-event";
+import { YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION } from "./raw-event";
 import type { YcApiGatewayEvent } from "./yc-apigw-raw-event";
 
 /**
@@ -32,7 +33,7 @@ import type { YcApiGatewayEvent } from "./yc-apigw-raw-event";
  */
 export function adaptYcApiGatewayEventToV2(event: YcApiGatewayEvent): RawHttpApiGatewayV2Event {
   return {
-    version: "2.0",
+    version: YANDEX_API_GATEWAY_PAYLOAD_FORMAT_VERSION,
     rawPath: event.path,
     rawQueryString: queryStringFromUrl(event.url) ?? serializeQueryString(event),
     headers: event.headers,

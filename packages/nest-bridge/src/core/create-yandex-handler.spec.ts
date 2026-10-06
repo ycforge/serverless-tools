@@ -634,4 +634,18 @@ describe("invocation-scoped execution context integration", () => {
     expect((failure as Error).message).toContain('expected field "memoryLimitInMB" to be a string');
     expect((failure as Error).message).not.toContain("1024");
   });
+
+  it("synthesizes the runtime context in tolerant mode (local invocation / tests)", async () => {
+    const http = createContextTransport("http", "api-gateway-v2");
+    const runtime = createInvocationRuntime(ContextModule, [http], {}, { runtimeContext: "tolerant" });
+    runtimes.push(runtime);
+
+    const context = (await runtime(HTTP_EVENT, {})) as YandexExecutionContext;
+
+    // No platform context at all: tolerant mode fills the observed fields
+    // instead of failing the invocation.
+    expect(context.awsRequestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(context.functionName).toBe("local-function");
+    expect(context.memoryLimitInMB).toBe("1024");
+  });
 });

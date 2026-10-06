@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { YandexExecutionContext } from "./yandex-execution-context";
 
 /**
@@ -6,6 +7,30 @@ import type { YandexExecutionContext } from "./yandex-execution-context";
  * AGENTS.md section 6.3.
  */
 const REDACTED_TOKEN = "REDACTED_TOKEN";
+
+/**
+ * Options for {@link buildYandexExecutionContext}.
+ */
+export interface BuildYandexExecutionContextOptions {
+  /**
+   * Local/test mode: instead of failing loudly on missing or mistyped runtime
+   * context fields, synthesize the ones the platform would have provided
+   * (`awsRequestId` via `crypto.randomUUID()`, a 15 s deadline, and static
+   * local placeholders for the identity fields). The default (`false`) keeps
+   * the strict, observed-invariant behavior unchanged.
+   */
+  readonly tolerant?: boolean;
+}
+
+/** Static local placeholders used only in tolerant mode. */
+const LOCAL_DEFAULTS = {
+  functionName: "local-function",
+  functionVersion: "$LATEST",
+  functionFolderId: "local-folder",
+  memoryLimitInMB: "1024",
+  logGroupName: "",
+} as const;
+
 
 /**
  * Builds the normalized {@link YandexExecutionContext} from one invocation's
@@ -26,25 +51,32 @@ const REDACTED_TOKEN = "REDACTED_TOKEN";
 export function buildYandexExecutionContext(
   rawEvent: unknown,
   rawContext: unknown,
+  options: BuildYandexExecutionContextOptions = {},
 ): YandexExecutionContext {
-  const source = requireContextObject(rawContext);
+  const tolerant = options.tolerant === true;
+  const source = requireContextObject(rawContext, tolerant);
   const token = readOptionalString(source, "token");
   const uberTraceId = readOptionalString(source, "uberTraceId");
   // trace_id duplicates the observed cross-transport awsRequestId (spec 004,
   // clarify Q1→A): one stable per-invocation id for context, logs and error
-  // envelopes. Always present because awsRequestId is required.
-  const awsRequestId = readRequiredString(source, "awsRequestId");
+  // envelopes. Always present because awsRequestId is required (or synthesized
+  // in tolerant mode).
+  const awsRequestId = readRequiredString(
+    source,
+    "awsRequestId",
+    tolerant ? randomUUID() : undefined,
+  );
 
   const executionContext: YandexExecutionContext = Object.freeze({
     awsRequestId,
     trace_id: awsRequestId,
-    functionName: readRequiredString(source, "functionName"),
-    functionVersion: readRequiredString(source, "functionVersion"),
-    functionFolderId: readRequiredString(source, "functionFolderId"),
+    functionName: readRequiredString(source, "functionName", tolerant ? LOCAL_DEFAULTS.functionName : undefined),
+    functionVersion: readRequiredString(source, "functionVersion", tolerant ? LOCAL_DEFAULTS.functionVersion : undefined),
+    functionFolderId: readRequiredString(source, "functionFolderId", tolerant ? LOCAL_DEFAULTS.functionFolderId : undefined),
     // Observed as string ("1024"); a number must fail loudly, never coerce.
-    memoryLimitInMB: readRequiredString(source, "memoryLimitInMB"),
-    deadlineMs: readRequiredNumber(source, "deadlineMs"),
-    logGroupName: readRequiredString(source, "logGroupName"),
+    memoryLimitInMB: readRequiredString(source, "memoryLimitInMB", tolerant ? LOCAL_DEFAULTS.memoryLimitInMB : undefined),
+    deadlineMs: readRequiredNumber(source, "deadlineMs", tolerant ? Date.now() + 15_000 : undefined),
+    logGroupName: readRequiredString(source, "logGroupName", tolerant ? LOCAL_DEFAULTS.logGroupName : undefined),
     // Optional fields are added only when actually present: absence must stay
     // observable as key absence, not as an undefined-valued property.
     ...(uberTraceId === undefined ? null : { uberTraceId }),
@@ -79,8 +111,11 @@ export function buildYandexExecutionContext(
   return executionContext;
 }
 
-function requireContextObject(rawContext: unknown): Record<string, unknown> {
+function requireContextObject(rawContext: unknown, tolerant = false): Record<string, unknown> {
   if (typeof rawContext !== "object" || rawContext === null) {
+    if (tolerant) {
+      return {};
+    }
     throw new Error("invalid Yandex Cloud Functions runtime context: expected an object");
   }
   return rawContext as Record<string, unknown>;
@@ -88,26 +123,42 @@ function requireContextObject(rawContext: unknown): Record<string, unknown> {
 
 /**
  * Value-free failure for a violated observed invariant: names only the field
- * and expected type — never the offending value (AGENTS.md section 6.2).
+ * and expected type — never the offending value (AGENTS.md section 6.2). When
+ * `fallback` is provided (tolerant/local mode) a missing or mistyped value is
+ * replaced instead of failing.
  */
-function readRequiredString(source: Record<string, unknown>, field: string): string {
+function readRequiredString(
+  source: Record<string, unknown>,
+  field: string,
+  fallback?: string,
+): string {
   const value = source[field];
-  if (typeof value !== "string") {
-    throw new Error(
-      `invalid Yandex Cloud Functions runtime context: expected field "${field}" to be a string`,
-    );
+  if (typeof value === "string") {
+    return value;
   }
-  return value;
+  if (fallback !== undefined) {
+    return fallback;
+  }
+  throw new Error(
+    `invalid Yandex Cloud Functions runtime context: expected field "${field}" to be a string`,
+  );
 }
 
-function readRequiredNumber(source: Record<string, unknown>, field: string): number {
+function readRequiredNumber(
+  source: Record<string, unknown>,
+  field: string,
+  fallback?: number,
+): number {
   const value = source[field];
-  if (typeof value !== "number") {
-    throw new Error(
-      `invalid Yandex Cloud Functions runtime context: expected field "${field}" to be a number`,
-    );
+  if (typeof value === "number") {
+    return value;
   }
-  return value;
+  if (fallback !== undefined) {
+    return fallback;
+  }
+  throw new Error(
+    `invalid Yandex Cloud Functions runtime context: expected field "${field}" to be a number`,
+  );
 }
 
 function readOptionalString(source: Record<string, unknown>, field: string): string | undefined {
